@@ -9,13 +9,18 @@
     "dev:ui": "vite",
     "dev:server": "tsx watch server/api.ts",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:ui\"",
-    "build": "tsc && vite build",
+    "build": "prisma generate && tsc && vite build",
     "lint": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:push": "prisma db push",
+    "prisma:migrate": "prisma migrate dev",
     "start": "node dist-server/api.js"
   },
   "dependencies": {
+    "@prisma/client": "^6.4.1",
     "better-sqlite3": "^11.8.1",
     "cors": "^2.8.5",
+    "dotenv": "^18.0.8",
     "express": "^4.21.2",
     "lucide-react": "^0.475.0",
     "react": "^18.3.1",
@@ -33,9 +38,15 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",
     "postcss": "^8.5.2",
+    "prisma": "^6.4.1",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true
   }
 }

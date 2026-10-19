@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+dist-electron/
+dist-server/
+
+# SQLite WAL & temporary files
+data/*.db-wal
+data/*.db-shm
+
+# Local backups
+backups/*.db
+
+# Local environment variables
+.env
+.env.local
+
+# Operating System files
+.DS_Store
+Thumbs.db

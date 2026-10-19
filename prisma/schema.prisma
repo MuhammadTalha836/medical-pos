@@ -1,0 +1,367 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  displayName String   @map("display_name")
+  description String?
+  isSystem    Int      @default(0) @map("is_system")
+  permissions String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("roles")
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  username      String         @unique
+  password      String
+  fullName      String         @map("full_name")
+  role          String         @default("cashier")
+  status        String         @default("active")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  sales         Sale[]
+  saleReturns   SaleReturn[]
+  purchases     Purchase[]
+  dailyClosings DailyClosing[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Company {
+  id              Int              @id @default(autoincrement())
+  code            String           @unique
+  name            String
+  contactPerson   String?          @map("contact_person")
+  phone           String?
+  email           String?
+  address         String?
+  status          String           @default("active")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  products        Product[]
+  purchases       Purchase[]
+  purchaseReturns PurchaseReturn[]
+
+  @@map("companies")
+}
+
+model Product {
+  id                  Int                  @id @default(autoincrement())
+  companyId           Int?                 @map("company_id")
+  cCode               String               @map("c_code")
+  pCode               String               @unique @map("p_code")
+  barcode             String?
+  name                String
+  genericName         String?              @map("generic_name")
+  unitType            String               @default("Tablets") @map("unit_type")
+  packing             Int                  @default(1)
+  boxTradePrice       Float                @default(0.0) @map("box_trade_price")
+  boxRetailPrice      Float                @default(0.0) @map("box_retail_price")
+  unitTradePrice      Float                @default(0.0) @map("unit_trade_price")
+  unitRetailPrice     Float                @default(0.0) @map("unit_retail_price")
+  defaultDiscountPct  Float                @default(0.0) @map("default_discount_pct")
+  locationRack        String?              @map("location_rack")
+  stockBoxes          Int                  @default(0) @map("stock_boxes")
+  stockLoose          Int                  @default(0) @map("stock_loose")
+  minStockAlert       Int                  @default(10) @map("min_stock_alert")
+  status              String               @default("active")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
+
+  company             Company?             @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  batches             ProductBatch[]
+  saleItems           SaleItem[]
+  saleReturnItems     SaleReturnItem[]
+  purchaseItems       PurchaseItem[]
+  purchaseReturnItems PurchaseReturnItem[]
+
+  @@index([cCode], name: "idx_products_c_code")
+  @@index([pCode], name: "idx_products_p_code")
+  @@index([barcode], name: "idx_products_barcode")
+  @@index([name], name: "idx_products_name")
+  @@map("products")
+}
+
+model ProductBatch {
+  id            Int        @id @default(autoincrement())
+  productId     Int        @map("product_id")
+  batchNo       String     @map("batch_no")
+  expiryDate    String     @map("expiry_date")
+  purchaseCost  Float      @default(0.0) @map("purchase_cost")
+  retailPrice   Float      @default(0.0) @map("retail_price")
+  quantityBoxes Int        @default(0) @map("quantity_boxes")
+  quantityLoose Int        @default(0) @map("quantity_loose")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  product       Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  saleItems     SaleItem[]
+
+  @@index([expiryDate], name: "idx_batches_expiry")
+  @@map("product_batches")
+}
+
+model Customer {
+  id             Int               @id @default(autoincrement())
+  name           String
+  phone          String?
+  address        String?
+  creditLimit    Float             @default(0.0) @map("credit_limit")
+  currentBalance Float             @default(0.0) @map("current_balance")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  payments       CustomerPayment[]
+  sales          Sale[]
+
+  @@map("customers")
+}
+
+model CustomerPayment {
+  id              Int      @id @default(autoincrement())
+  customerId      Int      @map("customer_id")
+  amount          Float
+  paymentMethod   String   @default("cash") @map("payment_method")
+  notes           String?
+  previousBalance Float    @map("previous_balance")
+  newBalance      Float    @map("new_balance")
+  userName        String?  @map("user_name")
+  paymentDate     DateTime @default(now()) @map("payment_date")
+
+  customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_payments")
+}
+
+model Sale {
+  id                Int          @id @default(autoincrement())
+  invoiceNo         String       @unique @map("invoice_no")
+  customerId        Int?         @map("customer_id")
+  customerName      String?      @default("Counter Customer") @map("customer_name")
+  customerPhone     String?      @map("customer_phone")
+  userId            Int?         @map("user_id")
+  userName          String?      @map("user_name")
+  saleDate          DateTime     @default(now()) @map("sale_date")
+  totalGross        Float        @default(0.0) @map("total_gross")
+  totalItemDiscount Float        @default(0.0) @map("total_item_discount")
+  billDiscountPct   Float        @default(0.0) @map("bill_discount_pct")
+  billDiscountAmt   Float        @default(0.0) @map("bill_discount_amt")
+  netTotal          Float        @default(0.0) @map("net_total")
+  cashTendered      Float        @default(0.0) @map("cash_tendered")
+  changeDue         Float        @default(0.0) @map("change_due")
+  paymentType       String       @default("Cash") @map("payment_type")
+  status            String       @default("completed")
+  notes             String?
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  customer          Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  user              User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items             SaleItem[]
+  returns           SaleReturn[]
+
+  @@index([invoiceNo], name: "idx_sales_invoice_no")
+  @@index([saleDate], name: "idx_sales_date")
+  @@map("sales")
+}
+
+model SaleItem {
+  id             Int           @id @default(autoincrement())
+  saleId         Int           @map("sale_id")
+  productId      Int           @map("product_id")
+  cCode          String        @map("c_code")
+  pCode          String        @map("p_code")
+  productName    String        @map("product_name")
+  unitType       String        @map("unit_type")
+  locationRack   String?       @map("location_rack")
+  isLoose        Int           @default(0) @map("is_loose")
+  quantity       Float
+  unitPrice      Float         @map("unit_price")
+  unitCost       Float         @map("unit_cost")
+  grossAmount    Float         @map("gross_amount")
+  discountPct    Float         @default(0.0) @map("discount_pct")
+  discountAmount Float         @default(0.0) @map("discount_amount")
+  netAmount      Float         @map("net_amount")
+  batchId        Int?          @map("batch_id")
+
+  sale           Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product        Product       @relation(fields: [productId], references: [id])
+  batch          ProductBatch? @relation(fields: [batchId], references: [id])
+
+  @@map("sale_items")
+}
+
+model SaleReturn {
+  id                Int              @id @default(autoincrement())
+  returnNo          String           @unique @map("return_no")
+  saleId            Int?             @map("sale_id")
+  originalInvoiceNo String?          @map("original_invoice_no")
+  customerName      String?          @map("customer_name")
+  refundAmount      Float            @default(0.0) @map("refund_amount")
+  reason            String?
+  userId            Int?             @map("user_id")
+  userName          String?          @map("user_name")
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  sale              Sale?            @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items             SaleReturnItem[]
+
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id              Int        @id @default(autoincrement())
+  saleReturnId    Int        @map("sale_return_id")
+  productId       Int        @map("product_id")
+  productName     String     @map("product_name")
+  isLoose         Int        @default(0) @map("is_loose")
+  quantity        Float
+  unitRefundPrice Float      @map("unit_refund_price")
+  totalRefund     Float      @map("total_refund")
+
+  saleReturn      SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  product         Product    @relation(fields: [productId], references: [id])
+
+  @@map("sale_return_items")
+}
+
+model Purchase {
+  id                Int              @id @default(autoincrement())
+  invoiceNo         String           @unique @map("invoice_no")
+  supplierInvoiceNo String?          @map("supplier_invoice_no")
+  companyId         Int              @map("company_id")
+  companyName       String           @map("company_name")
+  purchaseDate      String           @map("purchase_date")
+  totalGross        Float            @default(0.0) @map("total_gross")
+  discountAmount    Float            @default(0.0) @map("discount_amount")
+  taxAmount         Float            @default(0.0) @map("tax_amount")
+  netTotal          Float            @default(0.0) @map("net_total")
+  paymentStatus     String           @default("Paid") @map("payment_status")
+  paidAmount        Float            @default(0.0) @map("paid_amount")
+  userId            Int?             @map("user_id")
+  notes             String?
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  company           Company          @relation(fields: [companyId], references: [id])
+  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items             PurchaseItem[]
+  returns           PurchaseReturn[]
+
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id             Int      @id @default(autoincrement())
+  purchaseId     Int      @map("purchase_id")
+  productId      Int      @map("product_id")
+  productName    String   @map("product_name")
+  batchNo        String   @map("batch_no")
+  expiryDate     String   @map("expiry_date")
+  quantityBoxes  Int      @map("quantity_boxes")
+  bonusBoxes     Int      @default(0) @map("bonus_boxes")
+  boxCostPrice   Float    @map("box_cost_price")
+  boxRetailPrice Float    @map("box_retail_price")
+  discountPct    Float    @default(0.0) @map("discount_pct")
+  totalCost      Float    @map("total_cost")
+
+  purchase       Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product        Product  @relation(fields: [productId], references: [id])
+
+  @@map("purchase_items")
+}
+
+model PurchaseReturn {
+  id          Int                  @id @default(autoincrement())
+  returnNo    String               @unique @map("return_no")
+  purchaseId  Int?                 @map("purchase_id")
+  companyId   Int                  @map("company_id")
+  companyName String               @map("company_name")
+  returnDate  String               @map("return_date")
+  totalRefund Float                @default(0.0) @map("total_refund")
+  reason      String?
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  purchase    Purchase?            @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  company     Company              @relation(fields: [companyId], references: [id])
+  items       PurchaseReturnItem[]
+
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnItem {
+  id               Int            @id @default(autoincrement())
+  purchaseReturnId Int            @map("purchase_return_id")
+  productId        Int            @map("product_id")
+  quantityBoxes    Int            @map("quantity_boxes")
+  boxCostPrice     Float          @map("box_cost_price")
+  totalRefund      Float          @map("total_refund")
+
+  purchaseReturn   PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  product          Product        @relation(fields: [productId], references: [id])
+
+  @@map("purchase_return_items")
+}
+
+model DailyClosing {
+  id                 Int       @id @default(autoincrement())
+  closingDate        String    @unique @map("closing_date")
+  openingTime        DateTime  @map("opening_time")
+  closingTime        DateTime? @map("closing_time")
+  userId             Int?      @map("user_id")
+  userName           String?   @map("user_name")
+  openingCash        Float     @default(0.0) @map("opening_cash")
+  totalSalesCash     Float     @default(0.0) @map("total_sales_cash")
+  totalSalesCard     Float     @default(0.0) @map("total_sales_card")
+  totalSalesCredit   Float     @default(0.0) @map("total_sales_credit")
+  totalReturns       Float     @default(0.0) @map("total_returns")
+  totalPurchasesPaid Float     @default(0.0) @map("total_purchases_paid")
+  expensesTotal      Float     @default(0.0) @map("expenses_total")
+  expectedCash       Float     @default(0.0) @map("expected_cash")
+  actualCash         Float     @default(0.0) @map("actual_cash")
+  difference         Float     @default(0.0) @map("difference")
+  notes              String?
+  isClosed           Int       @default(0) @map("is_closed")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  user               User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("daily_closings")
+}
+
+model SystemSetting {
+  key   String @id
+  value String
+
+  @@map("system_settings")
+}
+
+model BackupHistory {
+  id             Int      @id @default(autoincrement())
+  backupFilename String   @map("backup_filename")
+  backupPath     String   @map("backup_path")
+  backupType     String   @map("backup_type")
+  fileSizeBytes  Int      @map("file_size_bytes")
+  status         String   @default("success")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("backup_history")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  module    String
+  details   String?
+  userId    Int?     @map("user_id")
+  userName  String?  @map("user_name")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}

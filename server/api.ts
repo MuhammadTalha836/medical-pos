@@ -1,6 +1,9 @@
+import 'dotenv/config';
+
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { db } from './database/db';
+import { Prisma } from '@prisma/client';
+import { prisma, initPrisma } from './database/prisma';
 import {
   createBackup,
   getBackupList,
@@ -15,6 +18,119 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Declare toJSON for BigInt to enable seamless JSON serialization for SQLite aggregations
+declare global {
+  interface BigInt {
+    toJSON(): number;
+  }
+}
+
+BigInt.prototype.toJSON = function (): number {
+  return Number(this);
+};
+
+// Helper for type-safe error message extraction
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+// Initialize SQLite WAL mode and busy timeout via Prisma
+initPrisma().catch(err => {
+  console.error('[Prisma] Initialization error:', err);
+});
+
+// Helper formatters to map Prisma models to client-expected snake_case contracts
+interface SaleItemEntity {
+  id?: number;
+  saleId: number;
+  productId: number;
+  cCode: string;
+  pCode: string;
+  productName: string;
+  unitType: string;
+  locationRack: string | null;
+  isLoose: number;
+  quantity: number;
+  unitPrice: number;
+  unitCost: number;
+  grossAmount: number;
+  discountPct: number;
+  discountAmount: number;
+  netAmount: number;
+  batchId: number | null;
+}
+
+interface SaleEntity {
+  id: number;
+  invoiceNo: string;
+  customerId: number | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  userId: number | null;
+  userName: string | null;
+  saleDate: Date;
+  totalGross: number;
+  totalItemDiscount: number;
+  billDiscountPct: number;
+  billDiscountAmt: number;
+  netTotal: number;
+  cashTendered: number;
+  changeDue: number;
+  paymentType: string;
+  status: string;
+  notes: string | null;
+  createdAt: Date;
+  items?: SaleItemEntity[];
+}
+
+function formatSaleItem(item: SaleItemEntity) {
+  return {
+    id: item.id,
+    sale_id: item.saleId,
+    product_id: item.productId,
+    c_code: item.cCode,
+    p_code: item.pCode,
+    product_name: item.productName,
+    unit_type: item.unitType,
+    location_rack: item.locationRack,
+    is_loose: item.isLoose,
+    quantity: item.quantity,
+    unit_price: item.unitPrice,
+    unit_cost: item.unitCost,
+    gross_amount: item.grossAmount,
+    discount_pct: item.discountPct,
+    discount_amount: item.discountAmount,
+    net_amount: item.netAmount,
+    batch_id: item.batchId
+  };
+}
+
+function formatSale(sale: SaleEntity) {
+  return {
+    id: sale.id,
+    invoice_no: sale.invoiceNo,
+    customer_id: sale.customerId,
+    customer_name: sale.customerName,
+    customer_phone: sale.customerPhone,
+    user_id: sale.userId,
+    user_name: sale.userName,
+    sale_date: sale.saleDate,
+    total_gross: sale.totalGross,
+    total_item_discount: sale.totalItemDiscount,
+    bill_discount_pct: sale.billDiscountPct,
+    bill_discount_amt: sale.billDiscountAmt,
+    net_total: sale.netTotal,
+    cash_tendered: sale.cashTendered,
+    change_due: sale.changeDue,
+    payment_type: sale.paymentType,
+    status: sale.status,
+    notes: sale.notes,
+    created_at: sale.createdAt,
+    items: sale.items ? sale.items.map(formatSaleItem) : undefined
+  };
+}
+
 // -------------------------------------------------------------
 // 1. Health & Dashboard KPI
 // -------------------------------------------------------------
@@ -22,38 +138,87 @@ app.get('/api/status', (_req: Request, res: Response) => {
   res.json({ status: 'ok', version: '1.0.0', time: new Date().toISOString() });
 });
 
-app.get('/api/dashboard/stats', (_req: Request, res: Response) => {
+app.get('/api/dashboard/stats', async (_req: Request, res: Response) => {
   try {
     const today = new Date().toISOString().split('T')[0];
+    const startOfToday = new Date(today + 'T00:00:00.000Z');
+    const endOfToday = new Date(today + 'T23:59:59.999Z');
 
-    const todaySales = db.prepare(`
-      SELECT 
-        COUNT(id) as total_invoices,
-        COALESCE(SUM(net_total), 0) as total_revenue,
-        COALESCE(SUM(total_gross - net_total), 0) as total_discount
-      FROM sales 
-      WHERE DATE(sale_date) = ? AND status = 'completed'
-    `).get(today) as any;
+    const todaySalesAgg = await prisma.sale.aggregate({
+      where: {
+        saleDate: {
+          gte: startOfToday,
+          lte: endOfToday
+        },
+        status: 'completed'
+      },
+      _count: { id: true },
+      _sum: {
+        netTotal: true,
+        totalGross: true
+      }
+    });
 
-    const totalProducts = (db.prepare("SELECT COUNT(*) as count FROM products WHERE status = 'active'").get() as any).count;
-    const lowStockCount = (db.prepare("SELECT COUNT(*) as count FROM products WHERE stock_boxes <= min_stock_alert AND status = 'active'").get() as any).count;
-    const outOfStockCount = (db.prepare("SELECT COUNT(*) as count FROM products WHERE stock_boxes = 0 AND stock_loose = 0 AND status = 'active'").get() as any).count;
-    const expiredCount = (db.prepare('SELECT COUNT(*) as count FROM product_batches WHERE expiry_date <= ? AND (quantity_boxes > 0 OR quantity_loose > 0)').get(today) as any).count;
+    const totalRevenue = todaySalesAgg._sum.netTotal || 0;
+    const totalGross = todaySalesAgg._sum.totalGross || 0;
+    const todaySales = {
+      total_invoices: todaySalesAgg._count.id || 0,
+      total_revenue: totalRevenue,
+      total_discount: totalGross - totalRevenue
+    };
 
-    const recentSales = db.prepare(`
-      SELECT id, invoice_no, customer_name, net_total, payment_type, sale_date, status
-      FROM sales
-      ORDER BY id DESC
-      LIMIT 6
-    `).all();
+    const totalProducts = await prisma.product.count({ where: { status: 'active' } });
 
-    const lowStockItems = db.prepare(`
+    const lowStockRaw = await prisma.$queryRaw<Array<{ count: bigint | number }>>`
+      SELECT COUNT(*) as count FROM products WHERE stock_boxes <= min_stock_alert AND status = 'active'
+    `;
+    const lowStockCount = Number(lowStockRaw[0]?.count || 0);
+
+    const outOfStockCount = await prisma.product.count({
+      where: { stockBoxes: 0, stockLoose: 0, status: 'active' }
+    });
+
+    const expiredCount = await prisma.productBatch.count({
+      where: {
+        expiryDate: { lte: today },
+        OR: [
+          { quantityBoxes: { gt: 0 } },
+          { quantityLoose: { gt: 0 } }
+        ]
+      }
+    });
+
+    const recentSales = await prisma.sale.findMany({
+      select: {
+        id: true,
+        invoiceNo: true,
+        customerName: true,
+        netTotal: true,
+        paymentType: true,
+        saleDate: true,
+        status: true
+      },
+      orderBy: { id: 'desc' },
+      take: 6
+    });
+
+    const lowStockItems = await prisma.$queryRaw<Array<{
+      id: number;
+      c_code: string;
+      p_code: string;
+      name: string;
+      unit_type: string;
+      stock_boxes: number;
+      stock_loose: number;
+      min_stock_alert: number;
+      location_rack: string | null;
+    }>>`
       SELECT p.id, p.c_code, p.p_code, p.name, p.unit_type, p.stock_boxes, p.stock_loose, p.min_stock_alert, p.location_rack
       FROM products p
       WHERE (p.stock_boxes <= p.min_stock_alert) AND p.status = 'active'
       ORDER BY p.stock_boxes ASC
       LIMIT 8
-    `).all();
+    `;
 
     res.json({
       todaySales,
@@ -61,11 +226,19 @@ app.get('/api/dashboard/stats', (_req: Request, res: Response) => {
       lowStockCount,
       outOfStockCount,
       expiredCount,
-      recentSales,
+      recentSales: recentSales.map(s => ({
+        id: s.id,
+        invoice_no: s.invoiceNo,
+        customer_name: s.customerName,
+        net_total: s.netTotal,
+        payment_type: s.paymentType,
+        sale_date: s.saleDate,
+        status: s.status
+      })),
       lowStockItems
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -73,292 +246,368 @@ app.get('/api/dashboard/stats', (_req: Request, res: Response) => {
 // 2. Roles, Authentication & Users
 // -------------------------------------------------------------
 
-// Ensure roles table exists and seed default roles if empty
-db.exec(`
-  CREATE TABLE IF NOT EXISTS roles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL,
-    display_name TEXT NOT NULL,
-    description TEXT,
-    is_system INTEGER DEFAULT 0,
-    permissions TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
+// Seed default roles if roles table is fresh
+async function ensureDefaultRoles(): Promise<void> {
+  try {
+    const roleCount = await prisma.role.count();
+    if (roleCount === 0) {
+      const adminPerms = {
+        dashboard: true, pos: true, sales: true, khata: true, masters: true, purchases: true, reports: true, utilities: true, settings: true,
+        can_add_product: true, can_edit_product: true, can_delete_product: true, can_add_company: true, can_edit_company: true, can_delete_company: true,
+        can_delete_invoice: true, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: true, can_add_purchase: true,
+        can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: true, can_discount: true,
+        can_backup: true, can_restore: true, can_shift_close: true, can_stock_zero: true, can_manage_users: true, can_manage_roles: true
+      };
 
-const roleCountCheck = (db.prepare('SELECT COUNT(*) as count FROM roles').get() as { count: number }).count;
-if (roleCountCheck === 0) {
-  const insertRole = db.prepare(`
-    INSERT INTO roles (name, display_name, description, is_system, permissions)
-    VALUES (?, ?, ?, ?, ?)
-  `);
+      const cashierPerms = {
+        dashboard: false, pos: true, sales: true, khata: true, masters: true, purchases: false, reports: false, utilities: false, settings: false,
+        can_add_product: true, can_edit_product: false, can_delete_product: false, can_add_company: true, can_edit_company: false, can_delete_company: false,
+        can_delete_invoice: false, can_return_sale: true, can_view_all_sales: false, can_view_financial_kpis: false, can_add_purchase: false,
+        can_add_customer: true, can_receive_payment: true, can_edit_customer: false, can_delete_customer: false, can_discount: true,
+        can_backup: false, can_restore: false, can_shift_close: false, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
+      };
 
-  const adminPerms = {
-    dashboard: true, pos: true, sales: true, khata: true, masters: true, purchases: true, reports: true, utilities: true, settings: true,
-    can_add_product: true, can_edit_product: true, can_delete_product: true, can_add_company: true, can_edit_company: true, can_delete_company: true,
-    can_delete_invoice: true, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: true, can_add_purchase: true,
-    can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: true, can_discount: true,
-    can_backup: true, can_restore: true, can_shift_close: true, can_stock_zero: true, can_manage_users: true, can_manage_roles: true
-  };
+      const pharmacistPerms = {
+        dashboard: true, pos: true, sales: true, khata: true, masters: true, purchases: true, reports: false, utilities: false, settings: false,
+        can_add_product: true, can_edit_product: true, can_delete_product: false, can_add_company: true, can_edit_company: true, can_delete_company: false,
+        can_delete_invoice: false, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: false, can_add_purchase: true,
+        can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: false, can_discount: true,
+        can_backup: false, can_restore: false, can_shift_close: true, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
+      };
 
-  const cashierPerms = {
-    dashboard: false, pos: true, sales: true, khata: true, masters: true, purchases: false, reports: false, utilities: false, settings: false,
-    can_add_product: true, can_edit_product: false, can_delete_product: false, can_add_company: true, can_edit_company: false, can_delete_company: false,
-    can_delete_invoice: false, can_return_sale: true, can_view_all_sales: false, can_view_financial_kpis: false, can_add_purchase: false,
-    can_add_customer: true, can_receive_payment: true, can_edit_customer: false, can_delete_customer: false, can_discount: true,
-    can_backup: false, can_restore: false, can_shift_close: false, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
-  };
-
-  const pharmacistPerms = {
-    dashboard: true, pos: true, sales: true, khata: true, masters: true, purchases: true, reports: false, utilities: false, settings: false,
-    can_add_product: true, can_edit_product: true, can_delete_product: false, can_add_company: true, can_edit_company: true, can_delete_company: false,
-    can_delete_invoice: false, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: false, can_add_purchase: true,
-    can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: false, can_discount: true,
-    can_backup: false, can_restore: false, can_shift_close: true, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
-  };
-
-  insertRole.run('admin', 'Administrator', 'Full system access and master privileges', 1, JSON.stringify(adminPerms));
-  insertRole.run('cashier', 'Counter Cashier', 'POS sales, customer credit recoveries, and view/add medicines. Cannot delete/edit records.', 0, JSON.stringify(cashierPerms));
-  insertRole.run('pharmacist', 'Pharmacist', 'Dispensing, master coding, and inventory purchases.', 0, JSON.stringify(pharmacistPerms));
+      await prisma.role.createMany({
+        data: [
+          { name: 'admin', displayName: 'Administrator', description: 'Full system access and master privileges', isSystem: 1, permissions: JSON.stringify(adminPerms) },
+          { name: 'cashier', displayName: 'Counter Cashier', description: 'POS sales, customer credit recoveries, and view/add medicines. Cannot delete/edit records.', isSystem: 0, permissions: JSON.stringify(cashierPerms) },
+          { name: 'pharmacist', displayName: 'Pharmacist', description: 'Dispensing, master coding, and inventory purchases.', isSystem: 0, permissions: JSON.stringify(pharmacistPerms) }
+        ]
+      });
+    }
+  } catch (error) {
+    console.error('[Prisma] Role seeding check failed:', error);
+  }
 }
+ensureDefaultRoles().catch(err => {
+  console.error('[Prisma] Role seeding error:', err);
+});
 
 // 2.1 Authentication & Profile
-app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { username, password } = req.body;
-  const user = db.prepare('SELECT id, username, full_name, role, status FROM users WHERE username = ? AND password = ?').get(username, password) as any;
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { username, password } = req.body;
+    const user = await prisma.user.findFirst({
+      where: { username, password },
+      select: { id: true, username: true, fullName: true, role: true, status: true }
+    });
 
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid username or password' });
-  }
-  if (user.status !== 'active') {
-    return res.status(403).json({ error: 'This user account has been disabled. Please contact Administrator.' });
-  }
-
-  // Fetch permissions for user's role
-  const roleRow = db.prepare('SELECT name, display_name, permissions FROM roles WHERE name = ?').get(user.role) as any;
-  let permissions = null;
-  if (roleRow && roleRow.permissions) {
-    try {
-      permissions = JSON.parse(roleRow.permissions);
-    } catch {
-      permissions = null;
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
     }
-  }
-
-  res.json({
-    success: true,
-    user: {
-      ...user,
-      role_display: roleRow ? roleRow.display_name : user.role,
-      permissions
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: 'This user account has been disabled. Please contact Administrator.' });
     }
-  });
+
+    const roleRow = await prisma.role.findUnique({ where: { name: user.role } });
+    let permissions = null;
+    if (roleRow && roleRow.permissions) {
+      try {
+        permissions = JSON.parse(roleRow.permissions);
+      } catch {
+        permissions = null;
+      }
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        full_name: user.fullName,
+        role: user.role,
+        status: user.status,
+        role_display: roleRow ? roleRow.displayName : user.role,
+        permissions
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
-app.put('/api/auth/profile', (req: Request, res: Response) => {
-  const { userId, username, full_name, currentPassword, newPassword } = req.body;
-  if (!userId || !username || !full_name) {
-    return res.status(400).json({ error: 'Missing required user profile fields' });
-  }
-
-  const existingUser = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
-  if (!existingUser) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  // Check if username is being taken by another user
-  const duplicate = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username.trim(), userId);
-  if (duplicate) {
-    return res.status(400).json({ error: 'Username is already taken by another account' });
-  }
-
-  if (newPassword) {
-    if (!currentPassword) {
-      return res.status(400).json({ error: 'Current password is required to change password' });
+app.put('/api/auth/profile', async (req: Request, res: Response) => {
+  try {
+    const { userId, username, full_name, currentPassword, newPassword } = req.body;
+    if (!userId || !username || !full_name) {
+      return res.status(400).json({ error: 'Missing required user profile fields' });
     }
-    if (existingUser.password !== currentPassword) {
+
+    const idNum = Number(userId);
+    const existingUser = await prisma.user.findUnique({ where: { id: idNum } });
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const duplicate = await prisma.user.findFirst({
+      where: {
+        username: username.trim(),
+        NOT: { id: idNum }
+      }
+    });
+    if (duplicate) {
+      return res.status(400).json({ error: 'Username is already taken by another account' });
+    }
+
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Current password is required to change password' });
+      }
+      if (existingUser.password !== currentPassword) {
+        return res.status(400).json({ error: 'Current password does not match' });
+      }
+      await prisma.user.update({
+        where: { id: idNum },
+        data: {
+          username: username.trim(),
+          fullName: full_name.trim(),
+          password: newPassword
+        }
+      });
+    } else {
+      await prisma.user.update({
+        where: { id: idNum },
+        data: {
+          username: username.trim(),
+          fullName: full_name.trim()
+        }
+      });
+    }
+
+    const updatedUser = await prisma.user.findUnique({ where: { id: idNum } });
+    const roleRow = updatedUser ? await prisma.role.findUnique({ where: { name: updatedUser.role } }) : null;
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: updatedUser!.id,
+        username: updatedUser!.username,
+        full_name: updatedUser!.fullName,
+        role: updatedUser!.role,
+        status: updatedUser!.status,
+        role_display: roleRow ? roleRow.displayName : updatedUser!.role,
+        permissions: roleRow?.permissions ? JSON.parse(roleRow.permissions) : null
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/auth/change-password', async (req: Request, res: Response) => {
+  try {
+    const { userId, oldPassword, newPassword } = req.body;
+    const idNum = Number(userId);
+    const user = await prisma.user.findFirst({
+      where: { id: idNum, password: oldPassword }
+    });
+    if (!user) {
       return res.status(400).json({ error: 'Current password does not match' });
     }
-    db.prepare('UPDATE users SET username = ?, full_name = ?, password = ? WHERE id = ?').run(
-      username.trim(), full_name.trim(), newPassword, userId
-    );
-  } else {
-    db.prepare('UPDATE users SET username = ?, full_name = ? WHERE id = ?').run(
-      username.trim(), full_name.trim(), userId
-    );
+
+    await prisma.user.update({
+      where: { id: idNum },
+      data: { password: newPassword }
+    });
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
-
-  const updatedUser = db.prepare('SELECT id, username, full_name, role, status FROM users WHERE id = ?').get(userId) as any;
-  const roleRow = db.prepare('SELECT name, display_name, permissions FROM roles WHERE name = ?').get(updatedUser.role) as any;
-
-  res.json({
-    success: true,
-    message: 'Profile updated successfully',
-    user: {
-      ...updatedUser,
-      role_display: roleRow ? roleRow.display_name : updatedUser.role,
-      permissions: roleRow?.permissions ? JSON.parse(roleRow.permissions) : null
-    }
-  });
-});
-
-app.post('/api/auth/change-password', (req: Request, res: Response) => {
-  const { userId, oldPassword, newPassword } = req.body;
-  const user = db.prepare('SELECT id FROM users WHERE id = ? AND password = ?').get(userId, oldPassword);
-  if (!user) {
-    return res.status(400).json({ error: 'Current password does not match' });
-  }
-
-  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(newPassword, userId);
-  res.json({ success: true, message: 'Password updated successfully' });
 });
 
 // 2.2 Users Management
-app.get('/api/users', (_req: Request, res: Response) => {
-  const users = db.prepare(`
-    SELECT u.id, u.username, u.full_name, u.role, u.status, u.created_at,
-           r.display_name as role_display
-    FROM users u
-    LEFT JOIN roles r ON u.role = r.name
-    ORDER BY u.id ASC
-  `).all();
-  res.json(users);
-});
-
-app.post('/api/users', (req: Request, res: Response) => {
-  const { username, password, full_name, role } = req.body;
-  if (!username || !password || !full_name) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
-
-  const duplicate = db.prepare('SELECT id FROM users WHERE username = ?').get(username.trim());
-  if (duplicate) {
-    return res.status(400).json({ error: 'Username is already in use' });
-  }
-
+app.get('/api/users', async (_req: Request, res: Response) => {
   try {
-    const info = db.prepare('INSERT INTO users (username, password, full_name, role, status) VALUES (?, ?, ?, ?, ?)').run(
-      username.trim(), password, full_name.trim(), role || 'cashier', 'active'
-    );
-    res.json({ success: true, id: info.lastInsertRowid });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    const users = await prisma.user.findMany({
+      orderBy: { id: 'asc' }
+    });
+    const roles = await prisma.role.findMany();
+    const roleMap = new Map(roles.map(r => [r.name, r.displayName]));
+
+    res.json(users.map(u => ({
+      id: u.id,
+      username: u.username,
+      full_name: u.fullName,
+      role: u.role,
+      status: u.status,
+      created_at: u.createdAt,
+      role_display: roleMap.get(u.role) || u.role
+    })));
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.put('/api/users/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { username, full_name, role, status, password } = req.body;
+app.post('/api/users', async (req: Request, res: Response) => {
+  try {
+    const { username, password, full_name, role } = req.body;
+    if (!username || !password || !full_name) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
 
-  const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
-  if (!existing) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  if (username && username.trim() !== existing.username) {
-    const duplicate = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username.trim(), id);
+    const duplicate = await prisma.user.findUnique({
+      where: { username: username.trim() }
+    });
     if (duplicate) {
-      return res.status(400).json({ error: 'Username is already taken' });
+      return res.status(400).json({ error: 'Username is already in use' });
     }
-  }
 
-  try {
-    if (password && password.trim() !== '') {
-      db.prepare(`
-        UPDATE users 
-        SET username = ?, full_name = ?, role = ?, status = ?, password = ?
-        WHERE id = ?
-      `).run(username.trim(), full_name.trim(), role || existing.role, status || existing.status, password, id);
-    } else {
-      db.prepare(`
-        UPDATE users 
-        SET username = ?, full_name = ?, role = ?, status = ?
-        WHERE id = ?
-      `).run(username.trim(), full_name.trim(), role || existing.role, status || existing.status, id);
-    }
-    res.json({ success: true, message: 'User updated successfully' });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    const newUser = await prisma.user.create({
+      data: {
+        username: username.trim(),
+        password,
+        fullName: full_name.trim(),
+        role: role || 'cashier',
+        status: 'active'
+      }
+    });
+    res.json({ success: true, id: newUser.id });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
-app.delete('/api/users/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const targetUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
-  if (!targetUser) {
-    return res.status(404).json({ error: 'User not found' });
-  }
-
-  // Prevent deleting admin id 1
-  if (targetUser.id === 1 || targetUser.username === 'admin') {
-    return res.status(400).json({ error: 'Primary Administrator account cannot be deleted' });
-  }
-
+app.put('/api/users/:id', async (req: Request, res: Response) => {
   try {
-    db.prepare('DELETE FROM users WHERE id = ?').run(id);
+    const idNum = Number(req.params.id);
+    const { username, full_name, role, status, password } = req.body;
+
+    const existing = await prisma.user.findUnique({ where: { id: idNum } });
+    if (!existing) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (username && username.trim() !== existing.username) {
+      const duplicate = await prisma.user.findFirst({
+        where: {
+          username: username.trim(),
+          NOT: { id: idNum }
+        }
+      });
+      if (duplicate) {
+        return res.status(400).json({ error: 'Username is already taken' });
+      }
+    }
+
+    const updateData: { username: string; fullName: string; role: string; status: string; password?: string } = {
+      username: username ? username.trim() : existing.username,
+      fullName: full_name ? full_name.trim() : existing.fullName,
+      role: role || existing.role,
+      status: status || existing.status,
+    };
+    if (password && password.trim() !== '') {
+      updateData.password = password;
+    }
+
+    await prisma.user.update({
+      where: { id: idNum },
+      data: updateData
+    });
+
+    res.json({ success: true, message: 'User updated successfully' });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.delete('/api/users/:id', async (req: Request, res: Response) => {
+  try {
+    const idNum = Number(req.params.id);
+    const targetUser = await prisma.user.findUnique({ where: { id: idNum } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (targetUser.id === 1 || targetUser.username === 'admin') {
+      return res.status(400).json({ error: 'Primary Administrator account cannot be deleted' });
+    }
+
+    await prisma.user.delete({ where: { id: idNum } });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
 // 2.3 Roles & Granular Permissions Management
-app.get('/api/roles', (_req: Request, res: Response) => {
+app.get('/api/roles', async (_req: Request, res: Response) => {
   try {
-    const roles = db.prepare(`
-      SELECT r.*,
-        (SELECT COUNT(*) FROM users u WHERE u.role = r.name) as user_count
-      FROM roles r
-      ORDER BY r.id ASC
-    `).all() as any[];
+    const roles = await prisma.role.findMany({
+      orderBy: { id: 'asc' }
+    });
+
+    const userCounts = await prisma.user.groupBy({
+      by: ['role'],
+      _count: { id: true }
+    });
+    const countMap = new Map(userCounts.map(uc => [uc.role, uc._count.id]));
 
     const parsedRoles = roles.map(r => ({
-      ...r,
+      id: r.id,
+      name: r.name,
+      display_name: r.displayName,
+      description: r.description,
+      is_system: r.isSystem,
+      created_at: r.createdAt,
+      user_count: countMap.get(r.name) || 0,
       permissions: typeof r.permissions === 'string' ? JSON.parse(r.permissions) : r.permissions
     }));
 
     res.json(parsedRoles);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.post('/api/roles', (req: Request, res: Response) => {
-  const { name, display_name, description, permissions } = req.body;
-  if (!name || !display_name || !permissions) {
-    return res.status(400).json({ error: 'Role identifier, display name, and permissions are required' });
-  }
-
-  const roleKey = name.toLowerCase().replace(/[^a-z0-9_]/g, '_').trim();
-  const existing = db.prepare('SELECT id FROM roles WHERE name = ?').get(roleKey);
-  if (existing) {
-    return res.status(400).json({ error: `A role with identifier "${roleKey}" already exists` });
-  }
-
+app.post('/api/roles', async (req: Request, res: Response) => {
   try {
+    const { name, display_name, description, permissions } = req.body;
+    if (!name || !display_name || !permissions) {
+      return res.status(400).json({ error: 'Role identifier, display name, and permissions are required' });
+    }
+
+    const roleKey = name.toLowerCase().replace(/[^a-z0-9_]/g, '_').trim();
+    const existing = await prisma.role.findUnique({ where: { name: roleKey } });
+    if (existing) {
+      return res.status(400).json({ error: `A role with identifier "${roleKey}" already exists` });
+    }
+
     const permsJson = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
-    const info = db.prepare(`
-      INSERT INTO roles (name, display_name, description, is_system, permissions)
-      VALUES (?, ?, ?, 0, ?)
-    `).run(roleKey, display_name.trim(), description || null, permsJson);
+    const newRole = await prisma.role.create({
+      data: {
+        name: roleKey,
+        displayName: display_name.trim(),
+        description: description || null,
+        isSystem: 0,
+        permissions: permsJson
+      }
+    });
 
-    res.json({ success: true, id: info.lastInsertRowid });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    res.json({ success: true, id: newRole.id });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
-app.put('/api/roles/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { display_name, description, permissions } = req.body;
-
-  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(id) as any;
-  if (!role) {
-    return res.status(404).json({ error: 'Role not found' });
-  }
-
+app.put('/api/roles/:id', async (req: Request, res: Response) => {
   try {
-    // If system admin role, keep critical permissions safe
+    const idNum = Number(req.params.id);
+    const { display_name, description, permissions } = req.body;
+
+    const role = await prisma.role.findUnique({ where: { id: idNum } });
+    if (!role) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+
     let permsJson = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
     if (role.name === 'admin') {
       const parsed = typeof permissions === 'string' ? JSON.parse(permissions) : permissions;
@@ -368,488 +617,632 @@ app.put('/api/roles/:id', (req: Request, res: Response) => {
       permsJson = JSON.stringify(parsed);
     }
 
-    db.prepare(`
-      UPDATE roles
-      SET display_name = ?, description = ?, permissions = ?
-      WHERE id = ?
-    `).run(display_name || role.display_name, description !== undefined ? description : role.description, permsJson, id);
+    await prisma.role.update({
+      where: { id: idNum },
+      data: {
+        displayName: display_name || role.displayName,
+        description: description !== undefined ? description : role.description,
+        permissions: permsJson
+      }
+    });
 
     res.json({ success: true, message: 'Role permissions updated successfully' });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
-app.delete('/api/roles/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(id) as any;
-  if (!role) {
-    return res.status(404).json({ error: 'Role not found' });
-  }
-
-  if (role.is_system === 1 || role.name === 'admin') {
-    return res.status(400).json({ error: 'System-protected roles cannot be deleted' });
-  }
-
-  const assignedUsers = (db.prepare('SELECT COUNT(*) as count FROM users WHERE role = ?').get(role.name) as { count: number }).count;
-  if (assignedUsers > 0) {
-    return res.status(400).json({ error: `Cannot delete role "${role.display_name}". ${assignedUsers} user(s) are currently assigned to it.` });
-  }
-
+app.delete('/api/roles/:id', async (req: Request, res: Response) => {
   try {
-    db.prepare('DELETE FROM roles WHERE id = ?').run(id);
+    const idNum = Number(req.params.id);
+    const role = await prisma.role.findUnique({ where: { id: idNum } });
+    if (!role) {
+      return res.status(404).json({ error: 'Role not found' });
+    }
+
+    if (role.isSystem === 1 || role.name === 'admin') {
+      return res.status(400).json({ error: 'System-protected roles cannot be deleted' });
+    }
+
+    const assignedUsers = await prisma.user.count({ where: { role: role.name } });
+    if (assignedUsers > 0) {
+      return res.status(400).json({ error: `Cannot delete role "${role.displayName}". ${assignedUsers} user(s) are currently assigned to it.` });
+    }
+
+    await prisma.role.delete({ where: { id: idNum } });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
 // -------------------------------------------------------------
 // 3. Companies / Manufacturers
 // -------------------------------------------------------------
-app.get('/api/companies', (_req: Request, res: Response) => {
-  const companies = db.prepare(`
-    SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.company_id = c.id) as product_count
-    FROM companies c
-    ORDER BY c.name ASC
-  `).all();
-  res.json(companies);
-});
-
-app.post('/api/companies', (req: Request, res: Response) => {
-  const { code, name, contact_person, phone, email, address } = req.body;
+app.get('/api/companies', async (_req: Request, res: Response) => {
   try {
-    const info = db.prepare(`
-      INSERT INTO companies (code, name, contact_person, phone, email, address)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(code.toUpperCase().trim(), name.trim(), contact_person, phone, email, address);
-    res.json({ success: true, id: info.lastInsertRowid });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    const companies = await prisma.company.findMany({
+      orderBy: { name: 'asc' },
+      include: {
+        _count: {
+          select: { products: true }
+        }
+      }
+    });
+
+    res.json(companies.map(c => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      contact_person: c.contactPerson,
+      phone: c.phone,
+      email: c.email,
+      address: c.address,
+      status: c.status,
+      created_at: c.createdAt,
+      product_count: c._count.products
+    })));
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.put('/api/companies/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { code, name, contact_person, phone, email, address, status } = req.body;
+app.post('/api/companies', async (req: Request, res: Response) => {
   try {
-    db.prepare(`
-      UPDATE companies
-      SET code = ?, name = ?, contact_person = ?, phone = ?, email = ?, address = ?, status = ?
-      WHERE id = ?
-    `).run(code.toUpperCase().trim(), name.trim(), contact_person, phone, email, address, status || 'active', id);
+    const { code, name, contact_person, phone, email, address } = req.body;
+    const newCompany = await prisma.company.create({
+      data: {
+        code: code.toUpperCase().trim(),
+        name: name.trim(),
+        contactPerson: contact_person || null,
+        phone: phone || null,
+        email: email || null,
+        address: address || null,
+        status: 'active'
+      }
+    });
+    res.json({ success: true, id: newCompany.id });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.put('/api/companies/:id', async (req: Request, res: Response) => {
+  try {
+    const idNum = Number(req.params.id);
+    const { code, name, contact_person, phone, email, address, status } = req.body;
+    await prisma.company.update({
+      where: { id: idNum },
+      data: {
+        code: code.toUpperCase().trim(),
+        name: name.trim(),
+        contactPerson: contact_person,
+        phone: phone,
+        email: email,
+        address: address,
+        status: status || 'active'
+      }
+    });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
-app.delete('/api/companies/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
+app.delete('/api/companies/:id', async (req: Request, res: Response) => {
   try {
-    db.prepare('DELETE FROM companies WHERE id = ?').run(id);
+    const idNum = Number(req.params.id);
+    await prisma.company.delete({ where: { id: idNum } });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
-
-// Ensure customer_payments table exists
-db.exec(`
-  CREATE TABLE IF NOT EXISTS customer_payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-    amount REAL NOT NULL,
-    payment_method TEXT NOT NULL DEFAULT 'cash',
-    notes TEXT,
-    previous_balance REAL NOT NULL,
-    new_balance REAL NOT NULL,
-    user_name TEXT,
-    payment_date DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-`);
 
 // -------------------------------------------------------------
 // 3.5 Customers & Credit Ledger (Khata)
 // -------------------------------------------------------------
-app.get('/api/customers', (_req: Request, res: Response) => {
+app.get('/api/customers', async (_req: Request, res: Response) => {
   try {
-    const customers = db.prepare(`
-      SELECT c.*, 
+    const customers = await prisma.$queryRaw<any[]>`
+      SELECT c.id, c.name, c.phone, c.address, c.credit_limit, c.current_balance, c.created_at,
         (SELECT COUNT(*) FROM sales s WHERE s.customer_id = c.id) as invoices_count,
         (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.payment_type = 'Credit') as total_credit_sales,
         (SELECT COALESCE(SUM(p.amount), 0) FROM customer_payments p WHERE p.customer_id = c.id) as total_payments
       FROM customers c
       ORDER BY c.current_balance DESC, c.name ASC
-    `).all();
+    `;
     res.json(customers);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.post('/api/customers', (req: Request, res: Response) => {
-  const { name, phone, address, credit_limit } = req.body;
+app.post('/api/customers', async (req: Request, res: Response) => {
   try {
-    const info = db.prepare(`
-      INSERT INTO customers (name, phone, address, credit_limit, current_balance)
-      VALUES (?, ?, ?, ?, 0.0)
-    `).run(name.trim(), phone || null, address || null, parseFloat(credit_limit) || 0);
-    res.json({ success: true, id: info.lastInsertRowid });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    const { name, phone, address, credit_limit } = req.body;
+    const newCustomer = await prisma.customer.create({
+      data: {
+        name: name.trim(),
+        phone: phone || null,
+        address: address || null,
+        creditLimit: parseFloat(credit_limit) || 0,
+        currentBalance: 0.0
+      }
+    });
+    res.json({ success: true, id: newCustomer.id });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
-app.put('/api/customers/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { name, phone, address, credit_limit } = req.body;
+app.put('/api/customers/:id', async (req: Request, res: Response) => {
   try {
-    db.prepare(`
-      UPDATE customers 
-      SET name = ?, phone = ?, address = ?, credit_limit = ?
-      WHERE id = ?
-    `).run(name.trim(), phone || null, address || null, parseFloat(credit_limit) || 0, id);
+    const idNum = Number(req.params.id);
+    const { name, phone, address, credit_limit } = req.body;
+    await prisma.customer.update({
+      where: { id: idNum },
+      data: {
+        name: name.trim(),
+        phone: phone || null,
+        address: address || null,
+        creditLimit: parseFloat(credit_limit) || 0
+      }
+    });
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
-app.post('/api/customers/:id/payment', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { amount, payment_method, notes } = req.body;
-  const paymentAmt = parseFloat(amount);
-  if (isNaN(paymentAmt) || paymentAmt <= 0) {
-    return res.status(400).json({ error: 'Valid positive payment amount required' });
-  }
-
-  const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(id) as any;
-  if (!customer) {
-    return res.status(404).json({ error: 'Customer not found' });
-  }
-
-  const newBalance = Math.max(0, customer.current_balance - paymentAmt);
-
-  const transaction = db.transaction(() => {
-    db.prepare('UPDATE customers SET current_balance = ? WHERE id = ?').run(newBalance, id);
-
-    db.prepare(`
-      INSERT INTO customer_payments (customer_id, amount, payment_method, notes, previous_balance, new_balance, user_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, paymentAmt, payment_method || 'cash', notes || null, customer.current_balance, newBalance, 'Cashier');
-
-    db.prepare(`
-      INSERT INTO audit_logs (action, module, details, user_name)
-      VALUES (?, ?, ?, ?)
-    `).run(
-      'CUSTOMER_PAYMENT',
-      'Khata',
-      `Payment received: ${paymentAmt} (${payment_method || 'Cash'}). Previous: ${customer.current_balance}, New Balance: ${newBalance}. Notes: ${notes || 'None'}`,
-      'Cashier'
-    );
-  });
-
+app.post('/api/customers/:id/payment', async (req: Request, res: Response) => {
   try {
-    transaction();
+    const idNum = Number(req.params.id);
+    const { amount, payment_method, notes } = req.body;
+    const paymentAmt = parseFloat(amount);
+    if (isNaN(paymentAmt) || paymentAmt <= 0) {
+      return res.status(400).json({ error: 'Valid positive payment amount required' });
+    }
+
+    const customer = await prisma.customer.findUnique({ where: { id: idNum } });
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    const newBalance = Math.max(0, customer.currentBalance - paymentAmt);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.customer.update({
+        where: { id: idNum },
+        data: { currentBalance: newBalance }
+      });
+
+      await tx.customerPayment.create({
+        data: {
+          customerId: idNum,
+          amount: paymentAmt,
+          paymentMethod: payment_method || 'cash',
+          notes: notes || null,
+          previousBalance: customer.currentBalance,
+          newBalance: newBalance,
+          userName: 'Cashier'
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          action: 'CUSTOMER_PAYMENT',
+          module: 'Khata',
+          details: `Payment received: ${paymentAmt} (${payment_method || 'Cash'}). Previous: ${customer.currentBalance}, New Balance: ${newBalance}. Notes: ${notes || 'None'}`,
+          userName: 'Cashier'
+        }
+      });
+    });
+
     res.json({ success: true, new_balance: newBalance });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.get('/api/customers/:id/ledger', (req: Request, res: Response) => {
-  const { id } = req.params;
+app.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
   try {
-    const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(id) as any;
+    const idNum = Number(req.params.id);
+    const customer = await prisma.customer.findUnique({ where: { id: idNum } });
     if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
-    const sales = db.prepare(`
-      SELECT id, invoice_no, sale_date, net_total, payment_type, status
-      FROM sales
-      WHERE customer_id = ?
-      ORDER BY id DESC
-    `).all(id);
+    const sales = await prisma.sale.findMany({
+      where: { customerId: idNum },
+      select: {
+        id: true,
+        invoiceNo: true,
+        saleDate: true,
+        netTotal: true,
+        paymentType: true,
+        status: true
+      },
+      orderBy: { id: 'desc' }
+    });
 
-    const payments = db.prepare(`
-      SELECT id, amount, payment_method, notes, previous_balance, new_balance, payment_date, user_name
-      FROM customer_payments
-      WHERE customer_id = ?
-      ORDER BY id DESC
-    `).all(id);
+    const payments = await prisma.customerPayment.findMany({
+      where: { customerId: idNum },
+      select: {
+        id: true,
+        amount: true,
+        paymentMethod: true,
+        notes: true,
+        previousBalance: true,
+        newBalance: true,
+        paymentDate: true,
+        userName: true
+      },
+      orderBy: { id: 'desc' }
+    });
 
-    res.json({ customer, sales, payments });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.json({
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        address: customer.address,
+        credit_limit: customer.creditLimit,
+        current_balance: customer.currentBalance,
+        created_at: customer.createdAt
+      },
+      sales: sales.map(s => ({
+        id: s.id,
+        invoice_no: s.invoiceNo,
+        sale_date: s.saleDate,
+        net_total: s.netTotal,
+        payment_type: s.paymentType,
+        status: s.status
+      })),
+      payments: payments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        payment_method: p.paymentMethod,
+        notes: p.notes,
+        previous_balance: p.previousBalance,
+        new_balance: p.newBalance,
+        payment_date: p.paymentDate,
+        user_name: p.userName
+      }))
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // -------------------------------------------------------------
 // 4. Products Master
 // -------------------------------------------------------------
-app.get('/api/products', (req: Request, res: Response) => {
-  const { q, company_id, low_stock } = req.query;
-  let query = `
-    SELECT p.*, c.name as company_name
-    FROM products p
-    LEFT JOIN companies c ON p.company_id = c.id
-    WHERE 1=1
-  `;
-  const params: any[] = [];
-
-  if (q) {
-    query += ` AND (p.name LIKE ? OR p.p_code LIKE ? OR p.c_code LIKE ? OR p.barcode LIKE ? OR p.generic_name LIKE ?)`;
-    const search = `%${q}%`;
-    params.push(search, search, search, search, search);
-  }
-
-  if (company_id) {
-    query += ` AND p.company_id = ?`;
-    params.push(company_id);
-  }
-
-  if (low_stock === 'true') {
-    query += ` AND p.stock_boxes <= p.min_stock_alert`;
-  }
-
-  query += ` ORDER BY p.name ASC`;
-
-  const products = db.prepare(query).all(...params);
-  res.json(products);
-});
-
-app.get('/api/products/search', (req: Request, res: Response) => {
-  const { q } = req.query;
-  if (!q) return res.json([]);
-
-  const search = `%${q}%`;
-  const products = db.prepare(`
-    SELECT p.*, c.name as company_name
-    FROM products p
-    LEFT JOIN companies c ON p.company_id = c.id
-    WHERE p.status = 'active' AND (
-      p.barcode = ? OR
-      p.p_code LIKE ? OR
-      p.c_code LIKE ? OR
-      p.name LIKE ? OR
-      p.generic_name LIKE ?
-    )
-    ORDER BY (p.barcode = ?) DESC, p.name ASC
-    LIMIT 25
-  `).all(q, search, search, search, search, q);
-
-  res.json(products);
-});
-
-app.post('/api/products', (req: Request, res: Response) => {
-  const {
-    company_id, c_code, p_code, barcode, name, generic_name, unit_type,
-    packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-    default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert
-  } = req.body;
-
+app.get('/api/products', async (req: Request, res: Response) => {
   try {
-    const info = db.prepare(`
-      INSERT INTO products (
-        company_id, c_code, p_code, barcode, name, generic_name, unit_type,
-        packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-        default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      company_id || null, c_code, p_code, barcode || null, name, generic_name || null, unit_type || 'Tablets',
-      packing || 1, box_trade_price || 0, box_retail_price || 0, unit_trade_price || 0, unit_retail_price || 0,
-      default_discount_pct || 0, location_rack || null, stock_boxes || 0, stock_loose || 0, min_stock_alert || 10
-    );
+    const { q, company_id, low_stock } = req.query;
+    const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
 
-    res.json({ success: true, id: info.lastInsertRowid });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    if (q) {
+      const search = `%${String(q).trim()}%`;
+      conditions.push(Prisma.sql`(p.name LIKE ${search} OR p.p_code LIKE ${search} OR p.c_code LIKE ${search} OR p.barcode LIKE ${search} OR p.generic_name LIKE ${search})`);
+    }
+
+    if (company_id) {
+      conditions.push(Prisma.sql`p.company_id = ${Number(company_id)}`);
+    }
+
+    if (low_stock === 'true') {
+      conditions.push(Prisma.sql`p.stock_boxes <= p.min_stock_alert`);
+    }
+
+    const whereClause = Prisma.join(conditions, ' AND ');
+
+    const products = await prisma.$queryRaw<any[]>`
+      SELECT p.id, p.company_id, p.c_code, p.p_code, p.barcode, p.name, p.generic_name,
+             p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
+             p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
+             p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.status, p.created_at, p.updated_at, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE ${whereClause}
+      ORDER BY p.name ASC
+    `;
+    res.json(products);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.put('/api/products/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const {
-    company_id, c_code, p_code, barcode, name, generic_name, unit_type,
-    packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-    default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert, status
-  } = req.body;
-
+app.get('/api/products/search', async (req: Request, res: Response) => {
   try {
-    db.prepare(`
-      UPDATE products SET
-        company_id = ?, c_code = ?, p_code = ?, barcode = ?, name = ?, generic_name = ?, unit_type = ?,
-        packing = ?, box_trade_price = ?, box_retail_price = ?, unit_trade_price = ?, unit_retail_price = ?,
-        default_discount_pct = ?, location_rack = ?, stock_boxes = ?, stock_loose = ?, min_stock_alert = ?,
-        status = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      company_id || null, c_code, p_code, barcode || null, name, generic_name || null, unit_type,
+    const { q } = req.query;
+    if (!q) return res.json([]);
+
+    const searchTerm = String(q).trim();
+    const searchWildcard = `%${searchTerm}%`;
+
+    const products = await prisma.$queryRaw<any[]>`
+      SELECT p.id, p.company_id, p.c_code, p.p_code, p.barcode, p.name, p.generic_name,
+             p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
+             p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
+             p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.status, p.created_at, p.updated_at, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE p.status = 'active' AND (
+        p.barcode = ${searchTerm} OR
+        p.p_code LIKE ${searchWildcard} OR
+        p.c_code LIKE ${searchWildcard} OR
+        p.name LIKE ${searchWildcard} OR
+        p.generic_name LIKE ${searchWildcard}
+      )
+      ORDER BY (p.barcode = ${searchTerm}) DESC, p.name ASC
+      LIMIT 25
+    `;
+
+    res.json(products);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/products', async (req: Request, res: Response) => {
+  try {
+    const {
+      company_id, c_code, p_code, barcode, name, generic_name, unit_type,
       packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert,
-      status || 'active', id
-    );
+      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert
+    } = req.body;
 
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    const newProd = await prisma.product.create({
+      data: {
+        companyId: company_id ? Number(company_id) : null,
+        cCode: c_code,
+        pCode: p_code,
+        barcode: barcode || null,
+        name,
+        genericName: generic_name || null,
+        unitType: unit_type || 'Tablets',
+        packing: Number(packing) || 1,
+        boxTradePrice: parseFloat(box_trade_price) || 0,
+        boxRetailPrice: parseFloat(box_retail_price) || 0,
+        unitTradePrice: parseFloat(unit_trade_price) || 0,
+        unitRetailPrice: parseFloat(unit_retail_price) || 0,
+        defaultDiscountPct: parseFloat(default_discount_pct) || 0,
+        locationRack: location_rack || null,
+        stockBoxes: parseInt(stock_boxes) || 0,
+        stockLoose: parseInt(stock_loose) || 0,
+        minStockAlert: parseInt(min_stock_alert) || 10,
+        status: 'active'
+      }
+    });
+
+    res.json({ success: true, id: newProd.id });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
-app.delete('/api/products/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
+app.put('/api/products/:id', async (req: Request, res: Response) => {
   try {
-    db.prepare('DELETE FROM products WHERE id = ?').run(id);
+    const idNum = Number(req.params.id);
+    const {
+      company_id, c_code, p_code, barcode, name, generic_name, unit_type,
+      packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
+      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert, status
+    } = req.body;
+
+    await prisma.product.update({
+      where: { id: idNum },
+      data: {
+        companyId: company_id ? Number(company_id) : null,
+        cCode: c_code,
+        pCode: p_code,
+        barcode: barcode || null,
+        name,
+        genericName: generic_name || null,
+        unitType: unit_type,
+        packing: Number(packing) || 1,
+        boxTradePrice: parseFloat(box_trade_price) || 0,
+        boxRetailPrice: parseFloat(box_retail_price) || 0,
+        unitTradePrice: parseFloat(unit_trade_price) || 0,
+        unitRetailPrice: parseFloat(unit_retail_price) || 0,
+        defaultDiscountPct: parseFloat(default_discount_pct) || 0,
+        locationRack: location_rack || null,
+        stockBoxes: parseInt(stock_boxes) || 0,
+        stockLoose: parseInt(stock_loose) || 0,
+        minStockAlert: parseInt(min_stock_alert) || 10,
+        status: status || 'active'
+      }
+    });
+
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.delete('/api/products/:id', async (req: Request, res: Response) => {
+  try {
+    const idNum = Number(req.params.id);
+    await prisma.product.delete({ where: { id: idNum } });
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
 // -------------------------------------------------------------
 // 5. Sales & Counter POS
 // -------------------------------------------------------------
-app.post('/api/sales', (req: Request, res: Response) => {
-  const {
-    customer_id, customer_name, customer_phone, user_id, user_name,
-    items, total_gross, total_item_discount, bill_discount_pct, bill_discount_amt,
-    net_total, cash_tendered, change_due, payment_type, notes
-  } = req.body;
+app.post('/api/sales', async (req: Request, res: Response) => {
+  try {
+    const {
+      customer_id, customer_name, customer_phone, user_id, user_name,
+      items, total_gross, total_item_discount, bill_discount_pct, bill_discount_amt,
+      net_total, cash_tendered, change_due, payment_type, notes
+    } = req.body;
 
-  if (!items || items.length === 0) {
-    return res.status(400).json({ error: 'Sale must include at least one item.' });
-  }
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'Sale must include at least one item.' });
+    }
 
-  const transaction = db.transaction(() => {
-    // 1. Generate Invoice No (e.g., INV-20261016-0001)
+    // Generate Invoice No (e.g., INV-20261016-0001)
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const countToday = (db.prepare(`
-      SELECT COUNT(*) as count FROM sales WHERE invoice_no LIKE ?
-    `).get(`INV-${today}-%`) as any).count;
+    const countToday = await prisma.sale.count({
+      where: { invoiceNo: { startsWith: `INV-${today}-` } }
+    });
     const invoiceNo = `INV-${today}-${String(countToday + 1).padStart(4, '0')}`;
 
-    // 2. Insert Sale Master
-    const insertSale = db.prepare(`
-      INSERT INTO sales (
-        invoice_no, customer_id, customer_name, customer_phone, user_id, user_name,
-        total_gross, total_item_discount, bill_discount_pct, bill_discount_amt,
-        net_total, cash_tendered, change_due, payment_type, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Insert Sale Master
+      const sale = await tx.sale.create({
+        data: {
+          invoiceNo,
+          customerId: customer_id ? Number(customer_id) : null,
+          customerName: customer_name || 'Counter Customer',
+          customerPhone: customer_phone || null,
+          userId: user_id ? Number(user_id) : null,
+          userName: user_name || 'Cashier',
+          totalGross: parseFloat(total_gross) || 0,
+          totalItemDiscount: parseFloat(total_item_discount) || 0,
+          billDiscountPct: parseFloat(bill_discount_pct) || 0,
+          billDiscountAmt: parseFloat(bill_discount_amt) || 0,
+          netTotal: parseFloat(net_total) || 0,
+          cashTendered: parseFloat(cash_tendered) || (parseFloat(net_total) || 0),
+          changeDue: parseFloat(change_due) || 0,
+          paymentType: payment_type || 'Cash',
+          notes: notes || null
+        }
+      });
 
-    const saleInfo = insertSale.run(
-      invoiceNo, customer_id || null, customer_name || 'Counter Customer', customer_phone || null,
-      user_id || null, user_name || 'Cashier', total_gross, total_item_discount,
-      bill_discount_pct || 0, bill_discount_amt || 0, net_total, cash_tendered || net_total,
-      change_due || 0, payment_type || 'Cash', notes || null
-    );
+      // 2. Insert Sale Items & Deduct Stock
+      for (const item of items) {
+        const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
+        if (!prod) throw new Error(`Product ID ${item.product_id} not found.`);
 
-    const saleId = saleInfo.lastInsertRowid;
+        const isLoose = item.is_loose ? 1 : 0;
+        const packing = prod.packing || 1;
+        const unitCost = isLoose ? prod.unitTradePrice : prod.boxTradePrice;
 
-    // 3. Insert Sale Items & Deduct Stock
-    const insertItem = db.prepare(`
-      INSERT INTO sale_items (
-        sale_id, product_id, c_code, p_code, product_name, unit_type, location_rack,
-        is_loose, quantity, unit_price, unit_cost, gross_amount, discount_pct, discount_amount, net_amount, batch_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+        await tx.saleItem.create({
+          data: {
+            saleId: sale.id,
+            productId: prod.id,
+            cCode: prod.cCode,
+            pCode: prod.pCode,
+            productName: prod.name,
+            unitType: prod.unitType,
+            locationRack: prod.locationRack,
+            isLoose,
+            quantity: parseFloat(item.quantity),
+            unitPrice: parseFloat(item.unit_price),
+            unitCost,
+            grossAmount: parseFloat(item.gross_amount),
+            discountPct: parseFloat(item.discount_pct) || 0,
+            discountAmount: parseFloat(item.discount_amount) || 0,
+            netAmount: parseFloat(item.net_amount),
+            batchId: item.batch_id ? Number(item.batch_id) : null
+          }
+        });
 
-    const updateProductStock = db.prepare(`
-      UPDATE products SET
-        stock_boxes = ?,
-        stock_loose = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
+        // Decrement inventory logically:
+        let totalCurrentUnits = (prod.stockBoxes * packing) + prod.stockLoose;
+        const unitsToDeduct = isLoose ? item.quantity : (item.quantity * packing);
+        totalCurrentUnits = Math.max(0, totalCurrentUnits - unitsToDeduct);
 
-    for (const item of items) {
-      const prod = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as any;
-      if (!prod) throw new Error(`Product ID ${item.product_id} not found.`);
+        const newBoxes = Math.floor(totalCurrentUnits / packing);
+        const newLoose = totalCurrentUnits % packing;
 
-      const isLoose = item.is_loose ? 1 : 0;
-      const packing = prod.packing || 1;
-      const unitCost = isLoose ? prod.unit_trade_price : prod.box_trade_price;
+        await tx.product.update({
+          where: { id: prod.id },
+          data: {
+            stockBoxes: newBoxes,
+            stockLoose: newLoose
+          }
+        });
+      }
 
-      insertItem.run(
-        saleId, prod.id, prod.c_code, prod.p_code, prod.name, prod.unit_type, prod.location_rack,
-        isLoose, item.quantity, item.unit_price, unitCost, item.gross_amount,
-        item.discount_pct || 0, item.discount_amount || 0, item.net_amount, item.batch_id || null
-      );
+      // 3. Update customer Khata balance if credit sale
+      if (payment_type === 'Credit' && customer_id) {
+        await tx.customer.update({
+          where: { id: Number(customer_id) },
+          data: {
+            currentBalance: { increment: parseFloat(net_total) || 0 }
+          }
+        });
+      }
 
-      // Decrement inventory logically:
-      // Convert current stock to total loose units:
-      let totalCurrentUnits = (prod.stock_boxes * packing) + prod.stock_loose;
-      const unitsToDeduct = isLoose ? item.quantity : (item.quantity * packing);
-      totalCurrentUnits = Math.max(0, totalCurrentUnits - unitsToDeduct);
+      return { saleId: sale.id, invoiceNo };
+    });
 
-      const newBoxes = Math.floor(totalCurrentUnits / packing);
-      const newLoose = totalCurrentUnits % packing;
-
-      updateProductStock.run(newBoxes, newLoose, prod.id);
-    }
-
-    // If credit sale to registered customer, update outstanding Khata balance
-    if (payment_type === 'Credit' && customer_id) {
-      db.prepare('UPDATE customers SET current_balance = current_balance + ? WHERE id = ?').run(net_total, customer_id);
-    }
-
-    return { saleId, invoiceNo };
-  });
-
-  try {
-    const result = transaction();
     res.json({ success: true, ...result });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.get('/api/sales', (req: Request, res: Response) => {
-  const { date_from, date_to, invoice_no, customer_id } = req.query;
-  let query = 'SELECT * FROM sales WHERE 1=1';
-  const params: any[] = [];
+app.get('/api/sales', async (req: Request, res: Response) => {
+  try {
+    const { date_from, date_to, invoice_no, customer_id } = req.query;
+    const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
 
-  if (invoice_no) {
-    query += ' AND invoice_no LIKE ?';
-    params.push(`%${invoice_no}%`);
-  }
-  if (date_from) {
-    query += ' AND DATE(sale_date) >= ?';
-    params.push(date_from);
-  }
-  if (date_to) {
-    query += ' AND DATE(sale_date) <= ?';
-    params.push(date_to);
-  }
-  if (customer_id) {
-    query += ' AND customer_id = ?';
-    params.push(customer_id);
-  }
+    if (invoice_no) {
+      const search = `%${String(invoice_no).trim()}%`;
+      conditions.push(Prisma.sql`invoice_no LIKE ${search}`);
+    }
+    if (date_from) {
+      conditions.push(Prisma.sql`DATE(sale_date) >= ${String(date_from)}`);
+    }
+    if (date_to) {
+      conditions.push(Prisma.sql`DATE(sale_date) <= ${String(date_to)}`);
+    }
+    if (customer_id) {
+      conditions.push(Prisma.sql`customer_id = ${Number(customer_id)}`);
+    }
 
-  query += ' ORDER BY id DESC LIMIT 100';
+    const whereClause = Prisma.join(conditions, ' AND ');
 
-  const sales = db.prepare(query).all(...params);
-  res.json(sales);
+    const sales = await prisma.$queryRaw<any[]>`
+      SELECT * FROM sales
+      WHERE ${whereClause}
+      ORDER BY id DESC
+      LIMIT 100
+    `;
+    res.json(sales);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
-app.get('/api/sales/:id', (req: Request, res: Response) => {
-  const { id } = req.params;
-  const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(id) as any;
-  if (!sale) return res.status(404).json({ error: 'Sale invoice not found' });
+app.get('/api/sales/:id', async (req: Request, res: Response) => {
+  try {
+    const idNum = Number(req.params.id);
+    const sale = await prisma.sale.findUnique({
+      where: { id: idNum },
+      include: {
+        items: true
+      }
+    });
 
-  const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(id);
-  res.json({ ...sale, items });
+    if (!sale) return res.status(404).json({ error: 'Sale invoice not found' });
+    res.json(formatSale(sale));
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
-app.post('/api/sales/return', (req: Request, res: Response) => {
-  const { sale_id, original_invoice_no, customer_name, return_items, reason, user_id, user_name } = req.body;
-  if (!return_items || return_items.length === 0) {
-    return res.status(400).json({ error: 'No return items specified' });
-  }
+app.post('/api/sales/return', async (req: Request, res: Response) => {
+  try {
+    const { sale_id, original_invoice_no, customer_name, return_items, reason, user_id, user_name } = req.body;
+    if (!return_items || return_items.length === 0) {
+      return res.status(400).json({ error: 'No return items specified' });
+    }
 
-  const transaction = db.transaction(() => {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const countToday = (db.prepare('SELECT COUNT(*) as count FROM sale_returns WHERE return_no LIKE ?').get(`SR-${today}-%`) as any).count;
+    const countToday = await prisma.saleReturn.count({
+      where: { returnNo: { startsWith: `SR-${today}-` } }
+    });
     const returnNo = `SR-${today}-${String(countToday + 1).padStart(4, '0')}`;
 
     let totalRefund = 0;
@@ -857,163 +1250,183 @@ app.post('/api/sales/return', (req: Request, res: Response) => {
       totalRefund += Number(item.total_refund || (item.quantity * item.unit_refund_price));
     }
 
-    const insertReturn = db.prepare(`
-      INSERT INTO sale_returns (return_no, sale_id, original_invoice_no, customer_name, refund_amount, reason, user_id, user_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    const result = await prisma.$transaction(async (tx) => {
+      const saleReturn = await tx.saleReturn.create({
+        data: {
+          returnNo,
+          saleId: sale_id ? Number(sale_id) : null,
+          originalInvoiceNo: original_invoice_no || null,
+          customerName: customer_name || 'Customer',
+          refundAmount: totalRefund,
+          reason: reason || null,
+          userId: user_id ? Number(user_id) : null,
+          userName: user_name || 'Cashier'
+        }
+      });
 
-    const returnInfo = insertReturn.run(
-      returnNo, sale_id || null, original_invoice_no || null, customer_name || 'Customer',
-      totalRefund, reason || null, user_id || null, user_name || 'Cashier'
-    );
+      for (const item of return_items) {
+        const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
+        if (prod) {
+          const isLoose = item.is_loose ? 1 : 0;
+          const packing = prod.packing || 1;
+          const itemRefund = item.total_refund || (item.quantity * item.unit_refund_price);
 
-    const returnId = returnInfo.lastInsertRowid;
+          await tx.saleReturnItem.create({
+            data: {
+              saleReturnId: saleReturn.id,
+              productId: prod.id,
+              productName: prod.name,
+              isLoose,
+              quantity: parseFloat(item.quantity),
+              unitRefundPrice: parseFloat(item.unit_refund_price),
+              totalRefund: itemRefund
+            }
+          });
 
-    const insertReturnItem = db.prepare(`
-      INSERT INTO sale_return_items (sale_return_id, product_id, product_name, is_loose, quantity, unit_refund_price, total_refund)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+          let totalUnits = (prod.stockBoxes * packing) + prod.stockLoose;
+          const unitsToAdd = isLoose ? item.quantity : (item.quantity * packing);
+          totalUnits += unitsToAdd;
 
-    const updateProductStock = db.prepare(`
-      UPDATE products SET
-        stock_boxes = ?,
-        stock_loose = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
+          const newBoxes = Math.floor(totalUnits / packing);
+          const newLoose = totalUnits % packing;
 
-    for (const item of return_items) {
-      const prod = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as any;
-      if (prod) {
-        const isLoose = item.is_loose ? 1 : 0;
-        const packing = prod.packing || 1;
-        const itemRefund = item.total_refund || (item.quantity * item.unit_refund_price);
-
-        insertReturnItem.run(returnId, prod.id, prod.name, isLoose, item.quantity, item.unit_refund_price, itemRefund);
-
-        let totalUnits = (prod.stock_boxes * packing) + prod.stock_loose;
-        const unitsToAdd = isLoose ? item.quantity : (item.quantity * packing);
-        totalUnits += unitsToAdd;
-
-        const newBoxes = Math.floor(totalUnits / packing);
-        const newLoose = totalUnits % packing;
-        updateProductStock.run(newBoxes, newLoose, prod.id);
+          await tx.product.update({
+            where: { id: prod.id },
+            data: {
+              stockBoxes: newBoxes,
+              stockLoose: newLoose
+            }
+          });
+        }
       }
-    }
 
-    if (sale_id) {
-      db.prepare("UPDATE sales SET status = 'returned' WHERE id = ?").run(sale_id);
-    }
+      if (sale_id) {
+        await tx.sale.update({
+          where: { id: Number(sale_id) },
+          data: { status: 'returned' }
+        });
+      }
 
-    return { returnId, returnNo, totalRefund };
-  });
+      return { returnId: saleReturn.id, returnNo, totalRefund };
+    });
 
-  try {
-    const result = transaction();
     res.json({ success: true, ...result });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // -------------------------------------------------------------
 // 6. Purchases & Supplier Inward
 // -------------------------------------------------------------
-app.get('/api/purchases', (_req: Request, res: Response) => {
-  const purchases = db.prepare(`
-    SELECT p.*, c.name as company_name, c.code as company_code
-    FROM purchases p
-    LEFT JOIN companies c ON p.company_id = c.id
-    ORDER BY p.id DESC LIMIT 100
-  `).all();
-  res.json(purchases);
+app.get('/api/purchases', async (_req: Request, res: Response) => {
+  try {
+    const purchases = await prisma.$queryRaw<any[]>`
+      SELECT p.*, c.name as company_name, c.code as company_code
+      FROM purchases p
+      LEFT JOIN companies c ON p.company_id = c.id
+      ORDER BY p.id DESC LIMIT 100
+    `;
+    res.json(purchases);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
-app.post('/api/purchases', (req: Request, res: Response) => {
-  const {
-    supplier_invoice_no, company_id, purchase_date, items,
-    total_gross, discount_amount, tax_amount, net_total, payment_status, notes, user_id
-  } = req.body;
+app.post('/api/purchases', async (req: Request, res: Response) => {
+  try {
+    const {
+      supplier_invoice_no, company_id, purchase_date, items,
+      total_gross, discount_amount, tax_amount, net_total, payment_status, notes, user_id
+    } = req.body;
 
-  if (!items || items.length === 0) {
-    return res.status(400).json({ error: 'Purchase must have items' });
-  }
-
-  const company = db.prepare('SELECT name FROM companies WHERE id = ?').get(company_id) as any;
-  if (!company) return res.status(400).json({ error: 'Company not found' });
-
-  const transaction = db.transaction(() => {
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const countToday = (db.prepare('SELECT COUNT(*) as count FROM purchases WHERE invoice_no LIKE ?').get(`PUR-${today}-%`) as any).count;
-    const invoiceNo = `PUR-${today}-${String(countToday + 1).padStart(4, '0')}`;
-
-    const insertPurchase = db.prepare(`
-      INSERT INTO purchases (
-        invoice_no, supplier_invoice_no, company_id, company_name, purchase_date,
-        total_gross, discount_amount, tax_amount, net_total, payment_status, notes, user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const purInfo = insertPurchase.run(
-      invoiceNo, supplier_invoice_no || null, company_id, company.name, purchase_date || new Date().toISOString().split('T')[0],
-      total_gross, discount_amount || 0, tax_amount || 0, net_total, payment_status || 'Paid', notes || null, user_id || null
-    );
-
-    const purchaseId = purInfo.lastInsertRowid;
-
-    const insertItem = db.prepare(`
-      INSERT INTO purchase_items (
-        purchase_id, product_id, product_name, batch_no, expiry_date,
-        quantity_boxes, bonus_boxes, box_cost_price, box_retail_price, discount_pct, total_cost
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const updateProduct = db.prepare(`
-      UPDATE products SET
-        stock_boxes = stock_boxes + ?,
-        box_trade_price = ?,
-        box_retail_price = ?,
-        unit_trade_price = ?,
-        unit_retail_price = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-
-    const insertBatch = db.prepare(`
-      INSERT INTO product_batches (
-        product_id, batch_no, expiry_date, purchase_cost, retail_price, quantity_boxes
-      ) VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    for (const item of items) {
-      const prod = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as any;
-      if (prod) {
-        const totalBoxes = Number(item.quantity_boxes || 0) + Number(item.bonus_boxes || 0);
-        const packing = prod.packing || 1;
-        const boxCost = Number(item.box_cost_price);
-        const boxRetail = Number(item.box_retail_price);
-        const unitCost = boxCost / packing;
-        const unitRetail = boxRetail / packing;
-
-        insertItem.run(
-          purchaseId, prod.id, prod.name, item.batch_no || 'NA', item.expiry_date || '',
-          item.quantity_boxes, item.bonus_boxes || 0, boxCost, boxRetail, item.discount_pct || 0, item.total_cost
-        );
-
-        updateProduct.run(totalBoxes, boxCost, boxRetail, unitCost, unitRetail, prod.id);
-
-        insertBatch.run(prod.id, item.batch_no || 'B-NEW', item.expiry_date || '', boxCost, boxRetail, totalBoxes);
-      }
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'Purchase must have items' });
     }
 
-    return { purchaseId, invoiceNo };
-  });
+    const company = await prisma.company.findUnique({ where: { id: Number(company_id) } });
+    if (!company) return res.status(400).json({ error: 'Company not found' });
 
-  try {
-    const result = transaction();
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const countToday = await prisma.purchase.count({
+      where: { invoiceNo: { startsWith: `PUR-${today}-` } }
+    });
+    const invoiceNo = `PUR-${today}-${String(countToday + 1).padStart(4, '0')}`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.create({
+        data: {
+          invoiceNo,
+          supplierInvoiceNo: supplier_invoice_no || null,
+          companyId: company.id,
+          companyName: company.name,
+          purchaseDate: purchase_date || new Date().toISOString().split('T')[0],
+          totalGross: parseFloat(total_gross) || 0,
+          discountAmount: parseFloat(discount_amount) || 0,
+          taxAmount: parseFloat(tax_amount) || 0,
+          netTotal: parseFloat(net_total) || 0,
+          paymentStatus: payment_status || 'Paid',
+          notes: notes || null,
+          userId: user_id ? Number(user_id) : null
+        }
+      });
+
+      for (const item of items) {
+        const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
+        if (prod) {
+          const totalBoxes = Number(item.quantity_boxes || 0) + Number(item.bonus_boxes || 0);
+          const packing = prod.packing || 1;
+          const boxCost = Number(item.box_cost_price);
+          const boxRetail = Number(item.box_retail_price);
+          const unitCost = boxCost / packing;
+          const unitRetail = boxRetail / packing;
+
+          await tx.purchaseItem.create({
+            data: {
+              purchaseId: purchase.id,
+              productId: prod.id,
+              productName: prod.name,
+              batchNo: item.batch_no || 'NA',
+              expiryDate: item.expiry_date || '',
+              quantityBoxes: Number(item.quantity_boxes),
+              bonusBoxes: Number(item.bonus_boxes || 0),
+              boxCostPrice: boxCost,
+              boxRetailPrice: boxRetail,
+              discountPct: parseFloat(item.discount_pct) || 0,
+              totalCost: parseFloat(item.total_cost) || 0
+            }
+          });
+
+          await tx.product.update({
+            where: { id: prod.id },
+            data: {
+              stockBoxes: { increment: totalBoxes },
+              boxTradePrice: boxCost,
+              boxRetailPrice: boxRetail,
+              unitTradePrice: unitCost,
+              unitRetailPrice: unitRetail
+            }
+          });
+
+          await tx.productBatch.create({
+            data: {
+              productId: prod.id,
+              batchNo: item.batch_no || 'B-NEW',
+              expiryDate: item.expiry_date || '',
+              purchaseCost: boxCost,
+              retailPrice: boxRetail,
+              quantityBoxes: totalBoxes
+            }
+          });
+        }
+      }
+
+      return { purchaseId: purchase.id, invoiceNo };
+    });
+
     res.json({ success: true, ...result });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -1022,156 +1435,182 @@ app.post('/api/purchases', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 
 // Available Stock with valuation
-app.get('/api/reports/stock/available', (_req: Request, res: Response) => {
-  const stock = db.prepare(`
-    SELECT 
-      p.id, p.c_code, p.p_code, p.name, p.generic_name, p.unit_type, p.packing,
-      p.location_rack, p.stock_boxes, p.stock_loose, p.box_trade_price, p.box_retail_price,
-      p.unit_trade_price, p.unit_retail_price,
-      ((p.stock_boxes * p.box_trade_price) + (p.stock_loose * p.unit_trade_price)) as total_cost_value,
-      ((p.stock_boxes * p.box_retail_price) + (p.stock_loose * p.unit_retail_price)) as total_retail_value,
-      c.name as company_name
-    FROM products p
-    LEFT JOIN companies c ON p.company_id = c.id
-    WHERE p.status = 'active'
-    ORDER BY p.name ASC
-  `).all();
-  res.json(stock);
+app.get('/api/reports/stock/available', async (_req: Request, res: Response) => {
+  try {
+    const stock = await prisma.$queryRaw<any[]>`
+      SELECT 
+        p.id, p.c_code, p.p_code, p.name, p.generic_name, p.unit_type, p.packing,
+        p.location_rack, p.stock_boxes, p.stock_loose, p.box_trade_price, p.box_retail_price,
+        p.unit_trade_price, p.unit_retail_price,
+        ((p.stock_boxes * p.box_trade_price) + (p.stock_loose * p.unit_trade_price)) as total_cost_value,
+        ((p.stock_boxes * p.box_retail_price) + (p.stock_loose * p.unit_retail_price)) as total_retail_value,
+        c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE p.status = 'active'
+      ORDER BY p.name ASC
+    `;
+    res.json(stock);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
 // Expired & Near-Expiry Products
-app.get('/api/reports/stock/expired', (req: Request, res: Response) => {
-  const { days = '0' } = req.query;
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + Number(days));
-  const targetStr = targetDate.toISOString().split('T')[0];
+app.get('/api/reports/stock/expired', async (req: Request, res: Response) => {
+  try {
+    const days = req.query.days ? String(req.query.days) : '0';
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + Number(days));
+    const targetStr = targetDate.toISOString().split('T')[0];
 
-  const expired = db.prepare(`
-    SELECT 
-      b.id as batch_id, b.batch_no, b.expiry_date, b.quantity_boxes, b.quantity_loose,
-      p.id as product_id, p.c_code, p.p_code, p.name as product_name, p.unit_type, p.location_rack,
-      p.box_trade_price, (b.quantity_boxes * p.box_trade_price) as loss_valuation,
-      c.name as company_name
-    FROM product_batches b
-    JOIN products p ON b.product_id = p.id
-    LEFT JOIN companies c ON p.company_id = c.id
-    WHERE b.expiry_date <= ? AND (b.quantity_boxes > 0 OR b.quantity_loose > 0)
-    ORDER BY b.expiry_date ASC
-  `).all(targetStr);
+    const expired = await prisma.$queryRaw<any[]>`
+      SELECT 
+        b.id as batch_id, b.batch_no, b.expiry_date, b.quantity_boxes, b.quantity_loose,
+        p.id as product_id, p.c_code, p.p_code, p.name as product_name, p.unit_type, p.location_rack,
+        p.box_trade_price, (b.quantity_boxes * p.box_trade_price) as loss_valuation,
+        c.name as company_name
+      FROM product_batches b
+      JOIN products p ON b.product_id = p.id
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE b.expiry_date <= ${targetStr} AND (b.quantity_boxes > 0 OR b.quantity_loose > 0)
+      ORDER BY b.expiry_date ASC
+    `;
 
-  res.json(expired);
+    res.json(expired);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
 // Finished / Zero stock
-app.get('/api/reports/stock/finished', (_req: Request, res: Response) => {
-  const finished = db.prepare(`
-    SELECT p.id, p.c_code, p.p_code, p.name, p.unit_type, p.location_rack, p.box_retail_price, c.name as company_name
-    FROM products p
-    LEFT JOIN companies c ON p.company_id = c.id
-    WHERE p.stock_boxes = 0 AND p.stock_loose = 0 AND p.status = 'active'
-    ORDER BY p.name ASC
-  `).all();
-  res.json(finished);
+app.get('/api/reports/stock/finished', async (_req: Request, res: Response) => {
+  try {
+    const finished = await prisma.$queryRaw<any[]>`
+      SELECT p.id, p.c_code, p.p_code, p.name, p.unit_type, p.location_rack, p.box_retail_price, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE p.stock_boxes = 0 AND p.stock_loose = 0 AND p.status = 'active'
+      ORDER BY p.name ASC
+    `;
+    res.json(finished);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
 // Sales & Profit/Loss Summary
-app.get('/api/reports/financial/pnl-summary', (req: Request, res: Response) => {
-  const { date_from, date_to } = req.query;
-  let where = "WHERE s.status = 'completed'";
-  const params: any[] = [];
+app.get('/api/reports/financial/pnl-summary', async (req: Request, res: Response) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const conditions: Prisma.Sql[] = [Prisma.sql`s.status = 'completed'`];
 
-  if (date_from) {
-    where += " AND DATE(s.sale_date) >= ?";
-    params.push(date_from);
+    if (date_from) {
+      conditions.push(Prisma.sql`DATE(s.sale_date) >= ${String(date_from)}`);
+    }
+    if (date_to) {
+      conditions.push(Prisma.sql`DATE(s.sale_date) <= ${String(date_to)}`);
+    }
+
+    const whereClause = Prisma.join(conditions, ' AND ');
+
+    const pnlRaw = await prisma.$queryRaw<any[]>`
+      SELECT 
+        COUNT(DISTINCT s.id) as total_invoices,
+        COALESCE(SUM(si.net_amount), 0) as total_revenue,
+        COALESCE(SUM(si.quantity * si.unit_cost), 0) as total_cost_of_goods,
+        COALESCE(SUM(si.net_amount) - SUM(si.quantity * si.unit_cost) - SUM(s.bill_discount_amt), 0) as gross_profit
+      FROM sales s
+      JOIN sale_items si ON s.id = si.sale_id
+      WHERE ${whereClause}
+    `;
+
+    res.json(pnlRaw[0] || { total_invoices: 0, total_revenue: 0, total_cost_of_goods: 0, gross_profit: 0 });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
-  if (date_to) {
-    where += " AND DATE(s.sale_date) <= ?";
-    params.push(date_to);
-  }
-
-  const pnl = db.prepare(`
-    SELECT 
-      COUNT(DISTINCT s.id) as total_invoices,
-      COALESCE(SUM(si.net_amount), 0) as total_revenue,
-      COALESCE(SUM(si.quantity * si.unit_cost), 0) as total_cost_of_goods,
-      COALESCE(SUM(si.net_amount) - SUM(si.quantity * si.unit_cost) - SUM(s.bill_discount_amt), 0) as gross_profit
-    FROM sales s
-    JOIN sale_items si ON s.id = si.sale_id
-    ${where}
-  `).get(...params);
-
-  res.json(pnl);
 });
 
 // Invoice-wise P&L
-app.get('/api/reports/financial/invoice-pnl', (req: Request, res: Response) => {
-  const { date_from, date_to } = req.query;
-  let where = "WHERE s.status = 'completed'";
-  const params: any[] = [];
+app.get('/api/reports/financial/invoice-pnl', async (req: Request, res: Response) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const conditions: Prisma.Sql[] = [Prisma.sql`s.status = 'completed'`];
 
-  if (date_from) {
-    where += " AND DATE(s.sale_date) >= ?";
-    params.push(date_from);
+    if (date_from) {
+      conditions.push(Prisma.sql`DATE(s.sale_date) >= ${String(date_from)}`);
+    }
+    if (date_to) {
+      conditions.push(Prisma.sql`DATE(s.sale_date) <= ${String(date_to)}`);
+    }
+
+    const whereClause = Prisma.join(conditions, ' AND ');
+
+    const list = await prisma.$queryRaw<any[]>`
+      SELECT 
+        s.id, s.invoice_no, s.sale_date, s.customer_name, s.payment_type,
+        s.net_total as sale_amount,
+        SUM(si.quantity * si.unit_cost) as total_cost,
+        (s.net_total - SUM(si.quantity * si.unit_cost)) as net_profit,
+        ROUND(((s.net_total - SUM(si.quantity * si.unit_cost)) / NULLIF(s.net_total, 0)) * 100, 2) as profit_margin_pct
+      FROM sales s
+      JOIN sale_items si ON s.id = si.sale_id
+      WHERE ${whereClause}
+      GROUP BY s.id
+      ORDER BY s.id DESC
+      LIMIT 100
+    `;
+
+    res.json(list);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
-  if (date_to) {
-    where += " AND DATE(s.sale_date) <= ?";
-    params.push(date_to);
-  }
-
-  const list = db.prepare(`
-    SELECT 
-      s.id, s.invoice_no, s.sale_date, s.customer_name, s.payment_type,
-      s.net_total as sale_amount,
-      SUM(si.quantity * si.unit_cost) as total_cost,
-      (s.net_total - SUM(si.quantity * si.unit_cost)) as net_profit,
-      ROUND(((s.net_total - SUM(si.quantity * si.unit_cost)) / NULLIF(s.net_total, 0)) * 100, 2) as profit_margin_pct
-    FROM sales s
-    JOIN sale_items si ON s.id = si.sale_id
-    ${where}
-    GROUP BY s.id
-    ORDER BY s.id DESC
-    LIMIT 100
-  `).all(...params);
-
-  res.json(list);
 });
 
 // Product-wise sales
-app.get('/api/reports/sales/product-wise', (req: Request, res: Response) => {
-  const list = db.prepare(`
-    SELECT 
-      si.product_id, si.c_code, si.p_code, si.product_name, si.unit_type,
-      SUM(si.quantity) as total_quantity_sold,
-      SUM(si.net_amount) as total_sales_amount,
-      SUM(si.quantity * si.unit_cost) as total_cost_amount,
-      (SUM(si.net_amount) - SUM(si.quantity * si.unit_cost)) as gross_profit
-    FROM sale_items si
-    JOIN sales s ON si.sale_id = s.id
-    WHERE s.status = 'completed'
-    GROUP BY si.product_id
-    ORDER BY total_sales_amount DESC
-    LIMIT 50
-  `).all();
-  res.json(list);
+app.get('/api/reports/sales/product-wise', async (_req: Request, res: Response) => {
+  try {
+    const list = await prisma.$queryRaw<any[]>`
+      SELECT 
+        si.product_id, si.c_code, si.p_code, si.product_name, si.unit_type,
+        SUM(si.quantity) as total_quantity_sold,
+        SUM(si.net_amount) as total_sales_amount,
+        SUM(si.quantity * si.unit_cost) as total_cost_amount,
+        (SUM(si.net_amount) - SUM(si.quantity * si.unit_cost)) as gross_profit
+      FROM sale_items si
+      JOIN sales s ON si.sale_id = s.id
+      WHERE s.status = 'completed'
+      GROUP BY si.product_id
+      ORDER BY total_sales_amount DESC
+      LIMIT 50
+    `;
+    res.json(list);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
 // Company-wise sales
-app.get('/api/reports/sales/company-wise', (_req: Request, res: Response) => {
-  const list = db.prepare(`
-    SELECT 
-      si.c_code as company_code,
-      c.name as company_name,
-      COUNT(DISTINCT s.id) as invoice_count,
-      SUM(si.quantity) as total_units_sold,
-      SUM(si.net_amount) as total_revenue
-    FROM sale_items si
-    JOIN sales s ON si.sale_id = s.id
-    LEFT JOIN companies c ON si.c_code = c.code
-    WHERE s.status = 'completed'
-    GROUP BY si.c_code
-    ORDER BY total_revenue DESC
-  `).all();
-  res.json(list);
+app.get('/api/reports/sales/company-wise', async (_req: Request, res: Response) => {
+  try {
+    const list = await prisma.$queryRaw<any[]>`
+      SELECT 
+        si.c_code as company_code,
+        c.name as company_name,
+        COUNT(DISTINCT s.id) as invoice_count,
+        SUM(si.quantity) as total_units_sold,
+        SUM(si.net_amount) as total_revenue
+      FROM sale_items si
+      JOIN sales s ON si.sale_id = s.id
+      LEFT JOIN companies c ON si.c_code = c.code
+      WHERE s.status = 'completed'
+      GROUP BY si.c_code
+      ORDER BY total_revenue DESC
+    `;
+    res.json(list);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
 });
 
 // -------------------------------------------------------------
@@ -1182,8 +1621,8 @@ app.get('/api/utilities/backups', (_req: Request, res: Response) => {
   try {
     const list = getBackupList();
     res.json(list);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -1192,8 +1631,8 @@ app.post('/api/utilities/backup', async (req: Request, res: Response) => {
   try {
     const result = await createBackup('manual', customDir);
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -1206,8 +1645,8 @@ app.post('/api/utilities/restore', async (req: Request, res: Response) => {
   try {
     const result = await restoreDatabase(backupFilePath);
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -1220,8 +1659,8 @@ app.post('/api/utilities/stock-zero', (req: Request, res: Response) => {
   try {
     const affected = resetStockZero(company_id ? Number(company_id) : undefined, user_id, user_name);
     res.json({ success: true, message: `Successfully zeroed stock for ${affected} product(s).`, affected });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -1229,43 +1668,67 @@ app.post('/api/utilities/optimize', (_req: Request, res: Response) => {
   try {
     const result = optimizeDatabase();
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // Daily Closing Utility
 app.post('/api/utilities/closing', async (req: Request, res: Response) => {
-  const {
-    closing_date, opening_cash, total_sales_cash, total_sales_card, total_sales_credit,
-    total_returns, total_purchases_paid, expenses_total, expected_cash, actual_cash, difference,
-    notes, user_id, user_name
-  } = req.body;
-
   try {
+    const {
+      closing_date, opening_cash, total_sales_cash, total_sales_card, total_sales_credit,
+      total_returns, total_purchases_paid, expenses_total, expected_cash, actual_cash, difference,
+      notes, user_id, user_name
+    } = req.body;
+
     const today = closing_date || new Date().toISOString().split('T')[0];
-    const now = new Date().toISOString();
+    const now = new Date();
 
-    const insertClosing = db.prepare(`
-      INSERT OR REPLACE INTO daily_closings (
-        closing_date, opening_time, closing_time, user_id, user_name,
-        opening_cash, total_sales_cash, total_sales_card, total_sales_credit,
-        total_returns, total_purchases_paid, expenses_total, expected_cash, actual_cash, difference,
-        notes, is_closed
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-    `);
-
-    insertClosing.run(
-      today, now, now, user_id || null, user_name || 'Admin',
-      opening_cash || 0, total_sales_cash || 0, total_sales_card || 0, total_sales_credit || 0,
-      total_returns || 0, total_purchases_paid || 0, expenses_total || 0, expected_cash || 0, actual_cash || 0, difference || 0,
-      notes || null
-    );
+    await prisma.dailyClosing.upsert({
+      where: { closingDate: today },
+      create: {
+        closingDate: today,
+        openingTime: now,
+        closingTime: now,
+        userId: user_id ? Number(user_id) : null,
+        userName: user_name || 'Admin',
+        openingCash: parseFloat(opening_cash) || 0,
+        totalSalesCash: parseFloat(total_sales_cash) || 0,
+        totalSalesCard: parseFloat(total_sales_card) || 0,
+        totalSalesCredit: parseFloat(total_sales_credit) || 0,
+        totalReturns: parseFloat(total_returns) || 0,
+        totalPurchasesPaid: parseFloat(total_purchases_paid) || 0,
+        expensesTotal: parseFloat(expenses_total) || 0,
+        expectedCash: parseFloat(expected_cash) || 0,
+        actualCash: parseFloat(actual_cash) || 0,
+        difference: parseFloat(difference) || 0,
+        notes: notes || null,
+        isClosed: 1
+      },
+      update: {
+        closingTime: now,
+        userId: user_id ? Number(user_id) : null,
+        userName: user_name || 'Admin',
+        openingCash: parseFloat(opening_cash) || 0,
+        totalSalesCash: parseFloat(total_sales_cash) || 0,
+        totalSalesCard: parseFloat(total_sales_card) || 0,
+        totalSalesCredit: parseFloat(total_sales_credit) || 0,
+        totalReturns: parseFloat(total_returns) || 0,
+        totalPurchasesPaid: parseFloat(total_purchases_paid) || 0,
+        expensesTotal: parseFloat(expenses_total) || 0,
+        expectedCash: parseFloat(expected_cash) || 0,
+        actualCash: parseFloat(actual_cash) || 0,
+        difference: parseFloat(difference) || 0,
+        notes: notes || null,
+        isClosed: 1
+      }
+    });
 
     // Auto-backup on closing if enabled
-    const autoBackupEnabled = db.prepare("SELECT value FROM system_settings WHERE key = 'auto_backup_enabled'").get() as any;
+    const autoBackupSetting = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_enabled' } });
     let backupResult = null;
-    if (autoBackupEnabled && autoBackupEnabled.value === 'true') {
+    if (autoBackupSetting?.value === 'true') {
       try {
         backupResult = await createBackup('auto_daily');
       } catch (bkErr) {
@@ -1274,40 +1737,46 @@ app.post('/api/utilities/closing', async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, message: 'Daily closing recorded successfully.', backup: backupResult });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
 // -------------------------------------------------------------
 // 9. System Settings
 // -------------------------------------------------------------
-app.get('/api/settings', (_req: Request, res: Response) => {
-  const rows = db.prepare('SELECT key, value FROM system_settings').all() as Array<{ key: string; value: string }>;
-  const settings: Record<string, string> = {
-    max_bill_discount_pct: '14'
-  };
-  for (const r of rows) {
-    settings[r.key] = r.value;
+app.get('/api/settings', async (_req: Request, res: Response) => {
+  try {
+    const rows = await prisma.systemSetting.findMany();
+    const settings: Record<string, string> = {
+      max_bill_discount_pct: '14'
+    };
+    for (const r of rows) {
+      settings[r.key] = r.value;
+    }
+    res.json(settings);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
-  res.json(settings);
 });
 
-app.post('/api/settings', (req: Request, res: Response) => {
-  const settings = req.body;
-  const upsert = db.prepare('INSERT INTO system_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
-
-  const transaction = db.transaction(() => {
-    for (const [key, val] of Object.entries(settings)) {
-      upsert.run(key, String(val));
-    }
-  });
-
+app.post('/api/settings', async (req: Request, res: Response) => {
   try {
-    transaction();
+    const settings = req.body;
+
+    await prisma.$transaction(
+      Object.entries(settings).map(([key, val]) =>
+        prisma.systemSetting.upsert({
+          where: { key },
+          update: { value: String(val) },
+          create: { key, value: String(val) }
+        })
+      )
+    );
+
     res.json({ success: true, message: 'Settings saved successfully' });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
