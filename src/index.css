@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-slate-100 text-slate-800 dark:bg-[#0b0f19] dark:text-slate-100 transition-colors duration-150;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Custom high-contrast scrollbars for fast POS tables */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  /* Light mode scrollbar */
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Dark mode scrollbar */
+  .dark ::-webkit-scrollbar-track {
+    background: #131b2e;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+/* POS High-speed input typography */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Thermal Receipt Print Stylesheet */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #thermal-receipt-printable,
+  #thermal-receipt-printable * {
+    visibility: visible;
+  }
+
+  #thermal-receipt-printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    margin: 0;
+    padding: 0;
+    color: #000000 !important;
+    background: #ffffff !important;
+    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+  }
+
+  @page {
+    size: 80mm auto;
+    margin: 2mm;
+  }
+}
+
+/* Glassmorphic and surface card styling */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .glass-panel {
+  background: rgba(19, 27, 46, 0.85);
+  border-color: rgba(51, 65, 85, 0.5);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(13, 148, 136, 0.4);
+}
+
+.dark .glass-panel-hover:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(45, 212, 191, 0.3);
+}
+
+.glow-teal {
+  box-shadow: 0 0 20px -3px rgba(20, 184, 166, 0.25);
+}
