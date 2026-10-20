@@ -30,6 +30,7 @@ const DEFAULT_ADMIN_PERMISSIONS: RolePermissions = {
   can_backup: true,
   can_restore: true,
   can_shift_close: true,
+  can_manage_shifts: true,
   can_stock_zero: true,
   can_manage_users: true,
   can_manage_roles: true

@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
   const visibleNavItems = allNavItems.filter(item => hasModuleAccess(item.id));
 
   return (
-    <aside className={`${collapsed ? 'w-18' : 'w-64'} bg-slate-50/95 dark:bg-[#0f172a]/95 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between select-none transition-all duration-200`}>
+    <aside className={`${collapsed ? 'w-18' : 'w-64'} bg-slate-50/95 dark:bg-[#0a0e17]/95 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between select-none transition-all duration-200`}>
       <div className="py-3 px-2.5 space-y-1">
         {/* Module Header / Toggle */}
         <div className="flex items-center justify-between px-2 pb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
           <button
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors ml-auto"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#162032] transition-colors ml-auto"
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
@@ -64,8 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
               title={collapsed ? item.label : undefined}
               className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} rounded-xl text-sm font-medium transition-all ${
                 isActive
-                  ? 'bg-teal-50 dark:bg-teal-600/20 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-500/40 shadow-sm shadow-teal-500/10'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
+                  ? 'bg-teal-50 dark:bg-teal-950/60 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/80 shadow-sm shadow-teal-500/10'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#111827]'
               }`}
             >
               <div className="flex items-center space-x-3">
@@ -75,8 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
               {!collapsed && item.hotkey && (
                 <span className={`px-1.5 py-0.5 text-[10px] font-mono rounded font-semibold ${
                   isActive
-                    ? 'bg-teal-100 dark:bg-teal-500/30 text-teal-800 dark:text-teal-200'
-                    : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                    ? 'bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200'
+                    : 'bg-slate-200 dark:bg-[#162032] text-slate-500 dark:text-slate-400'
                 }`}>
                   {item.hotkey}
                 </span>
@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
 
       {/* System Status footer widget */}
       {!collapsed && (
-        <div className="p-3.5 m-2.5 rounded-xl bg-slate-200/50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+        <div className="p-3.5 m-2.5 rounded-xl bg-slate-200/50 dark:bg-[#111827]/70 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
           <div className="flex items-center justify-between font-semibold text-slate-800 dark:text-slate-300">
             <span>Engine Status</span>
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>

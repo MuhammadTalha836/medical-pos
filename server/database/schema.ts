@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS customer_payments (
   previous_balance REAL NOT NULL,
   new_balance REAL NOT NULL,
   user_name TEXT,
+  shift_id INTEGER REFERENCES cashier_shifts(id),
   payment_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -119,6 +120,7 @@ CREATE TABLE IF NOT EXISTS sales (
   payment_type TEXT NOT NULL DEFAULT 'Cash', -- 'Cash', 'Card', 'Credit'
   status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'returned', 'cancelled'
   notes TEXT,
+  shift_id INTEGER REFERENCES cashier_shifts(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -154,6 +156,7 @@ CREATE TABLE IF NOT EXISTS sale_returns (
   reason TEXT,
   user_id INTEGER REFERENCES users(id),
   user_name TEXT,
+  shift_id INTEGER REFERENCES cashier_shifts(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -278,6 +281,32 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 18. Cashier Shifts
+CREATE TABLE IF NOT EXISTS cashier_shifts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shift_no TEXT UNIQUE NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  user_name TEXT NOT NULL,
+  start_time DATETIME NOT NULL,
+  end_time DATETIME,
+  duration_minutes INTEGER,
+  opening_cash REAL NOT NULL DEFAULT 0.0,
+  closing_cash REAL,
+  expected_cash REAL,
+  cash_difference REAL,
+  total_sales_count INTEGER DEFAULT 0,
+  total_sales_amount REAL DEFAULT 0.0,
+  total_cash_sales REAL DEFAULT 0.0,
+  total_card_sales REAL DEFAULT 0.0,
+  total_credit_sales REAL DEFAULT 0.0,
+  total_returns_amount REAL DEFAULT 0.0,
+  total_customer_payments REAL DEFAULT 0.0,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indices for performance
 CREATE INDEX IF NOT EXISTS idx_products_c_code ON products(c_code);
 CREATE INDEX IF NOT EXISTS idx_products_p_code ON products(p_code);
@@ -286,4 +315,7 @@ CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 CREATE INDEX IF NOT EXISTS idx_sales_invoice_no ON sales(invoice_no);
 CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
 CREATE INDEX IF NOT EXISTS idx_batches_expiry ON product_batches(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_shifts_user_status ON cashier_shifts(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_shifts_shift_no ON cashier_shifts(shift_no);
+CREATE INDEX IF NOT EXISTS idx_shifts_start_time ON cashier_shifts(start_time);
 `;

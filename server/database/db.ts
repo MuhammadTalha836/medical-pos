@@ -24,6 +24,11 @@ export function initDatabase(customPath?: string): Database.Database {
   // Execute schema
   db.exec(SCHEMA_SQL);
 
+  // Safe migrations for shift_id columns if upgrading existing database
+  try { db.exec(`ALTER TABLE sales ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
+  try { db.exec(`ALTER TABLE sale_returns ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
+  try { db.exec(`ALTER TABLE customer_payments ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
+
   // Seed default data if database is fresh
   seedInitialData(db);
 

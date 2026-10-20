@@ -100,7 +100,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
   ];
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-4">
         <div>
@@ -112,14 +112,14 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
           <button
             onClick={handleExportCSV}
             disabled={reportData.length === 0}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors disabled:opacity-40 shadow-sm"
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 dark:bg-[#162032] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors disabled:opacity-40 shadow-sm"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
           </button>
           <button
             onClick={() => window.print()}
-            className="flex items-center space-x-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors active:scale-95"
+            className="btn-print px-3 py-1.5 text-xs flex items-center space-x-1.5"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print Report</span>
@@ -139,7 +139,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
               className={`flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
                 isActive
                   ? 'bg-teal-600 text-white border-teal-500 shadow-md shadow-teal-500/20'
-                  : 'bg-white dark:bg-[#101726] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-850 shadow-sm'
+                  : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#162032] shadow-sm'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -151,7 +151,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
 
       {/* Filters Bar for Date / Expiry parameters */}
       {(currentReport === 'pnl_summary' || currentReport === 'invoice_pnl') && (
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center space-x-3 text-xs shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center space-x-3 text-xs shadow-sm">
           <span className="text-slate-600 dark:text-slate-400 font-semibold flex items-center space-x-1">
             <Calendar className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
             <span>Date Range:</span>
@@ -160,18 +160,18 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
           />
           <span className="text-slate-400">to</span>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
           />
           <button
             onClick={loadCurrentReport}
-            className="px-3 py-1 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-lg transition-colors active:scale-95"
+            className="btn-save px-3 py-1 text-xs"
           >
             Apply Filter
           </button>
@@ -179,12 +179,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
       )}
 
       {currentReport === 'expired_stock' && (
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center space-x-3 text-xs shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center space-x-3 text-xs shadow-sm">
           <span className="text-slate-700 dark:text-slate-300 font-semibold">Expiry Window:</span>
           <select
             value={expiryDays}
             onChange={(e) => setExpiryDays(e.target.value)}
-            className="bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
           >
             <option value="0">Already Expired (Past Dates)</option>
             <option value="30">Expiring in next 30 days</option>
@@ -200,17 +200,17 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
       {currentReport === 'available_stock' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
               <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Stock Items</span>
               <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-1">{reportData.length}</div>
             </div>
-            <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
               <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Valuation at Cost (T-Price)</span>
               <div className="text-2xl font-bold font-mono text-teal-600 dark:text-teal-400 mt-1">
                 {currency} {reportData.reduce((s, i) => s + (i.total_cost_value || 0), 0).toFixed(2)}
               </div>
             </div>
-            <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm">
               <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Valuation at Retail (MRP)</span>
               <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
                 {currency} {reportData.reduce((s, i) => s + (i.total_retail_value || 0), 0).toFixed(2)}
@@ -218,10 +218,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="py-2.5 px-3">C-Code</th>
                     <th className="py-2.5 px-3">P-Code</th>
@@ -242,10 +242,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                       className={`transition-colors ${
                         idx % 2 === 0
                           ? 'bg-transparent'
-                          : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                      } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                          : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                      } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                     >
-                      <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">{p.c_code}</td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-400">{p.c_code}</td>
                       <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">{p.p_code}</td>
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{p.name}</td>
                       <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{p.unit_type}</td>
@@ -255,7 +255,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">{currency} {p.box_trade_price.toFixed(2)}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-200">{currency} {p.box_retail_price.toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-teal-600 dark:text-teal-300 font-bold">{currency} {p.total_cost_value.toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-teal-600 dark:text-teal-400 font-bold">{currency} {p.total_cost_value.toFixed(2)}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold">{currency} {p.total_retail_value.toFixed(2)}</td>
                     </tr>
                   ))}
@@ -268,10 +268,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
 
       {/* 2. EXPIRED & NEAR-EXPIRY REPORT */}
       {currentReport === 'expired_stock' && (
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">Medicine</th>
                   <th className="py-2.5 px-3">Manufacturer</th>
@@ -296,8 +296,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                       className={`transition-colors ${
                         idx % 2 === 0
                           ? 'bg-transparent'
-                          : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                      } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                          : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                      } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                     >
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
                         {b.product_name}
@@ -322,10 +322,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
 
       {/* 3. FINISHED (ZERO) STOCK REPORT */}
       {currentReport === 'finished_stock' && (
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">C-Code</th>
                   <th className="py-2.5 px-3">P-Code</th>
@@ -350,17 +350,17 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                       className={`transition-colors ${
                         idx % 2 === 0
                           ? 'bg-transparent'
-                          : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                      } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                          : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                      } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                     >
-                      <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">{p.c_code}</td>
+                      <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-400">{p.c_code}</td>
                       <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">{p.p_code}</td>
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{p.name}</td>
                       <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{p.unit_type}</td>
                       <td className="py-2.5 px-3 font-mono text-amber-600 dark:text-amber-400 font-semibold">{p.location_rack || '-'}</td>
                       <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">{p.company_name}</td>
                       <td className="py-2.5 px-3 text-center">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                        <span className="badge-danger">
                           OUT OF STOCK
                         </span>
                       </td>
@@ -376,7 +376,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
       {/* 4. PROFIT & LOSS SUMMARY */}
       {currentReport === 'pnl_summary' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Net Sales Revenue</span>
             <div className="text-3xl font-extrabold font-mono text-slate-900 dark:text-white mt-2">
               {currency} {Number(pnlSummary?.total_revenue || 0).toFixed(2)}
@@ -384,7 +384,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{pnlSummary?.total_invoices || 0} invoice(s)</div>
           </div>
 
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Cost of Goods Sold (COGS)</span>
             <div className="text-3xl font-extrabold font-mono text-amber-600 dark:text-amber-400 mt-2">
               {currency} {Number(pnlSummary?.total_cost_of_goods || 0).toFixed(2)}
@@ -392,7 +392,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Based on purchase trade price</div>
           </div>
 
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Gross Profit</span>
             <div className="text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-2">
               {currency} {Number(pnlSummary?.gross_profit || 0).toFixed(2)}
@@ -400,7 +400,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
             <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Revenue minus COGS & bill discounts</div>
           </div>
 
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Profit Margin</span>
             <div className="text-3xl font-extrabold font-mono text-teal-600 dark:text-teal-400 mt-2">
               {pnlSummary?.total_revenue > 0
@@ -414,10 +414,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
 
       {/* 5. INVOICE-WISE PROFIT & LOSS */}
       {currentReport === 'invoice_pnl' && (
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">Invoice #</th>
                   <th className="py-2.5 px-3">Date</th>
@@ -435,16 +435,16 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                     className={`transition-colors ${
                       idx % 2 === 0
                         ? 'bg-transparent'
-                        : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                    } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                        : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                    } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                   >
-                    <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">{inv.invoice_no}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-400">{inv.invoice_no}</td>
                     <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{new Date(inv.sale_date).toLocaleDateString()}</td>
                     <td className="py-2.5 px-3 text-slate-900 dark:text-white font-medium">{inv.customer_name}</td>
                     <td className="py-2.5 px-3 text-right font-mono text-slate-900 dark:text-white">{currency} {Number(inv.sale_amount).toFixed(2)}</td>
                     <td className="py-2.5 px-3 text-right font-mono text-amber-600 dark:text-amber-400">{currency} {Number(inv.total_cost).toFixed(2)}</td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{currency} {Number(inv.net_profit).toFixed(2)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-300">{inv.profit_margin_pct}%</td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">{inv.profit_margin_pct}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -455,10 +455,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
 
       {/* 6. PRODUCT-WISE SALES */}
       {currentReport === 'product_sales' && (
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">C-Code</th>
                   <th className="py-2.5 px-3">P-Code</th>
@@ -476,10 +476,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                     className={`transition-colors ${
                       idx % 2 === 0
                         ? 'bg-transparent'
-                        : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                    } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                        : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                      } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                   >
-                    <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">{item.c_code}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-400">{item.c_code}</td>
                     <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">{item.p_code}</td>
                     <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{item.product_name}</td>
                     <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">{item.total_quantity_sold}</td>
@@ -496,10 +496,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
 
       {/* 7. COMPANY-WISE SALES */}
       {currentReport === 'company_sales' && (
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">Company Code</th>
                   <th className="py-2.5 px-3">Company Name</th>
@@ -515,10 +515,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                     className={`transition-colors ${
                       idx % 2 === 0
                         ? 'bg-transparent'
-                        : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                    } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                        : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                    } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                   >
-                    <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">{c.company_code}</td>
+                    <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-400">{c.company_code}</td>
                     <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{c.company_name}</td>
                     <td className="py-2.5 px-3 text-center font-mono text-slate-600 dark:text-slate-300">{c.invoice_count}</td>
                     <td className="py-2.5 px-3 text-center font-mono text-slate-600 dark:text-slate-300">{c.total_units_sold}</td>

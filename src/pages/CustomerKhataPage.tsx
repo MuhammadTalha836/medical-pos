@@ -3,6 +3,7 @@ import { api } from '../services/apiService';
 import { Customer, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
 import { useAuthStore } from '../store/useAuthStore';
+import { useShiftStore } from '../store/useShiftStore';
 import {
   CreditCard,
   Search,
@@ -24,6 +25,7 @@ interface CustomerKhataPageProps {
 
 export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }) => {
   const { hasPermission } = useAuthStore();
+  const { activeShift, fetchShiftSummary } = useShiftStore();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -135,10 +137,14 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
       const res = await api.recordCustomerPayment(selectedCustomerForPayment.id, {
         amount: paymentAmount,
         payment_method: paymentMethod,
-        notes: paymentNotes
+        notes: paymentNotes,
+        shift_id: activeShift?.id || null
       });
 
       if (res.success) {
+        if (activeShift) {
+          fetchShiftSummary(activeShift.id);
+        }
         setNotification(`Payment of ${currency} ${paymentAmount.toFixed(2)} recorded for ${selectedCustomerForPayment.name}. New Balance: ${currency} ${res.new_balance.toFixed(2)}.`);
         setSelectedCustomerForPayment(null);
         loadCustomers();
@@ -165,7 +171,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
   };
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-100 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-150">
+    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-150">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-4">
         <div>
@@ -180,7 +186,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
         {hasPermission('can_add_customer') && (
           <button
             onClick={handleOpenAddCustomer}
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold text-xs rounded-xl shadow-md transition-all self-start sm:self-auto"
+            className="btn-save flex items-center space-x-2 text-xs font-bold px-4 py-2 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Customer Account</span>
@@ -189,7 +195,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
       </div>
 
       {notification && (
-        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
+        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           <span>{notification}</span>
         </div>
@@ -197,10 +203,10 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Outstanding Udhar</span>
-            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/80 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
+            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/80 text-amber-700 dark:text-amber-400">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
@@ -214,10 +220,10 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Registered Accounts</span>
-            <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/80 border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-300">
+            <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800/80 text-teal-700 dark:text-teal-400">
               <UserCheck className="w-4 h-4" />
             </div>
           </div>
@@ -231,15 +237,15 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Credit Accounts with Balances</span>
-            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+            <div className="p-2 rounded-xl bg-slate-100 dark:bg-[#162032] border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
               <CreditCard className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <div className="text-2xl font-extrabold font-mono text-teal-700 dark:text-teal-400 tracking-tight">
+            <div className="text-2xl font-extrabold font-mono text-teal-600 dark:text-teal-400 tracking-tight">
               {customersWithCredit} / {customers.length}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -250,7 +256,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
       </div>
 
       {/* Search and Filters Bar */}
-      <div className="bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex items-center space-x-3">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex items-center space-x-3">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
@@ -258,16 +264,16 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by customer name, phone number, or clinic address..."
-            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 transition-colors"
+            className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 transition-colors"
           />
         </div>
       </div>
 
       {/* Customer Accounts Table */}
-      <div className="bg-white dark:bg-[#131b2e] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Customer Name</th>
                 <th className="py-3 px-4">Contact Info</th>
@@ -294,14 +300,18 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map((cust) => {
+                filteredCustomers.map((cust, idx) => {
                   const hasBalance = cust.current_balance > 0;
                   const isOverLimit = cust.credit_limit > 0 && cust.current_balance > cust.credit_limit;
 
                   return (
                     <tr
                       key={cust.id}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors even:bg-slate-50/40 dark:even:bg-slate-900/30"
+                      className={`transition-colors ${
+                        idx % 2 === 0
+                          ? 'bg-transparent'
+                          : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                      } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                     >
                       <td className="py-3 px-4">
                         <div className="font-bold text-slate-900 dark:text-white text-sm">{cust.name}</div>
@@ -347,13 +357,13 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                       </td>
 
                       <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                        <span className={
                           isOverLimit
-                            ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                            ? 'badge-danger'
                             : hasBalance
-                            ? 'bg-amber-50 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                            : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                        }`}>
+                            ? 'badge-warning'
+                            : 'badge-success'
+                        }>
                           {isOverLimit ? 'LIMIT EXCEEDED' : hasBalance ? 'PENDING UDHAR' : 'CLEAR'}
                         </span>
                       </td>
@@ -363,7 +373,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                           {hasBalance && hasPermission('can_receive_payment') && (
                             <button
                               onClick={() => handleOpenPaymentModal(cust)}
-                              className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-semibold shadow-sm transition-colors flex items-center space-x-1"
+                              className="btn-save px-2.5 py-1 text-[11px] font-semibold flex items-center space-x-1"
                             >
                               <DollarSign className="w-3 h-3" />
                               <span>Receive Cash</span>
@@ -372,7 +382,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
 
                           <button
                             onClick={() => handleOpenLedger(cust)}
-                            className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-medium border border-slate-200 dark:border-slate-700 transition-colors flex items-center space-x-1"
+                            className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#162032] hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold border border-slate-200 dark:border-slate-700 transition-colors flex items-center space-x-1"
                           >
                             <FileText className="w-3 h-3 text-teal-600 dark:text-teal-400" />
                             <span>Ledger</span>
@@ -381,7 +391,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                           {hasPermission('can_edit_customer') && (
                             <button
                               onClick={() => handleOpenEditCustomer(cust)}
-                              className="p-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors text-xs"
+                              className="btn-edit px-2 py-1 text-[11px]"
                               title="Edit Account Details"
                             >
                               Edit
@@ -423,7 +433,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               max={selectedCustomerForPayment?.current_balance}
               value={paymentAmount || ''}
               onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold font-mono text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -438,7 +448,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                   className={`py-2 text-xs font-semibold rounded-lg border transition-all ${
                     paymentMethod === method
                       ? 'bg-teal-600 text-white border-teal-500 shadow-sm'
-                      : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                      : 'bg-slate-100 dark:bg-[#0d131f] border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
                   }`}
                 >
                   {method}
@@ -454,7 +464,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               value={paymentNotes}
               onChange={(e) => setPaymentNotes(e.target.value)}
               placeholder="e.g. Cleared installment via Cash"
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -462,14 +472,14 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
             <button
               type="button"
               onClick={() => setSelectedCustomerForPayment(null)}
-              className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
+              className="btn-cancel px-4 py-2 text-xs"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmittingPayment}
-              className="px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-50"
+              className="btn-save px-5 py-2 text-xs"
             >
               {isSubmittingPayment ? 'Processing...' : 'Confirm Payment & Update Balance'}
             </button>
@@ -488,7 +498,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
         maxWidth="max-w-2xl"
       >
         <div className="space-y-4 text-xs">
-          <div className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl flex justify-between items-center">
+          <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl flex justify-between items-center">
             <div>
               <div className="font-bold text-slate-900 dark:text-white text-sm">{selectedCustomerForLedger?.name}</div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400">{selectedCustomerForLedger?.phone || 'No phone'} • {selectedCustomerForLedger?.address || 'No address'}</div>
@@ -508,7 +518,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               className={`pb-2 text-xs font-bold transition-colors border-b-2 flex items-center space-x-1.5 ${
                 ledgerTab === 'sales'
                   ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
               <FileText className="w-3.5 h-3.5" />
@@ -519,7 +529,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               className={`pb-2 text-xs font-bold transition-colors border-b-2 flex items-center space-x-1.5 ${
                 ledgerTab === 'payments'
                   ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -530,7 +540,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
           {ledgerTab === 'sales' ? (
             <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase">
+                <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase">
                   <tr>
                     <th className="py-2 px-3">Invoice #</th>
                     <th className="py-2 px-3">Date</th>
@@ -550,11 +560,11 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                     </tr>
                   ) : (
                     ledgerData?.sales.map(sale => (
-                      <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="py-2 px-3 font-mono font-bold text-teal-700 dark:text-teal-300">{sale.invoice_no}</td>
+                      <tr key={sale.id} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
+                        <td className="py-2 px-3 font-mono font-bold text-teal-600 dark:text-teal-400">{sale.invoice_no}</td>
                         <td className="py-2 px-3 text-slate-600 dark:text-slate-300">{new Date(sale.sale_date).toLocaleDateString()}</td>
                         <td className="py-2 px-3 text-center">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-[#162032] text-slate-700 dark:text-slate-300">
                             {sale.payment_type}
                           </span>
                         </td>
@@ -562,11 +572,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                           {currency} {Number(sale.net_total).toFixed(2)}
                         </td>
                         <td className="py-2 px-3 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                            sale.status === 'completed'
-                              ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                              : 'bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
-                          }`}>
+                          <span className={sale.status === 'completed' ? 'badge-success' : 'badge-warning'}>
                             {sale.status}
                           </span>
                         </td>
@@ -579,7 +585,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
           ) : (
             <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
               <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase">
+                <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase">
                   <tr>
                     <th className="py-2 px-3">Date</th>
                     <th className="py-2 px-3 text-right">Amount Paid</th>
@@ -600,7 +606,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                     </tr>
                   ) : (
                     ledgerData.payments.map((p: any) => (
-                      <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <tr key={p.id} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
                         <td className="py-2 px-3 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
                           {p.payment_date?.split(' ')[0] || p.payment_date}
                         </td>
@@ -608,7 +614,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                           {currency} {Number(p.amount).toFixed(2)}
                         </td>
                         <td className="py-2 px-3 text-center">
-                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-slate-100 dark:bg-[#162032] text-slate-700 dark:text-slate-300 font-semibold">
                             {p.payment_method}
                           </span>
                         </td>
@@ -635,7 +641,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                 setSelectedCustomerForLedger(null);
                 setLedgerData(null);
               }}
-              className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
+              className="btn-cancel px-4 py-2"
             >
               Close Ledger
             </button>
@@ -659,7 +665,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               value={customerForm.name}
               onChange={(e) => setCustomerForm(prev => ({ ...prev, name: e.target.value }))}
               placeholder="e.g. Dr. Rashid Clinic"
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -670,7 +676,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               value={customerForm.phone}
               onChange={(e) => setCustomerForm(prev => ({ ...prev, phone: e.target.value }))}
               placeholder="+92 300 ..."
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -681,7 +687,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               value={customerForm.address}
               onChange={(e) => setCustomerForm(prev => ({ ...prev, address: e.target.value }))}
               placeholder="Plot #, Street, City"
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -692,7 +698,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
               min="0"
               value={customerForm.credit_limit}
               onChange={(e) => setCustomerForm(prev => ({ ...prev, credit_limit: parseFloat(e.target.value) || 0 }))}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 font-mono text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
@@ -700,13 +706,13 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
             <button
               type="button"
               onClick={() => setIsAddCustomerModalOpen(false)}
-              className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
+              className="btn-cancel px-4 py-2 text-xs"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-save px-5 py-2 text-xs"
             >
               {editingCustomer ? 'Update Account' : 'Register Customer'}
             </button>

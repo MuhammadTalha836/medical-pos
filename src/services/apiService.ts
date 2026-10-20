@@ -1,4 +1,4 @@
-import { Company, Product, SaleInvoice, PurchaseInvoice, SystemSettings, User, Customer, Role } from '../types';
+import { Company, Product, SaleInvoice, PurchaseInvoice, SystemSettings, User, Customer, Role, CashierShift, ShiftSummary } from '../types';
 
 const API_BASE = '/api';
 
@@ -79,7 +79,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(r => handleResponse<{ success: boolean }>(r)),
-  recordCustomerPayment: (customerId: number, data: { amount: number; payment_method: string; notes?: string }) =>
+  recordCustomerPayment: (customerId: number, data: { amount: number; payment_method: string; notes?: string; shift_id?: number | null }) =>
     fetch(`${API_BASE}/customers/${customerId}/payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -208,6 +208,46 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(r => handleResponse<any>(r)),
+
+  // Cashier Shifts & Drawer Reconciliation
+  getActiveShift: (userId: number) =>
+    fetch(`${API_BASE}/shifts/active?user_id=${userId}`).then(r => handleResponse<{ activeShift: CashierShift | null; summary?: ShiftSummary }>(r)),
+  startShift: (data: { user_id: number; user_name: string; opening_cash: number; notes?: string }) =>
+    fetch(`${API_BASE}/shifts/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<{ success: boolean; shift: CashierShift }>(r)),
+  getShiftSummary: (shiftId: number) =>
+    fetch(`${API_BASE}/shifts/${shiftId}/summary`).then(r => handleResponse<{ shift: CashierShift; summary: ShiftSummary }>(r)),
+  closeShift: (shiftId: number, data: { actual_cash: number; notes?: string; user_id?: number; user_name?: string }) =>
+    fetch(`${API_BASE}/shifts/${shiftId}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift; backup?: any }>(r)),
+  getShifts: (params?: { user_id?: number; status?: string; date_from?: string; date_to?: string }) => {
+    const url = new URL(`${API_BASE}/shifts`, window.location.origin);
+    if (params?.user_id) url.searchParams.append('user_id', String(params.user_id));
+    if (params?.status) url.searchParams.append('status', params.status);
+    if (params?.date_from) url.searchParams.append('date_from', params.date_from);
+    if (params?.date_to) url.searchParams.append('date_to', params.date_to);
+    return fetch(url.toString()).then(r => handleResponse<CashierShift[]>(r));
+  },
+  getShiftDetails: (shiftId: number) =>
+    fetch(`${API_BASE}/shifts/${shiftId}`).then(r => handleResponse<{ shift: CashierShift; sales: any[]; returns: any[]; payments: any[] }>(r)),
+  reopenShiftByAdmin: (shiftId: number, data: { admin_id: number; admin_name: string; reason: string }) =>
+    fetch(`${API_BASE}/shifts/${shiftId}/admin/reopen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift }>(r)),
+  correctShiftByAdmin: (shiftId: number, data: { admin_id: number; admin_name: string; corrected_closing_cash: number; reason: string }) =>
+    fetch(`${API_BASE}/shifts/${shiftId}/admin/correct`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift }>(r)),
 
   // System Settings
   getSettings: () => fetch(`${API_BASE}/settings`).then(r => handleResponse<SystemSettings>(r)),

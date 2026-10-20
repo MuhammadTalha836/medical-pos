@@ -61,6 +61,7 @@ export function seedInitialData(db: Database.Database) {
       can_backup: true,
       can_restore: true,
       can_shift_close: true,
+      can_manage_shifts: true,
       can_stock_zero: true,
       can_manage_users: true,
       can_manage_roles: true
@@ -94,7 +95,8 @@ export function seedInitialData(db: Database.Database) {
       can_discount: true,
       can_backup: false,
       can_restore: false,
-      can_shift_close: false,
+      can_shift_close: true,
+      can_manage_shifts: false,
       can_stock_zero: false,
       can_manage_users: false,
       can_manage_roles: false
@@ -129,6 +131,7 @@ export function seedInitialData(db: Database.Database) {
       can_backup: false,
       can_restore: false,
       can_shift_close: true,
+      can_manage_shifts: false,
       can_stock_zero: false,
       can_manage_users: false,
       can_manage_roles: false

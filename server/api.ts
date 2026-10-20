@@ -256,7 +256,7 @@ async function ensureDefaultRoles(): Promise<void> {
         can_add_product: true, can_edit_product: true, can_delete_product: true, can_add_company: true, can_edit_company: true, can_delete_company: true,
         can_delete_invoice: true, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: true, can_add_purchase: true,
         can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: true, can_discount: true,
-        can_backup: true, can_restore: true, can_shift_close: true, can_stock_zero: true, can_manage_users: true, can_manage_roles: true
+        can_backup: true, can_restore: true, can_shift_close: true, can_manage_shifts: true, can_stock_zero: true, can_manage_users: true, can_manage_roles: true
       };
 
       const cashierPerms = {
@@ -264,7 +264,7 @@ async function ensureDefaultRoles(): Promise<void> {
         can_add_product: true, can_edit_product: false, can_delete_product: false, can_add_company: true, can_edit_company: false, can_delete_company: false,
         can_delete_invoice: false, can_return_sale: true, can_view_all_sales: false, can_view_financial_kpis: false, can_add_purchase: false,
         can_add_customer: true, can_receive_payment: true, can_edit_customer: false, can_delete_customer: false, can_discount: true,
-        can_backup: false, can_restore: false, can_shift_close: false, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
+        can_backup: false, can_restore: false, can_shift_close: true, can_manage_shifts: false, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
       };
 
       const pharmacistPerms = {
@@ -272,7 +272,7 @@ async function ensureDefaultRoles(): Promise<void> {
         can_add_product: true, can_edit_product: true, can_delete_product: false, can_add_company: true, can_edit_company: true, can_delete_company: false,
         can_delete_invoice: false, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: false, can_add_purchase: true,
         can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: false, can_discount: true,
-        can_backup: false, can_restore: false, can_shift_close: true, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
+        can_backup: false, can_restore: false, can_shift_close: true, can_manage_shifts: false, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
       };
 
       await prisma.role.createMany({
@@ -798,7 +798,7 @@ app.put('/api/customers/:id', async (req: Request, res: Response) => {
 app.post('/api/customers/:id/payment', async (req: Request, res: Response) => {
   try {
     const idNum = Number(req.params.id);
-    const { amount, payment_method, notes } = req.body;
+    const { amount, payment_method, notes, shift_id, user_id, user_name } = req.body;
     const paymentAmt = parseFloat(amount);
     if (isNaN(paymentAmt) || paymentAmt <= 0) {
       return res.status(400).json({ error: 'Valid positive payment amount required' });
@@ -807,6 +807,17 @@ app.post('/api/customers/:id/payment', async (req: Request, res: Response) => {
     const customer = await prisma.customer.findUnique({ where: { id: idNum } });
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    let activeShiftId = shift_id ? Number(shift_id) : null;
+    if (!activeShiftId && user_id) {
+      const activeShift = await prisma.cashierShift.findFirst({
+        where: { userId: Number(user_id), status: 'open' },
+        orderBy: { id: 'desc' }
+      });
+      if (activeShift) {
+        activeShiftId = activeShift.id;
+      }
     }
 
     const newBalance = Math.max(0, customer.currentBalance - paymentAmt);
@@ -825,7 +836,8 @@ app.post('/api/customers/:id/payment', async (req: Request, res: Response) => {
           notes: notes || null,
           previousBalance: customer.currentBalance,
           newBalance: newBalance,
-          userName: 'Cashier'
+          userName: user_name || 'Cashier',
+          shiftId: activeShiftId
         }
       });
 
@@ -1080,11 +1092,32 @@ app.post('/api/sales', async (req: Request, res: Response) => {
     const {
       customer_id, customer_name, customer_phone, user_id, user_name,
       items, total_gross, total_item_discount, bill_discount_pct, bill_discount_amt,
-      net_total, cash_tendered, change_due, payment_type, notes
+      net_total, cash_tendered, change_due, payment_type, notes, shift_id
     } = req.body;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Sale must include at least one item.' });
+    }
+
+    // Strict Shift Lock: Verify active open shift
+    let activeShiftId = shift_id ? Number(shift_id) : null;
+    if (!activeShiftId && user_id) {
+      const activeShift = await prisma.cashierShift.findFirst({
+        where: { userId: Number(user_id), status: 'open' },
+        orderBy: { id: 'desc' }
+      });
+      if (activeShift) {
+        activeShiftId = activeShift.id;
+      }
+    }
+
+    if (!activeShiftId) {
+      return res.status(403).json({ error: 'No active open cashier shift found. You must start a shift before invoicing.' });
+    }
+
+    const verifiedShift = await prisma.cashierShift.findUnique({ where: { id: activeShiftId } });
+    if (!verifiedShift || verifiedShift.status !== 'open') {
+      return res.status(403).json({ error: 'This shift is closed and locked. Sales cannot be added to a closed shift.' });
     }
 
     // Generate Invoice No (e.g., INV-20261016-0001)
@@ -1104,6 +1137,7 @@ app.post('/api/sales', async (req: Request, res: Response) => {
           customerPhone: customer_phone || null,
           userId: user_id ? Number(user_id) : null,
           userName: user_name || 'Cashier',
+          shiftId: activeShiftId,
           totalGross: parseFloat(total_gross) || 0,
           totalItemDiscount: parseFloat(total_item_discount) || 0,
           billDiscountPct: parseFloat(bill_discount_pct) || 0,
@@ -1234,9 +1268,30 @@ app.get('/api/sales/:id', async (req: Request, res: Response) => {
 
 app.post('/api/sales/return', async (req: Request, res: Response) => {
   try {
-    const { sale_id, original_invoice_no, customer_name, return_items, reason, user_id, user_name } = req.body;
+    const { sale_id, original_invoice_no, customer_name, return_items, reason, user_id, user_name, shift_id } = req.body;
     if (!return_items || return_items.length === 0) {
       return res.status(400).json({ error: 'No return items specified' });
+    }
+
+    // Strict Shift Lock: Verify active open shift for returns
+    let activeShiftId = shift_id ? Number(shift_id) : null;
+    if (!activeShiftId && user_id) {
+      const activeShift = await prisma.cashierShift.findFirst({
+        where: { userId: Number(user_id), status: 'open' },
+        orderBy: { id: 'desc' }
+      });
+      if (activeShift) {
+        activeShiftId = activeShift.id;
+      }
+    }
+
+    if (!activeShiftId) {
+      return res.status(403).json({ error: 'No active open cashier shift found. You must start a shift before processing returns.' });
+    }
+
+    const verifiedShift = await prisma.cashierShift.findUnique({ where: { id: activeShiftId } });
+    if (!verifiedShift || verifiedShift.status !== 'open') {
+      return res.status(403).json({ error: 'This shift is closed and locked. Returns cannot be processed under a closed shift.' });
     }
 
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -1260,7 +1315,8 @@ app.post('/api/sales/return', async (req: Request, res: Response) => {
           refundAmount: totalRefund,
           reason: reason || null,
           userId: user_id ? Number(user_id) : null,
-          userName: user_name || 'Cashier'
+          userName: user_name || 'Cashier',
+          shiftId: activeShiftId
         }
       });
 
@@ -1668,6 +1724,701 @@ app.post('/api/utilities/optimize', (_req: Request, res: Response) => {
   try {
     const result = optimizeDatabase();
     res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// -------------------------------------------------------------
+// 8b. Cashier Shift Management & Drawer Reconciliation
+// -------------------------------------------------------------
+
+function formatShiftDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
+// 1. Get active shift for a cashier user
+app.get('/api/shifts/active', async (req: Request, res: Response) => {
+  try {
+    const { user_id } = req.query;
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    const shift = await prisma.cashierShift.findFirst({
+      where: {
+        userId: Number(user_id),
+        status: 'open'
+      },
+      orderBy: { id: 'desc' }
+    });
+
+    if (!shift) {
+      return res.json({ activeShift: null });
+    }
+
+    // Compute live shift stats
+    const [sales, returns, customerPayments] = await Promise.all([
+      prisma.sale.findMany({
+        where: { shiftId: shift.id },
+        select: { netTotal: true, cashTendered: true, changeDue: true, paymentType: true }
+      }),
+      prisma.saleReturn.findMany({
+        where: { shiftId: shift.id },
+        select: { refundAmount: true }
+      }),
+      prisma.customerPayment.findMany({
+        where: { shiftId: shift.id },
+        select: { amount: true, paymentMethod: true }
+      })
+    ]);
+
+    let totalCashSales = 0;
+    let totalCardSales = 0;
+    let totalCreditSales = 0;
+    let totalSalesAmount = 0;
+
+    for (const s of sales) {
+      totalSalesAmount += s.netTotal;
+      if (s.paymentType === 'Cash') {
+        totalCashSales += s.netTotal;
+      } else if (s.paymentType === 'Card') {
+        totalCardSales += s.netTotal;
+      } else if (s.paymentType === 'Credit') {
+        totalCreditSales += s.netTotal;
+      }
+    }
+
+    let totalReturnsCash = 0;
+    for (const r of returns) {
+      totalReturnsCash += r.refundAmount;
+    }
+
+    let totalCustomerPaymentsCash = 0;
+    for (const cp of customerPayments) {
+      if (cp.paymentMethod.toLowerCase() === 'cash') {
+        totalCustomerPaymentsCash += cp.amount;
+      }
+    }
+
+    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
+    const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(shift.startTime).getTime()) / 60000));
+
+    res.json({
+      activeShift: {
+        id: shift.id,
+        shift_no: shift.shiftNo,
+        user_id: shift.userId,
+        user_name: shift.userName,
+        start_time: shift.startTime,
+        end_time: shift.endTime,
+        duration_minutes: elapsedMinutes,
+        opening_cash: shift.openingCash,
+        closing_cash: shift.closingCash,
+        expected_cash: expectedCash,
+        cash_difference: shift.cashDifference,
+        total_sales_count: sales.length,
+        total_sales_amount: totalSalesAmount,
+        total_cash_sales: totalCashSales,
+        total_card_sales: totalCardSales,
+        total_credit_sales: totalCreditSales,
+        total_returns_amount: totalReturnsCash,
+        total_customer_payments: totalCustomerPaymentsCash,
+        notes: shift.notes,
+        status: shift.status
+      },
+      summary: {
+        opening_cash: shift.openingCash,
+        total_sales_cash: totalCashSales,
+        total_sales_card: totalCardSales,
+        total_sales_credit: totalCreditSales,
+        total_returns_cash: totalReturnsCash,
+        total_customer_payments_cash: totalCustomerPaymentsCash,
+        expected_cash: expectedCash,
+        invoices_count: sales.length,
+        returns_count: returns.length,
+        duration_formatted: formatShiftDuration(elapsedMinutes)
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 2. Open a new cashier shift
+app.post('/api/shifts/start', async (req: Request, res: Response) => {
+  try {
+    const { user_id, user_name, opening_cash, notes } = req.body;
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    // Check if user already has an open shift
+    const existingOpen = await prisma.cashierShift.findFirst({
+      where: {
+        userId: Number(user_id),
+        status: 'open'
+      }
+    });
+
+    if (existingOpen) {
+      return res.status(400).json({
+        error: `User already has an active open shift (${existingOpen.shiftNo}). You must close it before starting a new one.`,
+        activeShift: existingOpen
+      });
+    }
+
+    // Generate unique shift number: e.g. SH-YYYYMMDD-0001
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const countToday = await prisma.cashierShift.count({
+      where: { shiftNo: { startsWith: `SH-${today}-` } }
+    });
+    const shiftNo = `SH-${today}-${String(countToday + 1).padStart(4, '0')}`;
+
+    const newShift = await prisma.cashierShift.create({
+      data: {
+        shiftNo,
+        userId: Number(user_id),
+        userName: user_name || 'Cashier',
+        startTime: new Date(),
+        openingCash: parseFloat(opening_cash) || 0,
+        notes: notes || null,
+        status: 'open'
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'SHIFT_OPENED',
+        module: 'Shift Management',
+        details: `Shift ${shiftNo} opened by ${user_name} with opening float ${opening_cash || 0}`,
+        userId: Number(user_id),
+        userName: user_name || 'Cashier'
+      }
+    });
+
+    res.json({
+      success: true,
+      shift: {
+        id: newShift.id,
+        shift_no: newShift.shiftNo,
+        user_id: newShift.userId,
+        user_name: newShift.userName,
+        start_time: newShift.startTime,
+        opening_cash: newShift.openingCash,
+        status: newShift.status,
+        notes: newShift.notes
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 3. Get live summary for active shift closing modal
+app.get('/api/shifts/:id/summary', async (req: Request, res: Response) => {
+  try {
+    const shiftId = Number(req.params.id);
+    const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId } });
+    if (!shift) {
+      return res.status(404).json({ error: 'Shift not found' });
+    }
+
+    const [sales, returns, customerPayments] = await Promise.all([
+      prisma.sale.findMany({
+        where: { shiftId: shift.id },
+        select: { id: true, invoiceNo: true, netTotal: true, cashTendered: true, changeDue: true, paymentType: true, saleDate: true }
+      }),
+      prisma.saleReturn.findMany({
+        where: { shiftId: shift.id },
+        select: { id: true, returnNo: true, refundAmount: true, createdAt: true }
+      }),
+      prisma.customerPayment.findMany({
+        where: { shiftId: shift.id },
+        select: { id: true, amount: true, paymentMethod: true, paymentDate: true }
+      })
+    ]);
+
+    let totalCashSales = 0;
+    let totalCardSales = 0;
+    let totalCreditSales = 0;
+    let totalSalesAmount = 0;
+
+    for (const s of sales) {
+      totalSalesAmount += s.netTotal;
+      if (s.paymentType === 'Cash') {
+        totalCashSales += s.netTotal;
+      } else if (s.paymentType === 'Card') {
+        totalCardSales += s.netTotal;
+      } else if (s.paymentType === 'Credit') {
+        totalCreditSales += s.netTotal;
+      }
+    }
+
+    let totalReturnsCash = 0;
+    for (const r of returns) {
+      totalReturnsCash += r.refundAmount;
+    }
+
+    let totalCustomerPaymentsCash = 0;
+    for (const cp of customerPayments) {
+      if (cp.paymentMethod.toLowerCase() === 'cash') {
+        totalCustomerPaymentsCash += cp.amount;
+      }
+    }
+
+    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
+    const endTime = shift.endTime || new Date();
+    const durationMinutes = Math.max(1, Math.round((new Date(endTime).getTime() - new Date(shift.startTime).getTime()) / 60000));
+
+    res.json({
+      shift: {
+        id: shift.id,
+        shift_no: shift.shiftNo,
+        user_id: shift.userId,
+        user_name: shift.userName,
+        start_time: shift.startTime,
+        end_time: shift.endTime,
+        duration_minutes: durationMinutes,
+        opening_cash: shift.openingCash,
+        closing_cash: shift.closingCash,
+        expected_cash: shift.expectedCash || expectedCash,
+        cash_difference: shift.cashDifference,
+        total_sales_count: sales.length,
+        total_sales_amount: totalSalesAmount,
+        total_cash_sales: totalCashSales,
+        total_card_sales: totalCardSales,
+        total_credit_sales: totalCreditSales,
+        total_returns_amount: totalReturnsCash,
+        total_customer_payments: totalCustomerPaymentsCash,
+        notes: shift.notes,
+        status: shift.status
+      },
+      summary: {
+        opening_cash: shift.openingCash,
+        total_sales_cash: totalCashSales,
+        total_sales_card: totalCardSales,
+        total_sales_credit: totalCreditSales,
+        total_returns_cash: totalReturnsCash,
+        total_customer_payments_cash: totalCustomerPaymentsCash,
+        expected_cash: expectedCash,
+        invoices_count: sales.length,
+        returns_count: returns.length,
+        duration_formatted: formatShiftDuration(durationMinutes)
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 4. Reconcile, close, and lock shift
+app.post('/api/shifts/:id/close', async (req: Request, res: Response) => {
+  try {
+    const shiftId = Number(req.params.id);
+    const { actual_cash, notes, user_id, user_name } = req.body;
+
+    const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId } });
+    if (!shift) {
+      return res.status(404).json({ error: 'Shift not found' });
+    }
+
+    if (shift.status === 'closed') {
+      return res.status(400).json({ error: 'Shift is already closed and locked.' });
+    }
+
+    const [sales, returns, customerPayments] = await Promise.all([
+      prisma.sale.findMany({
+        where: { shiftId: shift.id },
+        select: { netTotal: true, paymentType: true }
+      }),
+      prisma.saleReturn.findMany({
+        where: { shiftId: shift.id },
+        select: { refundAmount: true }
+      }),
+      prisma.customerPayment.findMany({
+        where: { shiftId: shift.id },
+        select: { amount: true, paymentMethod: true }
+      })
+    ]);
+
+    let totalCashSales = 0;
+    let totalCardSales = 0;
+    let totalCreditSales = 0;
+    let totalSalesAmount = 0;
+
+    for (const s of sales) {
+      totalSalesAmount += s.netTotal;
+      if (s.paymentType === 'Cash') totalCashSales += s.netTotal;
+      else if (s.paymentType === 'Card') totalCardSales += s.netTotal;
+      else if (s.paymentType === 'Credit') totalCreditSales += s.netTotal;
+    }
+
+    let totalReturnsCash = 0;
+    for (const r of returns) {
+      totalReturnsCash += r.refundAmount;
+    }
+
+    let totalCustomerPaymentsCash = 0;
+    for (const cp of customerPayments) {
+      if (cp.paymentMethod.toLowerCase() === 'cash') totalCustomerPaymentsCash += cp.amount;
+    }
+
+    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
+    const actualCashNum = parseFloat(actual_cash) || 0;
+    const difference = actualCashNum - expectedCash;
+    const now = new Date();
+    const durationMinutes = Math.max(1, Math.round((now.getTime() - new Date(shift.startTime).getTime()) / 60000));
+
+    const updatedShift = await prisma.cashierShift.update({
+      where: { id: shift.id },
+      data: {
+        status: 'closed',
+        endTime: now,
+        durationMinutes: durationMinutes,
+        closingCash: actualCashNum,
+        expectedCash: expectedCash,
+        cashDifference: difference,
+        totalSalesCount: sales.length,
+        totalSalesAmount: totalSalesAmount,
+        totalCashSales: totalCashSales,
+        totalCardSales: totalCardSales,
+        totalCreditSales: totalCreditSales,
+        totalReturnsAmount: totalReturnsCash,
+        totalCustomerPayments: totalCustomerPaymentsCash,
+        notes: notes || shift.notes
+      }
+    });
+
+    // Auto-backup on shift close if configured
+    let backupResult = null;
+    const autoBackupSetting = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_enabled' } });
+    if (autoBackupSetting?.value === 'true') {
+      try {
+        backupResult = await createBackup('auto_daily');
+      } catch (bkErr) {
+        console.error('Auto backup during shift closing error:', bkErr);
+      }
+    }
+
+    // Write audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'SHIFT_CLOSED',
+        module: 'Shift Management',
+        details: `Shift ${shift.shiftNo} closed by ${user_name || shift.userName}. Duration: ${formatShiftDuration(durationMinutes)}. Expected: ${expectedCash}, Actual: ${actualCashNum}, Variance: ${difference}`,
+        userId: user_id ? Number(user_id) : shift.userId,
+        userName: user_name || shift.userName
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Shift reconciled and locked successfully.',
+      shift: {
+        id: updatedShift.id,
+        shift_no: updatedShift.shiftNo,
+        user_id: updatedShift.userId,
+        user_name: updatedShift.userName,
+        start_time: updatedShift.startTime,
+        end_time: updatedShift.endTime,
+        duration_minutes: updatedShift.durationMinutes,
+        opening_cash: updatedShift.openingCash,
+        closing_cash: updatedShift.closingCash,
+        expected_cash: updatedShift.expectedCash,
+        cash_difference: updatedShift.cashDifference,
+        total_sales_count: updatedShift.totalSalesCount,
+        total_sales_amount: updatedShift.totalSalesAmount,
+        total_cash_sales: updatedShift.totalCashSales,
+        total_card_sales: updatedShift.totalCardSales,
+        total_credit_sales: updatedShift.totalCreditSales,
+        total_returns_amount: updatedShift.totalReturnsAmount,
+        total_customer_payments: updatedShift.totalCustomerPayments,
+        notes: updatedShift.notes,
+        status: updatedShift.status
+      },
+      backup: backupResult
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 5. List all shifts with filters
+app.get('/api/shifts', async (req: Request, res: Response) => {
+  try {
+    const { user_id, status, date_from, date_to } = req.query;
+    const where: Prisma.CashierShiftWhereInput = {};
+
+    if (user_id) where.userId = Number(user_id);
+    if (status) where.status = String(status);
+    if (date_from || date_to) {
+      where.startTime = {};
+      if (date_from) where.startTime.gte = new Date(`${date_from}T00:00:00.000Z`);
+      if (date_to) where.startTime.lte = new Date(`${date_to}T23:59:59.999Z`);
+    }
+
+    const shifts = await prisma.cashierShift.findMany({
+      where,
+      orderBy: { id: 'desc' }
+    });
+
+    res.json(shifts.map(s => ({
+      id: s.id,
+      shift_no: s.shiftNo,
+      user_id: s.userId,
+      user_name: s.userName,
+      start_time: s.startTime,
+      end_time: s.endTime,
+      duration_minutes: s.durationMinutes,
+      opening_cash: s.openingCash,
+      closing_cash: s.closingCash,
+      expected_cash: s.expectedCash,
+      cash_difference: s.cashDifference,
+      total_sales_count: s.totalSalesCount,
+      total_sales_amount: s.totalSalesAmount,
+      total_cash_sales: s.totalCashSales,
+      total_card_sales: s.totalCardSales,
+      total_credit_sales: s.totalCreditSales,
+      total_returns_amount: s.totalReturnsAmount,
+      total_customer_payments: s.totalCustomerPayments,
+      notes: s.notes,
+      status: s.status,
+      created_at: s.createdAt,
+      updated_at: s.updatedAt
+    })));
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 6. Get shift details with transactions
+app.get('/api/shifts/:id', async (req: Request, res: Response) => {
+  try {
+    const shiftId = Number(req.params.id);
+    const shift = await prisma.cashierShift.findUnique({
+      where: { id: shiftId },
+      include: {
+        sales: {
+          select: {
+            id: true,
+            invoiceNo: true,
+            customerName: true,
+            totalGross: true,
+            netTotal: true,
+            paymentType: true,
+            saleDate: true,
+            status: true
+          },
+          orderBy: { id: 'desc' }
+        },
+        saleReturns: {
+          select: {
+            id: true,
+            returnNo: true,
+            originalInvoiceNo: true,
+            customerName: true,
+            refundAmount: true,
+            reason: true,
+            createdAt: true
+          },
+          orderBy: { id: 'desc' }
+        },
+        customerPayments: {
+          select: {
+            id: true,
+            amount: true,
+            paymentMethod: true,
+            notes: true,
+            paymentDate: true
+          },
+          orderBy: { id: 'desc' }
+        }
+      }
+    });
+
+    if (!shift) {
+      return res.status(404).json({ error: 'Shift not found' });
+    }
+
+    res.json({
+      shift: {
+        id: shift.id,
+        shift_no: shift.shiftNo,
+        user_id: shift.userId,
+        user_name: shift.userName,
+        start_time: shift.startTime,
+        end_time: shift.endTime,
+        duration_minutes: shift.durationMinutes,
+        opening_cash: shift.openingCash,
+        closing_cash: shift.closingCash,
+        expected_cash: shift.expectedCash,
+        cash_difference: shift.cashDifference,
+        total_sales_count: shift.totalSalesCount,
+        total_sales_amount: shift.totalSalesAmount,
+        total_cash_sales: shift.totalCashSales,
+        total_card_sales: shift.totalCardSales,
+        total_credit_sales: shift.totalCreditSales,
+        total_returns_amount: shift.totalReturnsAmount,
+        total_customer_payments: shift.totalCustomerPayments,
+        notes: shift.notes,
+        status: shift.status
+      },
+      sales: shift.sales.map(s => ({
+        id: s.id,
+        invoice_no: s.invoiceNo,
+        customer_name: s.customerName,
+        total_gross: s.totalGross,
+        net_total: s.netTotal,
+        payment_type: s.paymentType,
+        sale_date: s.saleDate,
+        status: s.status
+      })),
+      returns: shift.saleReturns.map(r => ({
+        id: r.id,
+        return_no: r.returnNo,
+        original_invoice_no: r.originalInvoiceNo,
+        customer_name: r.customerName,
+        refund_amount: r.refundAmount,
+        reason: r.reason,
+        created_at: r.createdAt
+      })),
+      payments: shift.customerPayments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        payment_method: p.paymentMethod,
+        notes: p.notes,
+        payment_date: p.paymentDate
+      }))
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 7. Admin Exceptional Reopen
+app.post('/api/shifts/:id/admin/reopen', async (req: Request, res: Response) => {
+  try {
+    const shiftId = Number(req.params.id);
+    const { admin_id, admin_name, reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'A mandatory reason is required for reopening a closed shift.' });
+    }
+
+    const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId } });
+    if (!shift) {
+      return res.status(404).json({ error: 'Shift not found' });
+    }
+
+    if (shift.status === 'open') {
+      return res.status(400).json({ error: 'Shift is already open.' });
+    }
+
+    const updated = await prisma.cashierShift.update({
+      where: { id: shift.id },
+      data: {
+        status: 'open',
+        endTime: null,
+        durationMinutes: null
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'ADMIN_SHIFT_REOPEN',
+        module: 'Shift Management',
+        details: `Shift ${shift.shiftNo} reopened by Admin ${admin_name || 'Admin'} (ID #${admin_id}). Reason: ${reason}`,
+        userId: admin_id ? Number(admin_id) : null,
+        userName: admin_name || 'Admin'
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Shift ${shift.shiftNo} reopened successfully.`,
+      shift: {
+        id: updated.id,
+        shift_no: updated.shiftNo,
+        user_id: updated.userId,
+        user_name: updated.userName,
+        start_time: updated.startTime,
+        end_time: updated.endTime,
+        duration_minutes: updated.durationMinutes,
+        opening_cash: updated.openingCash,
+        closing_cash: updated.closingCash,
+        expected_cash: updated.expectedCash,
+        cash_difference: updated.cashDifference,
+        status: updated.status,
+        notes: updated.notes
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 8. Admin Exceptional Cash Reconciliation Correction
+app.post('/api/shifts/:id/admin/correct', async (req: Request, res: Response) => {
+  try {
+    const shiftId = Number(req.params.id);
+    const { admin_id, admin_name, corrected_closing_cash, reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'A mandatory reason is required for correcting shift cash figures.' });
+    }
+
+    const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId } });
+    if (!shift) {
+      return res.status(404).json({ error: 'Shift not found' });
+    }
+
+    const newClosingCash = parseFloat(corrected_closing_cash) || 0;
+    const expected = shift.expectedCash || 0;
+    const newDifference = newClosingCash - expected;
+    const oldClosingCash = shift.closingCash;
+
+    const updated = await prisma.cashierShift.update({
+      where: { id: shift.id },
+      data: {
+        closingCash: newClosingCash,
+        cashDifference: newDifference,
+        notes: shift.notes ? `${shift.notes} | [Corrected by ${admin_name}: ${reason}]` : `[Corrected by ${admin_name}: ${reason}]`
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'ADMIN_SHIFT_CORRECT',
+        module: 'Shift Management',
+        details: `Shift ${shift.shiftNo} closing cash corrected by Admin ${admin_name || 'Admin'}. Old: ${oldClosingCash}, New: ${newClosingCash}, New Variance: ${newDifference}. Reason: ${reason}`,
+        userId: admin_id ? Number(admin_id) : null,
+        userName: admin_name || 'Admin'
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Shift ${shift.shiftNo} cash figures corrected successfully.`,
+      shift: {
+        id: updated.id,
+        shift_no: updated.shiftNo,
+        user_id: updated.userId,
+        user_name: updated.userName,
+        start_time: updated.startTime,
+        end_time: updated.endTime,
+        duration_minutes: updated.durationMinutes,
+        opening_cash: updated.openingCash,
+        closing_cash: updated.closingCash,
+        expected_cash: updated.expectedCash,
+        cash_difference: updated.cashDifference,
+        status: updated.status,
+        notes: updated.notes
+      }
+    });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }

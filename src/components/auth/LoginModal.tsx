@@ -57,7 +57,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="w-full max-w-md bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
+      <div className="w-full max-w-md bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center space-y-2">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-teal-500/25">
@@ -97,7 +97,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="e.g. admin or cashier"
-                className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+                className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white font-medium focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
               />
             </div>
           </div>
@@ -116,7 +116,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
+                className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
               />
               <button
                 type="button"
@@ -131,7 +131,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/25 active:scale-98 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+            className="w-full py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/25 active:scale-98 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
           >
             <span>{loading ? 'Authenticating...' : 'Sign In to Workspace'}</span>
             <ArrowRight className="w-4 h-4" />
@@ -139,15 +139,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
         </form>
 
         {/* Quick Demo Credentials */}
-        <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80">
-          <span className="text-[11px] font-semibold text-slate-400 block mb-2 text-center uppercase tracking-wider">
+        <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+          <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 block mb-2 text-center uppercase tracking-wider">
             Quick Shift Accounts
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => handleQuickSelect('admin', 'admin123')}
-              className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/70 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-left transition-all group"
+              className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-left transition-all group"
             >
               <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-teal-600 dark:group-hover:text-teal-400">
                 Admin
@@ -160,7 +160,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
             <button
               type="button"
               onClick={() => handleQuickSelect('cashier', 'cash123')}
-              className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/70 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-left transition-all group"
+              className="p-2 bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-left transition-all group"
             >
               <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-teal-600 dark:group-hover:text-teal-400">
                 Cashier

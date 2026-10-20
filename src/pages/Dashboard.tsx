@@ -77,7 +77,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
   const expiredCount = stats?.expiredCount || 0;
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* Welcome Banner */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -98,10 +98,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Today's Sales */}
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4.5 flex flex-col justify-between hover:border-teal-500/40 transition-all shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-teal-500/40 transition-all shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Today's Revenue</span>
-            <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400">
+            <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/80 border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
@@ -126,10 +126,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Total Active Products */}
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4.5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Products</span>
-            <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+            <div className="p-2 rounded-xl bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
               <Package className="w-4 h-4" />
             </div>
           </div>
@@ -144,10 +144,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Low Stock Warning */}
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4.5 flex flex-col justify-between hover:border-amber-500/40 transition-all shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-amber-500/40 transition-all shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Low Stock Alert</span>
-            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400">
+            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/80 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
@@ -166,10 +166,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Expired Products */}
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4.5 flex flex-col justify-between hover:border-rose-500/40 transition-all shadow-sm">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-rose-500/40 transition-all shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Expired Batches</span>
-            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400">
+            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400">
               <Calendar className="w-4 h-4" />
             </div>
           </div>
@@ -187,7 +187,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
       {/* Main Content: Low Stock Priority Table & Recent Invoices */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Low Stock Priority Table */}
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -204,7 +204,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
 
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2 px-3">Product</th>
                   <th className="py-2 px-3">Rack</th>
@@ -223,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
                   </tr>
                 ) : (
                   stats?.lowStockItems?.map((item: any) => (
-                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors">
+                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-[#162032] transition-colors">
                       <td className="py-2 px-3">
                         <div className="font-bold text-slate-900 dark:text-white">{item.name}</div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{item.c_code} • {item.p_code}</div>
@@ -246,7 +246,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
                       <td className="py-2 px-3 text-right">
                         <button
                           onClick={() => onNavigateTab('purchases')}
-                          className="px-2 py-1 text-[10px] font-semibold bg-teal-50 hover:bg-teal-100 dark:bg-teal-950 dark:hover:bg-teal-900 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-lg transition-colors"
+                          className="px-2 py-1 text-[10px] font-semibold bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-lg transition-colors"
                         >
                           Order
                         </button>
@@ -260,7 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Recent Sales Transactions */}
-        <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col">
+        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Receipt className="w-4 h-4 text-teal-600 dark:text-teal-400" />
@@ -277,7 +277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
 
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2 px-3">Invoice #</th>
                   <th className="py-2 px-3">Customer</th>
@@ -295,7 +295,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
                   </tr>
                 ) : (
                   stats?.recentSales?.map((sale: any) => (
-                    <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors">
+                    <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-[#162032] transition-colors">
                       <td className="py-2 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">
                         {sale.invoice_no}
                       </td>
@@ -307,7 +307,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
                           sale.payment_type === 'Online'
                             ? 'bg-purple-50 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
                             : sale.payment_type === 'Card'
-                            ? 'bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                            ? 'bg-sky-50 dark:bg-sky-950/70 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
                             : sale.payment_type === 'Credit'
                             ? 'bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
                             : 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
@@ -321,7 +321,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
                       <td className="py-2 px-3 text-center">
                         <button
                           onClick={() => handleViewInvoice(sale.id)}
-                          className="p-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                          className="p-1 rounded bg-slate-100 hover:bg-sky-50 dark:bg-[#162032] dark:hover:bg-sky-950/60 text-slate-600 hover:text-sky-600 dark:text-slate-300 dark:hover:text-sky-300 border border-slate-200 dark:border-slate-700 transition-colors"
                           title="View & Reprint Receipt"
                         >
                           <Eye className="w-3.5 h-3.5" />

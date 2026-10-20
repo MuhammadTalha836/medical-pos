@@ -245,7 +245,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
   };
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-4">
         <div>
@@ -254,7 +254,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center space-x-2 bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm">
+        <div className="flex items-center space-x-2 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm">
           <button
             onClick={() => setActiveTab('products')}
             className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -291,7 +291,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       {activeTab === 'products' && (
         <div className="space-y-4">
           {/* Controls Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
             <form onSubmit={handleSearchSubmit} className="flex-1 min-w-[260px] flex items-center space-x-2">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -300,24 +300,24 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by Name, Generic, C-Code, or P-Code..."
-                  className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full pos-input pl-10 pr-4"
                 />
               </div>
 
               <select
                 value={selectedCompanyFilter}
                 onChange={(e) => setSelectedCompanyFilter(e.target.value)}
-                className="bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="pos-input"
               >
                 <option value="">All Companies</option>
                 {companies.map(c => (
-                  <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                  <option key={c.id} value={c.code}>{c.code} - {c.name}</option>
                 ))}
               </select>
 
               <button
                 type="submit"
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors"
+                className="btn-cancel"
               >
                 Search
               </button>
@@ -326,7 +326,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             {hasPermission('can_add_product') && (
               <button
                 onClick={handleOpenAddProduct}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/20 active:scale-95 transition-all"
+                className="btn-save"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add New Medicine</span>
@@ -335,10 +335,10 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
           </div>
 
           {/* Products Table */}
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="py-3 px-3">C-Code</th>
                     <th className="py-3 px-3">P-Code</th>
@@ -378,7 +378,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                           className={`transition-colors ${
                             idx % 2 === 0
                               ? 'bg-transparent'
-                              : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
+                              : 'bg-slate-50/70 dark:bg-[#0d131f]/40'
                           } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
                         >
                           <td className="py-3 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">
@@ -394,7 +394,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                             )}
                           </td>
                           <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                               {prod.unit_type}
                             </span>
                           </td>
@@ -429,7 +429,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                               {hasPermission('can_edit_product') && (
                                 <button
                                   onClick={() => handleOpenEditProduct(prod)}
-                                  className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                                  className="btn-edit"
                                   title="Edit Medicine"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
@@ -438,7 +438,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                               {hasPermission('can_delete_product') && (
                                 <button
                                   onClick={() => handleDeleteProduct(prod.id, prod.name)}
-                                  className="p-1 rounded bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-950/60 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
+                                  className="btn-delete"
                                   title="Delete Medicine"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -463,7 +463,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       {/* COMPANIES TAB */}
       {activeTab === 'companies' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-center bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">Registered Pharmaceutical Companies / Distributors</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">Companies map to short C-Codes used across sales and inventory</p>
@@ -471,7 +471,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             {hasPermission('can_add_company') && (
               <button
                 onClick={handleOpenAddCompany}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/20 active:scale-95 transition-all"
+                className="btn-save"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Company</span>
@@ -481,10 +481,10 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {companies.map(c => (
-              <div key={c.id} className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-teal-500/40 transition-all space-y-3 shadow-sm">
+              <div key={c.id} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-teal-500/40 transition-all space-y-3 shadow-sm">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="px-2 py-0.5 text-xs font-mono font-bold bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded">
+                    <span className="px-2 py-0.5 text-xs font-mono font-bold bg-teal-50 dark:bg-teal-950/70 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded">
                       C-Code: {c.code}
                     </span>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{c.name}</h3>
@@ -493,7 +493,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                     {hasPermission('can_edit_company') ? (
                       <button
                         onClick={() => handleOpenEditCompany(c)}
-                        className="p-1 text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
+                        className="btn-edit"
                         title="Edit Company"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -543,7 +543,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                     c_code: comp ? comp.code : prev.c_code
                   }));
                 }}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input"
               >
                 <option value="">Select Company</option>
                 {companies.map(c => (
@@ -560,7 +560,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 value={productForm.p_code}
                 onChange={(e) => setProductForm(prev => ({ ...prev, p_code: e.target.value.toUpperCase() }))}
                 placeholder="e.g. PAN-500"
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input font-mono"
               />
             </div>
 
@@ -571,7 +571,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 value={productForm.barcode}
                 onChange={(e) => setProductForm(prev => ({ ...prev, barcode: e.target.value }))}
                 placeholder="Scan or type barcode"
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input font-mono"
               />
             </div>
           </div>
@@ -585,7 +585,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 value={productForm.name}
                 onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="e.g. Panadol Extra 500mg"
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 font-bold"
+                className="w-full pos-input font-bold"
               />
             </div>
 
@@ -596,7 +596,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 value={productForm.generic_name}
                 onChange={(e) => setProductForm(prev => ({ ...prev, generic_name: e.target.value }))}
                 placeholder="e.g. Paracetamol + Caffeine"
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input"
               />
             </div>
           </div>
@@ -607,7 +607,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
               <select
                 value={productForm.unit_type}
                 onChange={(e) => setProductForm(prev => ({ ...prev, unit_type: e.target.value }))}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input"
               >
                 <option value="Tablets">Tablets</option>
                 <option value="Capsules">Capsules</option>
@@ -629,7 +629,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 required
                 value={productForm.packing}
                 onChange={(e) => handleProductBoxPricingChange(productForm.box_trade_price, productForm.box_retail_price, parseInt(e.target.value) || 1)}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input font-mono"
               />
             </div>
 
@@ -640,13 +640,13 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 value={productForm.location_rack}
                 onChange={(e) => setProductForm(prev => ({ ...prev, location_rack: e.target.value }))}
                 placeholder="e.g. Rack-A1"
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input font-mono"
               />
             </div>
           </div>
 
           {/* Pricing Grid */}
-          <div className="bg-slate-50 dark:bg-[#0e1424] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
+          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
             <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider block">Pricing & Margin Details</span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
@@ -657,7 +657,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   required
                   value={productForm.box_trade_price}
                   onChange={(e) => handleProductBoxPricingChange(parseFloat(e.target.value) || 0, productForm.box_retail_price, productForm.packing)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
 
@@ -669,7 +669,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   required
                   value={productForm.box_retail_price}
                   onChange={(e) => handleProductBoxPricingChange(productForm.box_trade_price, parseFloat(e.target.value) || 0, productForm.packing)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
 
@@ -680,7 +680,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   step="0.01"
                   value={productForm.unit_retail_price}
                   onChange={(e) => setProductForm(prev => ({ ...prev, unit_retail_price: parseFloat(e.target.value) || 0 }))}
-                  className="w-full bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-800 rounded-lg px-2.5 py-1.5 text-xs text-teal-800 dark:text-teal-200 font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-800 rounded-lg px-2.5 py-1.5 text-xs text-teal-800 dark:text-teal-200 font-mono font-bold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
 
@@ -693,7 +693,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   max="100"
                   value={productForm.default_discount_pct}
                   onChange={(e) => setProductForm(prev => ({ ...prev, default_discount_pct: parseFloat(e.target.value) || 0 }))}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
             </div>
@@ -708,7 +708,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 min="0"
                 value={productForm.stock_boxes}
                 onChange={(e) => setProductForm(prev => ({ ...prev, stock_boxes: parseInt(e.target.value) || 0 }))}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input font-mono"
               />
             </div>
 
@@ -719,7 +719,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 min="0"
                 value={productForm.stock_loose}
                 onChange={(e) => setProductForm(prev => ({ ...prev, stock_loose: parseInt(e.target.value) || 0 }))}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input font-mono"
               />
             </div>
 
@@ -730,7 +730,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 min="1"
                 value={productForm.min_stock_alert}
                 onChange={(e) => setProductForm(prev => ({ ...prev, min_stock_alert: parseInt(e.target.value) || 10 }))}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-amber-600 dark:text-amber-300 font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 font-semibold"
+                className="w-full pos-input font-mono font-semibold text-amber-600 dark:text-amber-400"
               />
             </div>
           </div>
@@ -739,13 +739,13 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             <button
               type="button"
               onClick={() => setIsProductModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+              className="btn-cancel"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+              className="btn-save"
             >
               {editingProduct ? 'Update Product' : 'Save Medicine'}
             </button>
@@ -769,7 +769,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
               value={companyForm.code}
               onChange={(e) => setCompanyForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
               placeholder="e.g. GSK"
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full pos-input font-mono font-bold"
             />
           </div>
 
@@ -781,7 +781,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
               value={companyForm.name}
               onChange={(e) => setCompanyForm(prev => ({ ...prev, name: e.target.value }))}
               placeholder="e.g. GlaxoSmithKline Pakistan"
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full pos-input"
             />
           </div>
 
@@ -792,7 +792,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
               value={companyForm.contact_person}
               onChange={(e) => setCompanyForm(prev => ({ ...prev, contact_person: e.target.value }))}
               placeholder="e.g. Regional Distributor"
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full pos-input"
             />
           </div>
 
@@ -804,7 +804,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 value={companyForm.phone}
                 onChange={(e) => setCompanyForm(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder="+92..."
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input font-mono"
               />
             </div>
             <div>
@@ -814,7 +814,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 value={companyForm.email}
                 onChange={(e) => setCompanyForm(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="supply@..."
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full pos-input"
               />
             </div>
           </div>
@@ -826,7 +826,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
               value={companyForm.address}
               onChange={(e) => setCompanyForm(prev => ({ ...prev, address: e.target.value }))}
               placeholder="Industrial Zone / Warehouse Location"
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full pos-input"
             />
           </div>
 
@@ -834,13 +834,13 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             <button
               type="button"
               onClick={() => setIsCompanyModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+              className="btn-cancel"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+              className="btn-save"
             >
               {editingCompany ? 'Update Company' : 'Save Company'}
             </button>

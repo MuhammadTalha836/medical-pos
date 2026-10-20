@@ -30,6 +30,7 @@ export interface RolePermissions {
   can_backup: boolean;
   can_restore: boolean;
   can_shift_close: boolean;
+  can_manage_shifts: boolean;
   can_stock_zero: boolean;
   can_manage_users: boolean;
   can_manage_roles: boolean;
@@ -87,6 +88,7 @@ export interface CustomerPayment {
   amount: number;
   payment_method: 'Cash' | 'Card' | 'Online';
   notes?: string;
+  shift_id?: number | null;
   payment_date: string;
 }
 
@@ -158,6 +160,7 @@ export interface SaleInvoice {
   payment_type: 'Cash' | 'Card' | 'Credit' | 'Online';
   status: 'completed' | 'returned' | 'cancelled';
   notes?: string | null;
+  shift_id?: number | null;
   items?: SaleItem[];
 }
 
@@ -251,4 +254,45 @@ export interface DailyClosing {
   difference: number;
   notes?: string;
   is_closed: number;
+}
+
+export interface CashierShift {
+  id: number;
+  shift_no: string;
+  user_id: number;
+  user_name: string;
+  start_time: string;
+  end_time?: string | null;
+  duration_minutes?: number | null;
+  opening_cash: number;
+  closing_cash?: number | null;
+  expected_cash?: number | null;
+  cash_difference?: number | null;
+  total_sales_count: number;
+  total_sales_amount: number;
+  total_cash_sales: number;
+  total_card_sales: number;
+  total_credit_sales: number;
+  total_returns_amount: number;
+  total_customer_payments: number;
+  notes?: string | null;
+  status: 'open' | 'closed';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ShiftSummary {
+  shift: CashierShift;
+  opening_cash: number;
+  total_sales_cash: number;
+  total_sales_card: number;
+  total_sales_credit: number;
+  total_returns_cash: number;
+  total_customer_payments_cash: number;
+  expected_cash: number;
+  actual_cash?: number;
+  difference?: number;
+  invoices_count: number;
+  returns_count: number;
+  duration_formatted: string;
 }

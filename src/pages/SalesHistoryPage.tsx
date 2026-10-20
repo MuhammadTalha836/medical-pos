@@ -4,6 +4,7 @@ import { SaleInvoice, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
 import { ThermalReceipt } from '../components/pos/ThermalReceipt';
 import { useAuthStore } from '../store/useAuthStore';
+import { useShiftStore } from '../store/useShiftStore';
 import {
   Search,
   Receipt,
@@ -20,6 +21,7 @@ interface SalesHistoryPageProps {
 
 export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) => {
   const { hasPermission } = useAuthStore();
+  const { activeShift, fetchShiftSummary } = useShiftStore();
   const [sales, setSales] = useState<SaleInvoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchInvoice, setSearchInvoice] = useState('');
@@ -127,10 +129,14 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
         original_invoice_no: returnInvoice.invoice_no,
         customer_name: returnInvoice.customer_name,
         return_items: itemsToReturn,
-        reason: returnReason
+        reason: returnReason,
+        shift_id: activeShift?.id || null
       });
 
       if (res.success) {
+        if (activeShift) {
+          fetchShiftSummary(activeShift.id);
+        }
         setIsReturnModalOpen(false);
         setSuccessMessage(`Return voucher ${res.returnNo} generated. Refund amount: ${currency} ${refundSum.toFixed(2)}. Stock restored.`);
         loadSales();
@@ -144,7 +150,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
   };
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -154,14 +160,14 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       </div>
 
       {successMessage && (
-        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
+        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {/* Filter and Search Bar */}
-      <form onSubmit={handleSearch} className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-wrap items-center gap-3 shadow-sm">
+      <form onSubmit={handleSearch} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-wrap items-center gap-3 shadow-sm">
         <div className="flex-1 min-w-[220px] relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
@@ -169,7 +175,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             value={searchInvoice}
             onChange={(e) => setSearchInvoice(e.target.value)}
             placeholder="Search by Invoice # (e.g. INV-2026...)"
-            className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
           />
         </div>
 
@@ -182,7 +188,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 font-mono"
+            className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
           />
         </div>
 
@@ -192,13 +198,13 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 font-mono"
+            className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
           />
         </div>
 
         <button
           type="submit"
-          className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-xl shadow-md transition-colors"
+          className="btn-save px-4 py-2 text-xs"
         >
           Filter Invoices
         </button>
@@ -212,7 +218,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
               setDateTo('');
               api.getSales().then(setSales);
             }}
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium text-xs rounded-xl transition-colors"
+            className="btn-cancel px-3 py-2 text-xs"
           >
             Reset
           </button>
@@ -220,10 +226,10 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       </form>
 
       {/* Invoices Table */}
-      <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Invoice #</th>
                 <th className="py-3 px-4">Date & Time</th>
@@ -258,10 +264,10 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                     className={`transition-colors ${
                       idx % 2 === 0
                         ? 'bg-transparent'
-                        : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                    } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                        : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                    } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                   >
-                    <td className="py-3 px-4 font-mono font-bold text-teal-600 dark:text-teal-300">
+                    <td className="py-3 px-4 font-mono font-bold text-teal-600 dark:text-teal-400">
                       {sale.invoice_no}
                     </td>
                     <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
@@ -278,8 +284,8 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                           : sale.payment_type === 'Card'
                           ? 'bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
                           : sale.payment_type === 'Credit'
-                          ? 'bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                          : 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                          ? 'badge-warning'
+                          : 'badge-success'
                       }`}>
                         {sale.payment_type}
                       </span>
@@ -294,11 +300,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                       {currency} {sale.net_total.toFixed(2)}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                        sale.status === 'completed'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80'
-                          : 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80'
-                      }`}>
+                      <span className={sale.status === 'completed' ? 'badge-success' : 'badge-warning'}>
                         {sale.status.toUpperCase()}
                       </span>
                     </td>
@@ -306,17 +308,17 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                       <div className="flex items-center justify-center space-x-1.5">
                         <button
                           onClick={() => handleOpenReceipt(sale.id)}
-                          className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium border border-slate-200 dark:border-slate-700 transition-colors flex items-center space-x-1"
+                          className="btn-print px-2.5 py-1 text-xs flex items-center space-x-1"
                           title="View / Print Receipt"
                         >
-                          <Eye className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                          <Eye className="w-3 h-3" />
                           <span>Receipt</span>
                         </button>
 
                         {sale.status !== 'returned' && hasPermission('can_return_sale') && (
                           <button
                             onClick={() => handleOpenReturnModal(sale.id)}
-                            className="px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-200 dark:border-amber-800/60 transition-colors flex items-center space-x-1"
+                            className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold border border-amber-300 dark:border-amber-700/60 transition-colors flex items-center space-x-1"
                             title="Return Items"
                           >
                             <RotateCcw className="w-3 h-3" />
@@ -366,7 +368,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
 
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">Product Name</th>
                   <th className="py-2.5 px-3 text-center">Billed Qty</th>
@@ -380,7 +382,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                   const prodId = Number(prodIdStr);
                   const refund = data.qty * data.price;
                   return (
-                    <tr key={prodId} className="hover:bg-slate-50 dark:hover:bg-slate-850/40">
+                    <tr key={prodId} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
                       <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">{data.name}</td>
                       <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400">{data.maxQty}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{currency} {data.price.toFixed(2)}</td>
@@ -397,10 +399,10 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                               [prodId]: { ...prev[prodId], qty: val }
                             }));
                           }}
-                          className="w-16 text-center bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                          className="w-16 text-center bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-teal-500"
                         />
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-300">
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
                         {currency} {refund.toFixed(2)}
                       </td>
                     </tr>
@@ -416,14 +418,14 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
               type="text"
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 
           <div className="flex justify-end space-x-2 pt-2">
             <button
               onClick={() => setIsReturnModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+              className="btn-cancel px-4 py-2 text-xs"
             >
               Cancel
             </button>

@@ -181,7 +181,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
   };
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -196,7 +196,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             }
             setIsNewPurchaseModalOpen(true);
           }}
-          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/20 active:scale-95 transition-all"
+          className="btn-save flex items-center space-x-2 text-xs font-bold px-4 py-2"
         >
           <Plus className="w-4 h-4" />
           <span>New Purchase Inward</span>
@@ -204,17 +204,17 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       </div>
 
       {feedback && (
-        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
+        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           <span>{feedback}</span>
         </div>
       )}
 
       {/* Purchases Invoices Table */}
-      <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Purchase Inv #</th>
                 <th className="py-3 px-4">Supplier Bill #</th>
@@ -249,10 +249,10 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                     className={`transition-colors ${
                       idx % 2 === 0
                         ? 'bg-transparent'
-                        : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
-                    } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
+                        : 'bg-slate-50/70 dark:bg-[#162032]/40'
+                    } hover:bg-teal-500/5 dark:hover:bg-teal-500/10`}
                   >
-                    <td className="py-3 px-4 font-mono font-bold text-teal-600 dark:text-teal-300">
+                    <td className="py-3 px-4 font-mono font-bold text-teal-600 dark:text-teal-400">
                       {pur.invoice_no}
                     </td>
                     <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300">
@@ -275,18 +275,14 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                       {currency} {pur.net_total.toFixed(2)}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                        pur.payment_status === 'Paid'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                          : 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                      }`}>
+                      <span className={pur.payment_status === 'Paid' ? 'badge-success' : 'badge-warning'}>
                         {pur.payment_status}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <button
                         onClick={() => setViewInvoice(pur)}
-                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center space-x-1"
+                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center space-x-1"
                       >
                         <Eye className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                         <span>Voucher</span>
@@ -309,14 +305,14 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       >
         <form onSubmit={handleSavePurchase} className="space-y-4">
           {/* Supplier & Header details */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0e1424] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0d131f] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Supplier / Company</label>
               <select
                 required
                 value={selectedCompanyId}
                 onChange={(e) => handleSelectCompanyInModal(e.target.value)}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               >
                 {companies.map(c => (
                   <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
@@ -331,7 +327,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 value={supplierInvoiceNo}
                 onChange={(e) => setSupplierInvoiceNo(e.target.value)}
                 placeholder="e.g. DC-98421"
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               />
             </div>
 
@@ -342,7 +338,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 required
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               />
             </div>
 
@@ -351,7 +347,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
               <select
                 value={paymentStatus}
                 onChange={(e) => setPaymentStatus(e.target.value as any)}
-                className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               >
                 <option value="Paid">Paid</option>
                 <option value="Pending">Pending / Credit</option>
@@ -361,7 +357,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           </div>
 
           {/* Add Line Item Box */}
-          <div className="bg-slate-50 dark:bg-[#0e1424] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
+          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
             <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider block">Add Medicine Line Item</span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="col-span-2">
@@ -369,7 +365,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 <select
                   value={lineProductId}
                   onChange={(e) => handleSelectProductInModal(e.target.value)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 >
                   <option value="">Select Medicine</option>
                   {products.map(p => (
@@ -385,7 +381,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   value={lineBatchNo}
                   onChange={(e) => setLineBatchNo(e.target.value.toUpperCase())}
                   placeholder="e.g. B-998"
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -395,7 +391,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   type="date"
                   value={lineExpiry}
                   onChange={(e) => setLineExpiry(e.target.value)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
             </div>
@@ -408,7 +404,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   min="1"
                   value={lineBoxes}
                   onChange={(e) => setLineBoxes(parseInt(e.target.value) || 1)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -419,7 +415,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   min="0"
                   value={lineBonus}
                   onChange={(e) => setLineBonus(parseInt(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -430,7 +426,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   step="0.01"
                   value={lineCost}
                   onChange={(e) => setLineCost(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -441,7 +437,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   step="0.01"
                   value={lineRetail}
                   onChange={(e) => setLineRetail(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -449,7 +445,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 <button
                   type="button"
                   onClick={handleAddLineItem}
-                  className="w-full py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center space-x-1"
+                  className="btn-save w-full py-1.5 text-xs flex items-center justify-center space-x-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Line</span>
@@ -461,7 +457,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           {/* Draft Items Table */}
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2 px-3">Item</th>
                   <th className="py-2 px-3">Batch & Expiry</th>
@@ -481,7 +477,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   </tr>
                 ) : (
                   draftItems.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-850/40">
+                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#162032]/50">
                       <td className="py-2 px-3 font-medium text-slate-900 dark:text-white">{item.product_name}</td>
                       <td className="py-2 px-3 font-mono text-[11px] text-slate-500 dark:text-slate-400">
                         {item.batch_no} (Exp: {item.expiry_date})
@@ -491,13 +487,13 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                         {item.bonus_boxes > 0 && <span className="text-emerald-600 dark:text-emerald-400 text-[10px] ml-1">(+{item.bonus_boxes})</span>}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{currency} {item.box_cost_price.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-300">{currency} {item.box_retail_price.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">{currency} {item.box_retail_price.toFixed(2)}</td>
                       <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{currency} {item.total_cost.toFixed(2)}</td>
                       <td className="py-2 px-2 text-center">
                         <button
                           type="button"
                           onClick={() => handleRemoveDraftItem(idx)}
-                          className="p-1 text-slate-400 hover:text-rose-500"
+                          className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -510,7 +506,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           </div>
 
           {/* Totals Summary */}
-          <div className="bg-slate-50 dark:bg-[#0e1424] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center justify-between text-xs">
+          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center justify-between text-xs">
             <div className="space-x-4 text-slate-600 dark:text-slate-400">
               <span>Lines: <strong className="text-slate-900 dark:text-white">{draftItems.length}</strong></span>
               <span>Total Boxes: <strong className="text-slate-900 dark:text-white">{draftItems.reduce((s, i) => s + i.quantity_boxes + i.bonus_boxes, 0)}</strong></span>
@@ -527,14 +523,14 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             <button
               type="button"
               onClick={() => setIsNewPurchaseModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+              className="btn-cancel px-4 py-2 text-xs"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={draftItems.length === 0}
-              className="px-6 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95"
+              className="btn-save px-6 py-2 text-xs"
             >
               Post Purchase & Update Stock
             </button>
@@ -551,7 +547,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       >
         {viewInvoice && (
           <div className="space-y-4 text-xs">
-            <div className="bg-slate-50 dark:bg-[#0e1424] p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="bg-slate-50 dark:bg-[#0d131f] p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
               <div className="flex justify-between font-bold text-slate-900 dark:text-white">
                 <span>{viewInvoice.company_name}</span>
                 <span className="text-teal-600 dark:text-teal-400">{viewInvoice.invoice_no}</span>
@@ -569,13 +565,13 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setViewInvoice(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium transition-colors"
+                className="btn-cancel px-4 py-2"
               >
                 Close
               </button>
               <button
                 onClick={() => window.print()}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold flex items-center space-x-1 shadow-md transition-all active:scale-95"
+                className="btn-print px-4 py-2 flex items-center space-x-1"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>Print Voucher</span>

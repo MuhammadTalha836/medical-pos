@@ -31,6 +31,7 @@ model User {
   saleReturns   SaleReturn[]
   purchases     Purchase[]
   dailyClosings DailyClosing[]
+  cashierShifts CashierShift[]
   auditLogs     AuditLog[]
 
   @@map("users")
@@ -132,8 +133,10 @@ model CustomerPayment {
   newBalance      Float    @map("new_balance")
   userName        String?  @map("user_name")
   paymentDate     DateTime @default(now()) @map("payment_date")
+  shiftId         Int?     @map("shift_id")
 
   customer        Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  shift           CashierShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
 
   @@map("customer_payments")
 }
@@ -157,10 +160,12 @@ model Sale {
   paymentType       String       @default("Cash") @map("payment_type")
   status            String       @default("completed")
   notes             String?
+  shiftId           Int?         @map("shift_id")
   createdAt         DateTime     @default(now()) @map("created_at")
 
   customer          Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
   user              User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  shift             CashierShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   items             SaleItem[]
   returns           SaleReturn[]
 
@@ -205,10 +210,12 @@ model SaleReturn {
   reason            String?
   userId            Int?             @map("user_id")
   userName          String?          @map("user_name")
+  shiftId           Int?             @map("shift_id")
   createdAt         DateTime         @default(now()) @map("created_at")
 
   sale              Sale?            @relation(fields: [saleId], references: [id], onDelete: SetNull)
   user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  shift             CashierShift?    @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   items             SaleReturnItem[]
 
   @@map("sale_returns")
@@ -364,4 +371,39 @@ model AuditLog {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
+}
+
+model CashierShift {
+  id                    Int               @id @default(autoincrement())
+  shiftNo               String            @unique @map("shift_no")
+  userId                Int               @map("user_id")
+  userName              String            @map("user_name")
+  startTime             DateTime          @map("start_time")
+  endTime               DateTime?         @map("end_time")
+  durationMinutes       Int?              @map("duration_minutes")
+  openingCash           Float             @default(0.0) @map("opening_cash")
+  closingCash           Float?            @map("closing_cash")
+  expectedCash          Float?            @map("expected_cash")
+  cashDifference        Float?            @map("cash_difference")
+  totalSalesCount       Int               @default(0) @map("total_sales_count")
+  totalSalesAmount      Float             @default(0.0) @map("total_sales_amount")
+  totalCashSales        Float             @default(0.0) @map("total_cash_sales")
+  totalCardSales        Float             @default(0.0) @map("total_card_sales")
+  totalCreditSales      Float             @default(0.0) @map("total_credit_sales")
+  totalReturnsAmount    Float             @default(0.0) @map("total_returns_amount")
+  totalCustomerPayments Float             @default(0.0) @map("total_customer_payments")
+  notes                 String?
+  status                String            @default("open")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at")
+
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sales                 Sale[]
+  saleReturns           SaleReturn[]
+  customerPayments      CustomerPayment[]
+
+  @@index([userId, status], name: "idx_shifts_user_status")
+  @@index([shiftNo], name: "idx_shifts_shift_no")
+  @@index([startTime], name: "idx_shifts_start_time")
+  @@map("cashier_shifts")
 }

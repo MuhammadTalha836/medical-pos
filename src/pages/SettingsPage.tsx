@@ -64,6 +64,7 @@ const DEFAULT_BLANK_PERMISSIONS: RolePermissions = {
   can_backup: false,
   can_restore: false,
   can_shift_close: false,
+  can_manage_shifts: false,
   can_stock_zero: false,
   can_manage_users: false,
   can_manage_roles: false
@@ -97,7 +98,8 @@ const DEFAULT_CASHIER_PERMISSIONS: RolePermissions = {
   can_discount: true,
   can_backup: false,
   can_restore: false,
-  can_shift_close: false,
+  can_shift_close: true,
+  can_manage_shifts: false,
   can_stock_zero: false,
   can_manage_users: false,
   can_manage_roles: false
@@ -132,6 +134,7 @@ const DEFAULT_ADMIN_PERMISSIONS: RolePermissions = {
   can_backup: true,
   can_restore: true,
   can_shift_close: true,
+  can_manage_shifts: true,
   can_stock_zero: true,
   can_manage_users: true,
   can_manage_roles: true
@@ -457,7 +460,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   );
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
       {/* Header */}
       <div className="pb-3 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -471,7 +474,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           <button
             onClick={handleSaveSettings}
             disabled={saving}
-            className="flex items-center space-x-1.5 px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/20 transition-all disabled:opacity-50"
+            className="btn-save flex items-center space-x-1.5 px-5 py-2 text-xs"
           >
             <Save className="w-4 h-4" />
             <span>{saving ? 'Saving...' : 'Save All Settings'}</span>
@@ -480,7 +483,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       </div>
 
       {successMsg && (
-        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
+        <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
           <span>{successMsg}</span>
         </div>
@@ -493,7 +496,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
             activeTab === 'store'
               ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           <Store className="w-4 h-4" />
@@ -506,7 +509,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
               activeTab === 'users'
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
             <Users className="w-4 h-4" />
@@ -520,7 +523,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
               activeTab === 'roles'
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
@@ -533,7 +536,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       {activeTab === 'store' && (
         <div className="space-y-6">
           {/* Visual Theme & Ergonomics Card */}
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
             <div className="flex items-center space-x-2">
               <Monitor className="w-5 h-5 text-teal-600 dark:text-teal-400" />
               <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Counter Ergonomics & Eye-Friendly Theme</h2>
@@ -548,10 +551,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 className={`cursor-pointer rounded-xl p-4 border transition-all flex items-start space-x-3.5 ${
                   theme === 'light'
                     ? 'bg-teal-50/70 border-teal-500 shadow-sm ring-1 ring-teal-500'
-                    : 'bg-slate-50/60 dark:bg-[#090d16] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${theme === 'light' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                <div className={`p-2 rounded-lg ${theme === 'light' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 dark:bg-[#162032] text-slate-600 dark:text-slate-400'}`}>
                   <Sun className="w-5 h-5" />
                 </div>
                 <div className="flex-1">
@@ -574,10 +577,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 className={`cursor-pointer rounded-xl p-4 border transition-all flex items-start space-x-3.5 ${
                   theme === 'dark'
                     ? 'bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
-                    : 'bg-slate-50/60 dark:bg-[#090d16] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                 }`}
               >
-                <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-teal-900/60 text-teal-300' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-teal-900/60 text-teal-300' : 'bg-slate-200 dark:bg-[#162032] text-slate-600 dark:text-slate-400'}`}>
                   <Moon className="w-5 h-5" />
                 </div>
                 <div className="flex-1">
@@ -590,7 +593,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     )}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                    Deep matte charcoal (<code className="text-teal-600 dark:text-teal-300 font-mono">#0B0F19</code>) and soothing teal accents. Calibrated for night shifts and low eye fatigue.
+                    Deep matte charcoal (<code className="text-teal-600 dark:text-teal-400 font-mono">#0A0E17</code>) and soothing teal accents. Calibrated for night shifts and low eye fatigue.
                   </p>
                 </div>
               </div>
@@ -599,7 +602,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
           <form onSubmit={handleSaveSettings} className="space-y-6">
             {/* Pharmacy Identity */}
-            <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex items-center space-x-2">
                 <Store className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Pharmacy Business Identity</h2>
@@ -613,7 +616,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     required
                     value={formData.store_name}
                     onChange={(e) => setFormData(prev => ({ ...prev, store_name: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
 
@@ -624,7 +627,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     required
                     value={formData.drug_license_no}
                     onChange={(e) => setFormData(prev => ({ ...prev, drug_license_no: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
 
@@ -634,7 +637,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.store_address}
                     onChange={(e) => setFormData(prev => ({ ...prev, store_address: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
 
@@ -644,7 +647,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.store_phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, store_phone: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
 
@@ -654,7 +657,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.tax_no}
                     onChange={(e) => setFormData(prev => ({ ...prev, tax_no: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
 
@@ -664,14 +667,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.currency_symbol}
                     onChange={(e) => setFormData(prev => ({ ...prev, currency_symbol: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
               </div>
             </div>
 
             {/* Thermal Receipt Layout Settings */}
-            <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex items-center space-x-2">
                 <Receipt className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Thermal Receipt Print Layout</h2>
@@ -684,7 +687,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.receipt_header}
                     onChange={(e) => setFormData(prev => ({ ...prev, receipt_header: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
 
@@ -693,7 +696,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <select
                     value={formData.paper_width}
                     onChange={(e) => setFormData(prev => ({ ...prev, paper_width: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   >
                     <option value="80mm">80mm Thermal Paper (Standard POS)</option>
                     <option value="58mm">58mm Thermal Paper (Compact)</option>
@@ -706,7 +709,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     rows={3}
                     value={formData.receipt_terms}
                     onChange={(e) => setFormData(prev => ({ ...prev, receipt_terms: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 font-mono"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
                   />
                 </div>
 
@@ -716,14 +719,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.receipt_footer}
                     onChange={(e) => setFormData(prev => ({ ...prev, receipt_footer: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
               </div>
             </div>
 
             {/* Automated Backup Settings */}
-            <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex items-center space-x-2">
                 <Shield className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Automated Backup Settings</h2>
@@ -735,7 +738,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <select
                     value={formData.auto_backup_enabled}
                     onChange={(e) => setFormData(prev => ({ ...prev, auto_backup_enabled: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   >
                     <option value="true">Enabled (Recommended)</option>
                     <option value="false">Disabled</option>
@@ -748,14 +751,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.auto_backup_dir}
                     onChange={(e) => setFormData(prev => ({ ...prev, auto_backup_dir: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                   />
                 </div>
               </div>
             </div>
 
             {/* Counter Sale & POS Discount Policy */}
-            <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
               <div className="flex items-center space-x-2">
                 <Percent className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Counter Sale & POS Discount Policy</h2>
@@ -775,7 +778,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       required
                       value={formData.max_bill_discount_pct ?? '14'}
                       onChange={(e) => setFormData(prev => ({ ...prev, max_bill_discount_pct: e.target.value }))}
-                      className="w-32 bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                      className="w-32 bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                     />
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400">%</span>
                   </div>
@@ -800,13 +803,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
                 placeholder="Search users by name, username, or role..."
-                className="w-full bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
             </div>
 
             <button
               onClick={() => setIsAddUserModalOpen(true)}
-              className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+              className="btn-save flex items-center space-x-1.5 px-4 py-2 text-white font-bold text-xs rounded-xl shadow-md transition-all"
             >
               <UserPlus className="w-4 h-4" />
               <span>Create New Staff Account</span>
@@ -814,9 +817,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           </div>
 
           {/* Users Table */}
-          <div className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-50 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3 px-4">Username / ID</th>
                   <th className="py-3 px-4">Staff Member</th>
@@ -831,12 +834,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   const isAdminId1 = u.id === 1 || u.username === 'admin';
 
                   return (
-                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-850/40 transition-colors">
+                    <tr key={u.id} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
                       <td className="py-3 px-4 font-mono">
                         <div className="flex items-center space-x-2">
-                          <span className="font-bold text-teal-600 dark:text-teal-300">@{u.username}</span>
+                          <span className="font-bold text-teal-600 dark:text-teal-400">@{u.username}</span>
                           {isCurrent && (
-                            <span className="text-[10px] bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300 font-bold px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] bg-teal-500/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold px-1.5 py-0.5 rounded border border-teal-500/30">
                               You
                             </span>
                           )}
@@ -854,10 +857,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                           u.role === 'admin'
-                            ? 'bg-rose-50 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                            ? 'badge-danger'
                             : u.role === 'pharmacist'
-                            ? 'bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                            : 'bg-teal-50 dark:bg-teal-950/70 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800'
+                            ? 'badge-info'
+                            : 'badge-success'
                         }`}>
                           {u.role_display || u.role}
                         </span>
@@ -866,8 +869,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       <td className="py-3 px-4 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
                           u.status === 'active'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'
+                            ? 'badge-success'
+                            : 'bg-slate-100 dark:bg-[#0d131f] text-slate-500 border-slate-300 dark:border-slate-800'
                         }`}>
                           {u.status.toUpperCase()}
                         </span>
@@ -877,17 +880,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                         <div className="flex items-center justify-center space-x-1.5">
                           <button
                             onClick={() => handleOpenEditUser(u)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium border border-slate-200 dark:border-slate-700 transition-colors flex items-center space-x-1"
+                            className="btn-edit px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1"
                             title="Edit User Login & Reset Password"
                           >
-                            <Edit className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                            <Edit className="w-3.5 h-3.5" />
                             <span>Edit / Reset</span>
                           </button>
 
                           {!isAdminId1 && (
                             <button
                               onClick={() => handleDeleteUser(u)}
-                              className="p-1 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 transition-colors"
+                              className="btn-delete p-1.5 rounded-lg transition-colors"
                               title="Delete Account"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -917,7 +920,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
             <button
               onClick={handleOpenAddRole}
-              className="flex items-center space-x-1.5 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+              className="btn-save flex items-center space-x-1.5 px-4 py-2 text-white font-bold text-xs rounded-xl shadow-md transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Create New Staff Role</span>
@@ -932,7 +935,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               return (
                 <div
                   key={r.id}
-                  className="bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col justify-between"
+                  className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col justify-between"
                 >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -946,24 +949,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       </div>
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                         isSys
-                          ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                          : 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800'
+                          ? 'badge-warning'
+                          : 'badge-info'
                       }`}>
                         {isSys ? 'System Role' : 'Custom'}
                       </span>
                     </div>
 
                     <div className="text-[11px] font-mono text-slate-400">
-                      Identifier: <span className="text-teal-600 dark:text-teal-300 font-bold">{r.name}</span>
+                      Identifier: <span className="text-teal-600 dark:text-teal-400 font-bold">{r.name}</span>
                     </div>
 
                     <p className="text-xs text-slate-500 dark:text-slate-400 min-h-[36px]">
                       {r.description || 'No description provided.'}
                     </p>
 
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                       <span>Assigned Users:</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                      <span className="font-mono font-bold text-slate-900 dark:text-white bg-slate-100 dark:bg-[#0d131f] px-2 py-0.5 rounded border border-slate-200 dark:border-slate-800">
                         {r.user_count || 0}
                       </span>
                     </div>
@@ -972,9 +975,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <div className="pt-2 flex items-center space-x-2">
                     <button
                       onClick={() => handleOpenEditRole(r)}
-                      className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1.5"
+                      className="btn-edit flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-colors flex items-center justify-center space-x-1.5"
                     >
-                      <Shield className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                      <Shield className="w-3.5 h-3.5" />
                       <span>Configure Permissions</span>
                     </button>
 
@@ -983,7 +986,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                         onClick={() => handleDeleteRole(r)}
                         disabled={(r.user_count || 0) > 0}
                         title={(r.user_count || 0) > 0 ? 'Cannot delete role with assigned users' : 'Delete Role'}
-                        className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 transition-colors disabled:opacity-40"
+                        className="btn-delete p-2 rounded-xl transition-colors disabled:opacity-40"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1012,7 +1015,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
               placeholder="e.g. cashier2"
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
 
@@ -1024,7 +1027,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               value={newFullName}
               onChange={(e) => setNewFullName(e.target.value)}
               placeholder="e.g. Muhammad Ali"
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
 
@@ -1036,7 +1039,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
 
@@ -1045,7 +1048,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
             >
               {roles.map(r => (
                 <option key={r.id} value={r.name}>
@@ -1059,13 +1062,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             <button
               type="button"
               onClick={() => setIsAddUserModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
+              className="btn-cancel px-4 py-2 rounded-xl font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
             >
               Create Account
             </button>
@@ -1088,7 +1091,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               required
               value={editUsername}
               onChange={(e) => setEditUsername(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
 
@@ -1099,7 +1102,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               required
               value={editFullName}
               onChange={(e) => setEditFullName(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
 
@@ -1109,7 +1112,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               value={editRole}
               onChange={(e) => setEditRole(e.target.value)}
               disabled={editingUser?.id === 1}
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
             >
               {roles.map(r => (
                 <option key={r.id} value={r.name}>
@@ -1125,15 +1128,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               value={editStatus}
               onChange={(e) => setEditStatus(e.target.value as any)}
               disabled={editingUser?.id === 1}
-              className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
             >
               <option value="active">Active (Access Allowed)</option>
               <option value="inactive">Inactive (Access Suspended)</option>
             </select>
           </div>
 
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl space-y-1.5">
-            <div className="flex items-center space-x-1.5 text-amber-800 dark:text-amber-300 font-bold">
+          <div className="p-3 bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 dark:border-amber-800/60 rounded-xl space-y-1.5">
+            <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-300 font-bold">
               <Key className="w-3.5 h-3.5" />
               <span>Reset Password (Optional)</span>
             </div>
@@ -1145,7 +1148,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               value={editPassword}
               onChange={(e) => setEditPassword(e.target.value)}
               placeholder="Enter new password to overwrite"
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
 
@@ -1153,13 +1156,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             <button
               type="button"
               onClick={() => setEditingUser(null)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
+              className="btn-cancel px-4 py-2 rounded-xl font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
             >
               Save Changes
             </button>
@@ -1186,7 +1189,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 value={newRoleName}
                 onChange={(e) => setNewRoleName(e.target.value)}
                 placeholder="e.g. junior_cashier or stock_manager"
-                className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
             </div>
 
@@ -1200,7 +1203,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 value={newRoleDisplayName}
                 onChange={(e) => setNewRoleDisplayName(e.target.value)}
                 placeholder="e.g. Junior Cashier"
-                className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
             </div>
 
@@ -1213,7 +1216,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 value={newRoleDescription}
                 onChange={(e) => setNewRoleDescription(e.target.value)}
                 placeholder="Brief summary of duties and responsibilities"
-                className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
             </div>
           </div>
@@ -1231,7 +1234,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               <button
                 type="button"
                 onClick={() => setNewRolePermissions({ ...DEFAULT_CASHIER_PERMISSIONS })}
-                className="px-2.5 py-1 text-[11px] rounded bg-teal-50 hover:bg-teal-100 dark:bg-teal-950 dark:hover:bg-teal-900 text-teal-700 dark:text-teal-300"
+                className="px-2.5 py-1 text-[11px] rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30"
               >
                 Cashier Preset
               </button>
@@ -1248,7 +1251,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           {/* Matrix Sections */}
           <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
             {/* Section 1: Page Navigation */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 1. Navigation & Module Access (Visible in Sidebar)
               </span>
@@ -1267,7 +1270,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(newRolePermissions, setNewRolePermissions, item.key as any)}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {newRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1281,7 +1284,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 2: Medicine & Company Masters Actions */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 2. Medicines & Distributors Management
               </span>
@@ -1297,7 +1300,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(newRolePermissions, setNewRolePermissions, item.key as any)}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {newRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1311,7 +1314,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 3: POS & Counter Sales Actions */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 3. POS Counter & Invoicing Actions
               </span>
@@ -1325,7 +1328,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(newRolePermissions, setNewRolePermissions, item.key as any)}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {newRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1339,7 +1342,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 4: Purchases & Khata Actions */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 4. Supplier Purchases & Customer Khata Actions
               </span>
@@ -1354,7 +1357,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(newRolePermissions, setNewRolePermissions, item.key as any)}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {newRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1368,7 +1371,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 5: Financial Intelligence & Security */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 5. Financial KPIs, Utilities & Security
               </span>
@@ -1378,6 +1381,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   { key: 'can_backup', label: 'Run Local SQLite Backup' },
                   { key: 'can_restore', label: 'Restore Database Snapshot' },
                   { key: 'can_shift_close', label: 'Execute Shift Closing' },
+                  { key: 'can_manage_shifts', label: 'Manage & Reopen Shifts' },
                   { key: 'can_stock_zero', label: 'Reset Stock Zero Audit' },
                   { key: 'can_manage_users', label: 'Manage Staff Logins' },
                   { key: 'can_manage_roles', label: 'Manage Roles & Matrix' }
@@ -1385,7 +1389,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(newRolePermissions, setNewRolePermissions, item.key as any)}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {newRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1403,13 +1407,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             <button
               type="button"
               onClick={() => setIsAddRoleModalOpen(false)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
+              className="btn-cancel px-4 py-2 rounded-xl font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
             >
               Save Custom Role
             </button>
@@ -1435,7 +1439,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 required
                 value={editRoleDisplayName}
                 onChange={(e) => setEditRoleDisplayName(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
             </div>
 
@@ -1447,7 +1451,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 type="text"
                 disabled
                 value={editingRole?.name || ''}
-                className="w-full bg-slate-100 dark:bg-[#090d16]/50 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-500 font-mono"
+                className="w-full bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-500 font-mono"
               />
             </div>
 
@@ -1460,7 +1464,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 value={editRoleDescription}
                 onChange={(e) => setEditRoleDescription(e.target.value)}
                 placeholder="Brief summary of duties and responsibilities"
-                className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
             </div>
           </div>
@@ -1478,7 +1482,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               <button
                 type="button"
                 onClick={() => setEditRolePermissions({ ...DEFAULT_CASHIER_PERMISSIONS })}
-                className="px-2.5 py-1 text-[11px] rounded bg-teal-50 hover:bg-teal-100 dark:bg-teal-950 dark:hover:bg-teal-900 text-teal-700 dark:text-teal-300"
+                className="px-2.5 py-1 text-[11px] rounded bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30"
               >
                 Cashier Preset
               </button>
@@ -1497,7 +1501,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           {/* Matrix Sections */}
           <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
             {/* Section 1: Page Navigation */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 1. Navigation & Module Access (Visible in Sidebar)
               </span>
@@ -1516,7 +1520,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(editRolePermissions, setEditRolePermissions, item.key as any, editingRole?.name === 'admin')}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {editRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1530,7 +1534,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 2: Medicine & Company Masters Actions */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 2. Medicines & Distributors Management
               </span>
@@ -1546,7 +1550,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(editRolePermissions, setEditRolePermissions, item.key as any, editingRole?.name === 'admin')}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {editRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1560,7 +1564,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 3: POS & Counter Sales Actions */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 3. POS Counter & Invoicing Actions
               </span>
@@ -1574,7 +1578,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(editRolePermissions, setEditRolePermissions, item.key as any, editingRole?.name === 'admin')}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {editRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1588,7 +1592,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 4: Purchases & Khata Actions */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 4. Supplier Purchases & Customer Khata Actions
               </span>
@@ -1603,7 +1607,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(editRolePermissions, setEditRolePermissions, item.key as any, editingRole?.name === 'admin')}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {editRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1617,7 +1621,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             </div>
 
             {/* Section 5: Financial Intelligence & Security */}
-            <div className="p-3 bg-slate-50 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
               <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
                 5. Financial KPIs, Utilities & Security
               </span>
@@ -1627,6 +1631,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   { key: 'can_backup', label: 'Run Local SQLite Backup' },
                   { key: 'can_restore', label: 'Restore Database Snapshot' },
                   { key: 'can_shift_close', label: 'Execute Shift Closing' },
+                  { key: 'can_manage_shifts', label: 'Manage & Reopen Shifts' },
                   { key: 'can_stock_zero', label: 'Reset Stock Zero Audit' },
                   { key: 'can_manage_users', label: 'Manage Staff Logins' },
                   { key: 'can_manage_roles', label: 'Manage Roles & Matrix' }
@@ -1634,7 +1639,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label
                     key={item.key}
                     onClick={() => togglePermission(editRolePermissions, setEditRolePermissions, item.key as any, editingRole?.name === 'admin')}
-                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                    className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors"
                   >
                     {editRolePermissions[item.key as keyof RolePermissions] ? (
                       <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
@@ -1652,13 +1657,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             <button
               type="button"
               onClick={() => setEditingRole(null)}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-medium"
+              className="btn-cancel px-4 py-2 rounded-xl font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
             >
               Save Permissions
             </button>

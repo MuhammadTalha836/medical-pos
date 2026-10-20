@@ -5,6 +5,7 @@ import { api } from '../services/apiService';
 import { Product, SaleInvoice, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
 import { ThermalReceipt } from '../components/pos/ThermalReceipt';
+import { useShiftStore } from '../store/useShiftStore';
 import {
   Search,
   Trash2,
@@ -19,7 +20,10 @@ import {
   CreditCard,
   Banknote,
   Percent,
-  Smartphone
+  Smartphone,
+  Lock,
+  PlayCircle,
+  ShieldAlert
 } from 'lucide-react';
 
 interface PosPageProps {
@@ -107,6 +111,34 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     getTotals
   } = usePosStore();
 
+  const {
+    activeShift,
+    activeSummary,
+    fetchShiftSummary,
+    setStartModalOpen,
+    setClosingModalOpen
+  } = useShiftStore();
+
+  const [elapsedMinutes, setElapsedMinutes] = useState<number>(0);
+
+  useEffect(() => {
+    if (!activeShift?.start_time) {
+      setElapsedMinutes(0);
+      return;
+    }
+    const update = () => {
+      const diffMs = Math.max(0, Date.now() - new Date(activeShift.start_time).getTime());
+      setElapsedMinutes(Math.floor(diffMs / 60000));
+    };
+    update();
+    const interval = setInterval(update, 30000);
+    return () => clearInterval(interval);
+  }, [activeShift?.start_time]);
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  const elapsedRemMinutes = elapsedMinutes % 60;
+  const elapsedFormatted = elapsedHours > 0 ? `${elapsedHours}h ${elapsedRemMinutes}m` : `${elapsedRemMinutes}m`;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [selectedResultIdx, setSelectedResultIdx] = useState(0);
@@ -149,6 +181,11 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       } else if (e.key === 'F9' || (e.ctrlKey && e.key === 'Enter')) {
         e.preventDefault();
         if (cart.length > 0 && !loadingSale) {
+          if (!activeShift) {
+            setErrorMessage('No active cashier shift. Please start a shift before finalizing sales.');
+            setStartModalOpen(true);
+            return;
+          }
           handleCompleteSale(true);
         }
       }
@@ -156,7 +193,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, loadingSale, totals, customerName, paymentType]);
+  }, [cart, loadingSale, totals, customerName, paymentType, activeShift]);
 
   // Product search with debounce
   useEffect(() => {
@@ -207,6 +244,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   };
 
   const handleCompleteSale = async (shouldPrint = true) => {
+    if (!activeShift) {
+      setErrorMessage('Cashier shift is not active. Please start a shift first.');
+      setStartModalOpen(true);
+      return;
+    }
+
     if (cart.length === 0) {
       setErrorMessage('Please add at least one product to the invoice.');
       return;
@@ -217,6 +260,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       setErrorMessage(null);
 
       const salePayload = {
+        shift_id: activeShift.id,
         customer_name: customerName || 'Counter Customer',
         customer_phone: customerPhone || null,
         user_id: user?.id || null,
@@ -283,6 +327,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
         clearCart();
         setCreatedInvoice(invoiceObj);
+        if (activeShift) {
+          fetchShiftSummary(activeShift.id);
+        }
 
         if (shouldPrint) {
           setIsReceiptModalOpen(true);
@@ -296,12 +343,85 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="flex-1 flex overflow-hidden bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200 relative">
+      {/* Shift Inactive Lock Overlay */}
+      {!activeShift && (
+        <div className="absolute inset-0 z-40 bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#111827] border border-amber-300/60 dark:border-amber-700/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center shadow-inner">
+              <Lock className="w-7 h-7" />
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                Cashier Shift Inactive / Locked
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Invoicing and counter sales are strictly locked until a cashier shift is opened. Declare your opening cash float to begin your working session.
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setStartModalOpen(true)}
+                className="w-full btn-save py-2.5 text-xs font-bold flex items-center justify-center space-x-2 shadow-lg shadow-teal-500/20"
+              >
+                <PlayCircle className="w-4 h-4" />
+                <span>Start Cashier Shift Now</span>
+              </button>
+            </div>
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 flex items-center justify-center space-x-1">
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+              <span>Anti-Bypass Protection Active • All operations audited</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* LEFT: Cart and Search Panel */}
-      <div className="flex-1 flex flex-col p-4 border-r border-slate-200 dark:border-slate-800/80 space-y-3 overflow-hidden">
+      <div className="flex-1 flex flex-col p-4 border-r border-slate-200 dark:border-slate-800 space-y-3 overflow-hidden">
+        {/* Active Shift Header Ribbon */}
+        {activeShift && (
+          <div className="bg-white dark:bg-[#111827] border border-teal-500/30 dark:border-teal-500/20 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs shadow-sm flex-shrink-0">
+            <div className="flex items-center space-x-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="font-bold text-slate-900 dark:text-white font-mono">{activeShift.shift_no}</span>
+                  <span className="text-[10px] text-teal-700 dark:text-teal-300 font-mono bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
+                    On Duty: {elapsedFormatted}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Cashier: <strong className="text-slate-700 dark:text-slate-300">{activeShift.user_name}</strong> • Float: <strong className="font-mono">{currency} {activeShift.opening_cash.toFixed(2)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              {activeSummary && (
+                <div className="text-right text-[11px] hidden sm:block">
+                  <div className="text-slate-500 dark:text-slate-400">Drawer Cash:</div>
+                  <div className="font-mono font-bold text-teal-600 dark:text-teal-400">
+                    {currency} {activeSummary.expected_cash.toFixed(2)}
+                  </div>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setClosingModalOpen(true)}
+                className="btn-cancel px-2.5 py-1 text-xs font-semibold flex items-center space-x-1"
+                title="Reconcile Cash Drawer & Close Shift"
+              >
+                <Lock className="w-3 h-3 text-amber-500" />
+                <span>Close Shift</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Search Bar */}
         <div className="relative">
-          <div className="flex items-center bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-700/80 rounded-xl px-4 py-2.5 shadow-sm focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20 transition-all">
+          <div className="flex items-center bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 shadow-sm focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20 transition-all">
             <Search className="w-5 h-5 text-teal-600 dark:text-teal-400 mr-3 flex-shrink-0" />
             <input
               ref={searchInputRef}
@@ -319,7 +439,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
           {/* Search Dropdown Results */}
           {searchResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-12 z-30 bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
+            <div className="absolute left-0 right-0 top-12 z-30 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
               {searchResults.map((prod, idx) => {
                 const isSelected = idx === selectedResultIdx;
                 const isOut = prod.stock_boxes === 0 && prod.stock_loose === 0;
@@ -330,16 +450,16 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                     className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-teal-50 dark:bg-teal-950/70 text-teal-900 dark:text-teal-200'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-200'
+                        : 'hover:bg-slate-50 dark:hover:bg-[#162032] text-slate-700 dark:text-slate-200'
                     }`}
                   >
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <span className="font-bold text-sm text-slate-900 dark:text-white">{prod.name}</span>
-                        <span className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-slate-800 text-teal-700 dark:text-teal-300 font-mono rounded font-semibold border border-slate-200 dark:border-slate-700">{prod.c_code}</span>
-                        <span className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono rounded border border-slate-200 dark:border-slate-700">{prod.p_code}</span>
+                        <span className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-[#0d131f] text-teal-700 dark:text-teal-300 font-mono rounded font-semibold border border-slate-200 dark:border-slate-700">{prod.c_code}</span>
+                        <span className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 font-mono rounded border border-slate-200 dark:border-slate-700">{prod.p_code}</span>
                         {prod.location_rack && (
-                          <span className="px-1.5 py-0.5 text-[10px] bg-amber-50 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 rounded font-mono border border-amber-200 dark:border-amber-800">Loc: {prod.location_rack}</span>
+                          <span className="px-1.5 py-0.5 text-[10px] badge-warning">Loc: {prod.location_rack}</span>
                         )}
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center space-x-3 mt-1">
@@ -378,17 +498,17 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
         {/* Error banner if any */}
         {errorMessage && (
-          <div className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/70 border border-rose-200 dark:border-rose-800/80 text-rose-700 dark:text-rose-300 text-xs">
+          <div className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/70 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
             <AlertTriangle className="w-4 h-4 text-rose-500 flex-shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {/* Cart Items Table */}
-        <div className="flex-1 bg-white dark:bg-[#101726] border border-slate-200 dark:border-slate-800/80 rounded-xl overflow-hidden flex flex-col shadow-sm">
+        <div className="flex-1 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-sm">
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-[#0c1220] border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase font-semibold text-[11px] tracking-wider sticky top-0 z-10">
+              <thead className="bg-slate-100 dark:bg-[#0d131f] border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase font-semibold text-[11px] tracking-wider sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3 w-8">#</th>
                   <th className="py-2.5 px-3">Product Name</th>
@@ -424,7 +544,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                         className={`transition-colors ${
                           idx % 2 === 0
                             ? 'bg-transparent'
-                            : 'bg-slate-50/70 dark:bg-[#131b2e]/40'
+                            : 'bg-slate-50/70 dark:bg-[#0d131f]/40'
                         } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
                       >
                         <td className="py-2.5 px-3 text-slate-400 dark:text-slate-500 font-mono">{idx + 1}</td>
@@ -469,7 +589,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                           <div className="flex items-center justify-center space-x-1">
                             <button
                               onClick={() => updateQuantity(idx, item.quantity - 1)}
-                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
                             >
                               <Minus className="w-3 h-3" />
                             </button>
@@ -478,11 +598,11 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateQuantity(idx, parseFloat(e.target.value) || 1)}
-                              className="w-12 text-center bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded py-0.5 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                              className="w-12 text-center bg-white dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded py-0.5 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-teal-500"
                             />
                             <button
                               onClick={() => updateQuantity(idx, item.quantity + 1)}
-                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
                             >
                               <Plus className="w-3 h-3" />
                             </button>
@@ -496,7 +616,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                             step="0.01"
                             value={item.unit_price}
                             onChange={(e) => updateUnitPrice(idx, parseFloat(e.target.value) || 0)}
-                            className="w-16 text-right bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded py-0.5 px-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                            className="w-16 text-right bg-white dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded py-0.5 px-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-teal-500"
                           />
                         </td>
 
@@ -509,7 +629,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                             step="1"
                             value={item.discount_pct}
                             onChange={(e) => updateDiscountPct(idx, parseFloat(e.target.value) || 0)}
-                            className="w-12 text-center bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded py-0.5 px-1 text-teal-700 dark:text-teal-300 font-mono text-xs focus:outline-none focus:border-teal-500 font-semibold"
+                            className="w-12 text-center bg-white dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded py-0.5 px-1 text-teal-700 dark:text-teal-300 font-mono text-xs focus:outline-none focus:border-teal-500 font-semibold"
                           />
                         </td>
 
@@ -536,7 +656,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           </div>
 
           {/* Cart Table Footer Info */}
-          <div className="p-3 bg-slate-50 dark:bg-[#0c1220] border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+          <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
             <div className="flex items-center space-x-3">
               <span>Lines: <strong className="text-slate-900 dark:text-white font-bold">{cart.length}</strong></span>
               <span>•</span>
@@ -556,9 +676,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       </div>
 
       {/* RIGHT: Bill Summary & Payment Settlement Panel */}
-      <div className="w-96 p-4 flex flex-col justify-between bg-white dark:bg-[#0e1424] border-l border-slate-200 dark:border-slate-800/80 overflow-y-auto space-y-4 shadow-sm">
+      <div className="w-96 p-4 flex flex-col justify-between bg-white dark:bg-[#111827] border-l border-slate-200 dark:border-slate-800 overflow-y-auto space-y-4 shadow-sm">
         {/* Customer Information */}
-        <div className="bg-slate-50 dark:bg-[#121826]/70 border border-slate-200 dark:border-slate-800/80 rounded-xl p-3.5 space-y-2.5">
+        <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
             <span className="flex items-center space-x-1.5">
               <User className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
@@ -573,20 +693,20 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               value={customerName}
               onChange={(e) => setCustomer(null, e.target.value, customerPhone)}
               placeholder="Customer Name (e.g. Counter Customer)"
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
             />
             <input
               type="text"
               value={customerPhone}
               onChange={(e) => setCustomer(null, customerName, e.target.value)}
               placeholder="Contact Number (Optional)"
-              className="w-full bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
             />
           </div>
         </div>
 
         {/* Bill Calculations breakdown */}
-        <div className="bg-slate-50 dark:bg-[#121826]/70 border border-slate-200 dark:border-slate-800/80 rounded-xl p-4 space-y-3">
+        <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
           <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
             <span>Gross Total:</span>
             <span className="font-mono text-slate-900 dark:text-slate-200 font-semibold">{currency} {totals.grossTotal.toFixed(2)}</span>
@@ -598,7 +718,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           </div>
 
           {/* Overall Bill Discount */}
-          <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <span className="text-xs text-slate-700 dark:text-slate-300 flex items-center space-x-1 font-medium">
               <Percent className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               <span>Bill Disc [F4]:</span>
@@ -619,7 +739,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                   setBillDiscountPct(val, maxBillDiscount);
                 }}
                 placeholder="%"
-                className="w-14 text-center bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg py-1 px-1 text-teal-700 dark:text-teal-300 font-mono text-xs font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-14 text-center bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg py-1 px-1 text-teal-700 dark:text-teal-300 font-mono text-xs font-bold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
               />
               <span className="text-xs text-slate-500 dark:text-slate-400">%</span>
               <span className="text-[10px] text-teal-700 dark:text-teal-300 font-bold bg-teal-50 dark:bg-teal-950/70 border border-teal-200 dark:border-teal-800 px-1.5 py-0.5 rounded">
@@ -658,7 +778,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                 className={`py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 border transition-all ${
                   paymentType === type
                     ? 'bg-teal-600 text-white border-teal-500 shadow-md shadow-teal-500/20'
-                    : 'bg-white dark:bg-[#090d16] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                    : 'bg-white dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#162032]'
                 }`}
               >
                 {type === 'Cash' && <Banknote className="w-3.5 h-3.5" />}
@@ -672,7 +792,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         </div>
 
         {/* Cash Tendered & Change calculator */}
-        <div className="bg-slate-50 dark:bg-[#121826]/70 border border-slate-200 dark:border-slate-800/80 rounded-xl p-3.5 space-y-2">
+        <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">Cash Received [F6]:</span>
             <input
@@ -681,7 +801,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               value={cashTendered || ''}
               onChange={(e) => setCashTendered(parseFloat(e.target.value) || 0)}
               placeholder={totals.netTotal.toString()}
-              className="w-28 text-right bg-white dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-lg py-1 px-2 text-slate-900 dark:text-white font-mono text-sm font-bold focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-28 text-right bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg py-1 px-2 text-slate-900 dark:text-white font-mono text-sm font-bold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
             />
           </div>
 
@@ -701,7 +821,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                       ? 'bg-teal-600 text-white border-teal-500 shadow-sm'
                       : isExact
                       ? 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border-teal-300 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/40'
-                      : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      : 'bg-white dark:bg-[#162032] hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                   }`}
                 >
                   {isExact ? `${amt}` : amt}
@@ -732,7 +852,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           <button
             onClick={() => handleCompleteSale(false)}
             disabled={cart.length === 0 || loadingSale}
-            className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1.5"
+            className="w-full py-2 bg-slate-100 dark:bg-[#162032] hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1.5"
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
             <span>Save Without Print</span>

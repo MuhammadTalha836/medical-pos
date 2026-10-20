@@ -114,9 +114,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
         )}
 
         {/* Current Role Badge */}
-        <div className="p-3 bg-slate-50 dark:bg-[#0c1220] border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between">
+        <div className="p-3 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950 text-teal-600 dark:text-teal-400">
+            <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400">
               <Shield className="w-4 h-4" />
             </div>
             <div>
@@ -124,7 +124,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <div className="font-bold text-slate-900 dark:text-white capitalize">{user.role_display || user.role}</div>
             </div>
           </div>
-          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+          <span className="badge-success">
             Account Active
           </span>
         </div>
@@ -138,7 +138,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="w-full pos-input"
           />
         </div>
 
@@ -151,12 +151,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full bg-slate-50 dark:bg-[#090d16] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+            className="w-full pos-input font-mono"
           />
         </div>
 
         {/* Password Reset Section */}
-        <div className="p-3.5 bg-slate-50/70 dark:bg-[#090d16] border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
+        <div className="p-3.5 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
           <div className="flex items-center space-x-1.5 text-slate-700 dark:text-slate-300 font-bold">
             <KeyRound className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
             <span>Change Account Password (Optional)</span>
@@ -171,7 +171,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-white dark:bg-[#0c1220] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-xs"
             />
           </div>
 
@@ -185,7 +185,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="New password"
-                className="w-full bg-white dark:bg-[#0c1220] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-xs"
               />
             </div>
             <div>
@@ -197,7 +197,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm password"
-                className="w-full bg-white dark:bg-[#0c1220] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-xs"
               />
             </div>
           </div>
@@ -207,14 +207,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-medium hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
+            className="btn-cancel"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50"
+            className="btn-save"
           >
             {loading ? 'Saving...' : 'Update My Credentials'}
           </button>
