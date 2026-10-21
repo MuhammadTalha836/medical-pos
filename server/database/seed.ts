@@ -435,8 +435,9 @@ export function seedInitialData(db: Database.Database) {
       INSERT INTO products (
         company_id, c_code, p_code, barcode, name, generic_name, unit_type,
         packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-        default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert,
+        allow_open_sale, min_sale_qty
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertBatch = db.prepare(`
@@ -448,11 +449,14 @@ export function seedInitialData(db: Database.Database) {
     for (const p of products) {
       const comp = getCompanyId.get(p.c_code) as { id: number } | undefined;
       const compId = comp ? comp.id : null;
+      const allowOpen = p.packing > 1 ? 1 : 0;
+      const minQty = 1;
 
       const res = insertProd.run(
         compId, p.c_code, p.p_code, p.barcode, p.name, p.generic_name, p.unit_type,
         p.packing, p.box_trade_price, p.box_retail_price, p.unit_trade_price, p.unit_retail_price,
-        p.default_discount_pct, p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert
+        p.default_discount_pct, p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+        allowOpen, minQty
       );
 
       const prodId = res.lastInsertRowid;

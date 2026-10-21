@@ -124,6 +124,8 @@ export interface Product {
   stock_boxes: number;
   stock_loose: number;
   min_stock_alert: number;
+  allow_open_sale?: boolean | number;
+  min_sale_qty?: number;
   status: 'active' | 'inactive';
   company_name?: string;
   created_at?: string;

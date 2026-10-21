@@ -24,10 +24,12 @@ export function initDatabase(customPath?: string): Database.Database {
   // Execute schema
   db.exec(SCHEMA_SQL);
 
-  // Safe migrations for shift_id columns if upgrading existing database
+  // Safe migrations for shift_id and product open-sale columns if upgrading existing database
   try { db.exec(`ALTER TABLE sales ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
   try { db.exec(`ALTER TABLE sale_returns ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
   try { db.exec(`ALTER TABLE customer_payments ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
+  try { db.exec(`ALTER TABLE products ADD COLUMN allow_open_sale INTEGER NOT NULL DEFAULT 1;`); } catch {}
+  try { db.exec(`ALTER TABLE products ADD COLUMN min_sale_qty INTEGER NOT NULL DEFAULT 1;`); } catch {}
 
   // Seed default data if database is fresh
   seedInitialData(db);

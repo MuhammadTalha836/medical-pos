@@ -219,7 +219,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   }, [searchQuery]);
 
   const handleSelectProduct = (product: Product, isLoose = false) => {
-    addItem(product, isLoose, 1);
+    const canOpen = product.allow_open_sale !== false && product.allow_open_sale !== 0;
+    if (isLoose && !canOpen) {
+      setErrorMessage(`Open packaging sale is prohibited for "${product.name}". This medicine can only be sold in complete packs.`);
+      addItem(product, false, 1);
+    } else {
+      setErrorMessage(null);
+      addItem(product, isLoose, 1);
+    }
     setSearchQuery('');
     setSearchResults([]);
     searchInputRef.current?.focus();
@@ -253,6 +260,20 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     if (cart.length === 0) {
       setErrorMessage('Please add at least one product to the invoice.');
       return;
+    }
+
+    // Validate Open-Sale Rules & Minimum Quantities before completing sale
+    for (const item of cart) {
+      const canOpen = item.product.allow_open_sale !== false && item.product.allow_open_sale !== 0;
+      if (item.is_loose && !canOpen) {
+        setErrorMessage(`Validation Error: "${item.product.name}" cannot be sold as loose units. Please switch to full packaging or remove it.`);
+        return;
+      }
+      const minQty = item.product.min_sale_qty || 1;
+      if (item.quantity < minQty) {
+        setErrorMessage(`Validation Error: Minimum sale quantity for "${item.product.name}" is ${minQty} ${item.is_loose ? item.product.unit_type : 'Pack(s)'}.`);
+        return;
+      }
     }
 
     try {
@@ -478,30 +499,44 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                         <div className="text-xs font-bold text-teal-700 dark:text-teal-400 font-mono">{currency} {prod.box_retail_price.toFixed(2)}<span className="text-[10px] font-normal text-slate-400">/Bx</span></div>
                         <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{currency} {prod.unit_retail_price.toFixed(2)}<span className="text-[9px] font-normal text-slate-400">/Unit</span></div>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectProduct(prod, false);
-                          }}
-                          title="Add Full Box/Strip to cart"
-                          className="px-2.5 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
-                        >
-                          + Box
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectProduct(prod, true);
-                          }}
-                          title="Add Loose Unit to cart"
-                          className="px-2.5 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
-                        >
-                          + Loose
-                        </button>
-                      </div>
+                      {(() => {
+                        const canOpen = prod.allow_open_sale !== false && prod.allow_open_sale !== 0;
+                        return (
+                          <div className="flex items-center space-x-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectProduct(prod, false);
+                              }}
+                              title="Add Full Box/Strip to cart"
+                              className="px-2.5 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                            >
+                              + Box
+                            </button>
+                            {canOpen ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectProduct(prod, true);
+                                }}
+                                title="Add Loose Unit to cart"
+                                className="px-2.5 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                              >
+                                + Loose
+                              </button>
+                            ) : (
+                              <span
+                                title="Open packaging sale prohibited. Must be sold in full packaging."
+                                className="px-2 py-1 text-[10px] font-semibold bg-slate-100 dark:bg-[#162032] text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-750 select-none"
+                              >
+                                Full Pack Only
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -586,30 +621,45 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
                         {/* Dual Unit Sale Segmented Toggle */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800">
-                            <button
-                              type="button"
-                              onClick={() => item.is_loose && toggleLooseUnit(idx)}
-                              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
-                                !item.is_loose
-                                  ? 'bg-teal-600 text-white shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                              }`}
-                            >
-                              Box
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => !item.is_loose && toggleLooseUnit(idx)}
-                              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
-                                item.is_loose
-                                  ? 'bg-amber-600 text-white shadow-xs'
-                                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                              }`}
-                            >
-                              Loose
-                            </button>
-                          </div>
+                          {(() => {
+                            const canOpen = item.product.allow_open_sale !== false && item.product.allow_open_sale !== 0;
+                            return (
+                              <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800">
+                                <button
+                                  type="button"
+                                  onClick={() => item.is_loose && toggleLooseUnit(idx)}
+                                  className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                                    !item.is_loose
+                                      ? 'bg-teal-600 text-white shadow-xs'
+                                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                                  }`}
+                                >
+                                  Box
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!canOpen}
+                                  onClick={() => {
+                                    if (!canOpen) {
+                                      setErrorMessage(`Open packaging sale is prohibited for "${item.product.name}". Must be sold in full complete packaging.`);
+                                      return;
+                                    }
+                                    if (!item.is_loose) toggleLooseUnit(idx);
+                                  }}
+                                  title={canOpen ? "Switch to loose unit sale" : "Open sale prohibited for this medicine"}
+                                  className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all ${
+                                    !canOpen
+                                      ? 'opacity-30 cursor-not-allowed text-slate-400 line-through'
+                                      : item.is_loose
+                                      ? 'bg-amber-600 text-white shadow-xs cursor-pointer'
+                                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer'
+                                  }`}
+                                >
+                                  Loose
+                                </button>
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Qty increment/decrement */}

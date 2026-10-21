@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS products (
   stock_boxes INTEGER NOT NULL DEFAULT 0, -- Stock count in whole boxes
   stock_loose INTEGER NOT NULL DEFAULT 0, -- Loose units count (0 to packing-1)
   min_stock_alert INTEGER NOT NULL DEFAULT 10, -- Low stock alert threshold
+  allow_open_sale INTEGER NOT NULL DEFAULT 1, -- 1 = Yes (Allow loose unit sales), 0 = No (Full pack only)
+  min_sale_qty INTEGER NOT NULL DEFAULT 1, -- Smallest quantity permitted per sale
   status TEXT NOT NULL DEFAULT 'active',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

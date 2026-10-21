@@ -953,6 +953,7 @@ app.get('/api/products', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.allow_open_sale, p.min_sale_qty,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -978,6 +979,7 @@ app.get('/api/products/search', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.allow_open_sale, p.min_sale_qty,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -1006,6 +1008,7 @@ app.get('/api/products/:id', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.allow_open_sale, p.min_sale_qty,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -1026,7 +1029,8 @@ app.post('/api/products', async (req: Request, res: Response) => {
     const {
       company_id, c_code, p_code, barcode, name, generic_name, unit_type,
       packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert
+      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert,
+      allow_open_sale, min_sale_qty
     } = req.body;
 
     const newProd = await prisma.product.create({
@@ -1048,6 +1052,8 @@ app.post('/api/products', async (req: Request, res: Response) => {
         stockBoxes: parseInt(stock_boxes) || 0,
         stockLoose: parseInt(stock_loose) || 0,
         minStockAlert: parseInt(min_stock_alert) || 10,
+        allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
+        minSaleQty: parseInt(min_sale_qty) || 1,
         status: 'active'
       }
     });
@@ -1064,7 +1070,8 @@ app.put('/api/products/:id', async (req: Request, res: Response) => {
     const {
       company_id, c_code, p_code, barcode, name, generic_name, unit_type,
       packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert, status
+      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert, status,
+      allow_open_sale, min_sale_qty
     } = req.body;
 
     await prisma.product.update({
@@ -1087,6 +1094,8 @@ app.put('/api/products/:id', async (req: Request, res: Response) => {
         stockBoxes: parseInt(stock_boxes) || 0,
         stockLoose: parseInt(stock_loose) || 0,
         minStockAlert: parseInt(min_stock_alert) || 10,
+        allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
+        minSaleQty: parseInt(min_sale_qty) || 1,
         status: status || 'active'
       }
     });
@@ -1211,13 +1220,26 @@ app.post('/api/sales', async (req: Request, res: Response) => {
         }
       });
 
-      // 2. Insert Sale Items & Deduct Stock
+      // 2. Validate Open-Sale Rules & Deduct Stock
       for (const item of computedItems) {
         const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
         if (!prod) throw new Error(`Product ID ${item.product_id} not found.`);
 
         const isLoose = item.is_loose ? 1 : 0;
         const packing = prod.packing || 1;
+
+        // Open-Sale Validation: Prohibit selling loose units if allowOpenSale is 0
+        if (isLoose && (!prod.allowOpenSale || prod.allowOpenSale === 0)) {
+          throw new Error(`Open packaging sale is prohibited for "${prod.name}". This medicine cannot be sold as an individual unit. Please sell it in its original packaging.`);
+        }
+
+        // Minimum Sale Quantity Validation
+        const minQty = prod.minSaleQty || 1;
+        if (item.quantity < minQty) {
+          const unitLabel = isLoose ? prod.unitType : 'Pack(s)';
+          throw new Error(`Minimum sale quantity for "${prod.name}" is ${minQty} ${unitLabel}. (Requested: ${item.quantity})`);
+        }
+
         const unitCost = isLoose ? prod.unitTradePrice : prod.boxTradePrice;
 
         await tx.saleItem.create({
@@ -1278,7 +1300,7 @@ app.post('/api/sales', async (req: Request, res: Response) => {
 
     res.json({ success: true, ...result });
   } catch (error: unknown) {
-    res.status(500).json({ error: getErrorMessage(error) });
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -1390,6 +1412,9 @@ app.post('/api/sales/return', async (req: Request, res: Response) => {
         const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
         if (prod) {
           const isLoose = item.is_loose ? 1 : 0;
+          if (isLoose && (!prod.allowOpenSale || prod.allowOpenSale === 0)) {
+            throw new Error(`This medicine cannot be returned as a loose unit because open packaging sales are prohibited for "${prod.name}".`);
+          }
           const packing = prod.packing || 1;
           const itemRefund = item.total_refund || (item.quantity * item.unit_refund_price);
 
@@ -1434,7 +1459,7 @@ app.post('/api/sales/return', async (req: Request, res: Response) => {
 
     res.json({ success: true, ...result });
   } catch (error: unknown) {
-    res.status(500).json({ error: getErrorMessage(error) });
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 

@@ -252,7 +252,139 @@ async function runTestSuite() {
     });
 
     // ---------------------------------------------------------
-    // 8. Customer Credit (Khata) & Recovery
+    // 8. Product-Level Open-Sale Validation & Minimum Sale Qty (Requirement 6)
+    // ---------------------------------------------------------
+    await step('Enforce Product Open-Sale Restrictions & Min Sale Quantity', async () => {
+      // Create a dedicated sealed product with allow_open_sale: 0 and min_sale_qty: 2
+      const sealedProduct = await request('/products', {
+        method: 'POST',
+        body: JSON.stringify({
+          c_code: 'SEAL',
+          p_code: `SEAL-${Date.now().toString().slice(-6)}`,
+          name: 'Sealed Pediatric Syrup 120ml',
+          generic_name: 'Paracetamol Oral Solution',
+          unit_type: 'Bottle',
+          packing: 1,
+          box_trade_price: 150,
+          box_retail_price: 180,
+          unit_trade_price: 180,
+          unit_retail_price: 180,
+          default_discount_pct: 0,
+          stock_boxes: 20,
+          stock_loose: 0,
+          min_stock_alert: 5,
+          allow_open_sale: 0,
+          min_sale_qty: 2,
+        }),
+      });
+      assert(sealedProduct && sealedProduct.id, 'Sealed test product created');
+
+      // Test 1: Attempting loose unit sale on sealed item must be REJECTED with HTTP 400
+      let looseBlocked = false;
+      try {
+        await request('/sales', {
+          method: 'POST',
+          body: JSON.stringify({
+            customer_name: 'Open Sale Test',
+            payment_type: 'Cash',
+            shift_id: testShift.id,
+            items: [
+              {
+                product_id: sealedProduct.id,
+                is_loose: 1, // Prohibited loose sale
+                quantity: 1,
+                unit_price: 180,
+              },
+            ],
+          }),
+        });
+      } catch (err: any) {
+        looseBlocked = true;
+        assert(err.message.includes('400') && err.message.includes('cannot be sold as an individual unit'),
+          `Correct rejection message: ${err.message}`);
+      }
+      assert(looseBlocked, 'Loose unit sale was strictly blocked by server');
+
+      // Test 2: Attempting quantity below min_sale_qty (1 < 2) must be REJECTED with HTTP 400
+      let minQtyBlocked = false;
+      try {
+        await request('/sales', {
+          method: 'POST',
+          body: JSON.stringify({
+            customer_name: 'Min Qty Test',
+            payment_type: 'Cash',
+            shift_id: testShift.id,
+            items: [
+              {
+                product_id: sealedProduct.id,
+                is_loose: 0,
+                quantity: 1, // Below minimum 2
+                unit_price: 180,
+              },
+            ],
+          }),
+        });
+      } catch (err: any) {
+        minQtyBlocked = true;
+        assert(err.message.includes('400') && err.message.includes('Minimum sale quantity'),
+          `Correct min quantity rejection: ${err.message}`);
+      }
+      assert(minQtyBlocked, 'Sale below minimum quantity was strictly blocked by server');
+
+      // Test 3: Valid sale meeting minimum quantity (2 full boxes) must SUCCEED
+      const validSale = await request('/sales', {
+        method: 'POST',
+        body: JSON.stringify({
+          customer_name: 'Valid Sealed Sale',
+          payment_type: 'Cash',
+          shift_id: testShift.id,
+          items: [
+            {
+              product_id: sealedProduct.id,
+              is_loose: 0,
+              quantity: 2, // Meets min_sale_qty = 2
+              unit_price: 180,
+            },
+          ],
+        }),
+      });
+      assert(validSale.success, 'Valid full-pack sale succeeded');
+
+      // Verify exact stock deduction (20 - 2 = 18 boxes)
+      const afterSale = await request(`/products/${sealedProduct.id}`);
+      assert(afterSale.stock_boxes === 18, `Stock deducted correctly: expected 18 boxes, got ${afterSale.stock_boxes}`);
+
+      // Test 4: Attempting to return a loose unit for a non-openable product must be REJECTED
+      let returnBlocked = false;
+      try {
+        await request('/sales/return', {
+          method: 'POST',
+          body: JSON.stringify({
+            sale_id: validSale.invoiceId,
+            original_invoice_no: validSale.invoiceNo,
+            shift_id: testShift.id,
+            reason: 'Defective unit',
+            return_items: [
+              {
+                product_id: sealedProduct.id,
+                is_loose: 1, // Prohibited loose return
+                quantity: 1,
+                unit_refund_price: 180,
+                total_refund: 180,
+              },
+            ],
+          }),
+        });
+      } catch (err: any) {
+        returnBlocked = true;
+        assert(err.message.includes('400') && err.message.includes('cannot be returned as a loose unit'),
+          `Correct return rejection: ${err.message}`);
+      }
+      assert(returnBlocked, 'Loose return for sealed product was strictly rejected');
+    });
+
+    // ---------------------------------------------------------
+    // 9. Customer Credit (Khata) & Recovery
     // ---------------------------------------------------------
     let testCustomer: any;
     await step('Record Customer Credit (Udhar) Sale and Recovery Payment', async () => {

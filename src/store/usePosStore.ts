@@ -52,18 +52,23 @@ export const usePosStore = create<PosState>((set, get) => ({
 
   addItem: (product: Product, isLoose = false, quantity = 1) => {
     set(state => {
-      const price = isLoose ? product.unit_retail_price : product.box_retail_price;
+      const canOpen = product.allow_open_sale !== false && product.allow_open_sale !== 0;
+      const finalIsLoose = canOpen ? isLoose : false;
+      const minQty = product.min_sale_qty || 1;
+      const safeQuantity = Math.max(minQty, quantity);
+
+      const price = finalIsLoose ? product.unit_retail_price : product.box_retail_price;
       const discountPct = product.default_discount_pct || 0;
 
       // Check if already in cart with same unit type
       const existingIdx = state.cart.findIndex(
-        item => item.product.id === product.id && item.is_loose === isLoose
+        item => item.product.id === product.id && item.is_loose === finalIsLoose
       );
 
       if (existingIdx >= 0) {
         const updatedCart = [...state.cart];
         const item = updatedCart[existingIdx];
-        const newQty = item.quantity + quantity;
+        const newQty = item.quantity + safeQuantity;
         const gross = newQty * item.unit_price;
         const discAmt = (gross * item.discount_pct) / 100;
 
@@ -77,12 +82,12 @@ export const usePosStore = create<PosState>((set, get) => ({
         return { cart: updatedCart };
       }
 
-      const gross = quantity * price;
+      const gross = safeQuantity * price;
       const discAmt = (gross * discountPct) / 100;
       const newItem: CartItem = {
         product,
-        is_loose: isLoose,
-        quantity,
+        is_loose: finalIsLoose,
+        quantity: safeQuantity,
         unit_price: price,
         discount_pct: discountPct,
         discount_amount: discAmt,
@@ -99,7 +104,8 @@ export const usePosStore = create<PosState>((set, get) => ({
       if (index < 0 || index >= state.cart.length) return state;
       const updatedCart = [...state.cart];
       const item = updatedCart[index];
-      const safeQty = Math.max(0.01, quantity);
+      const minQty = item.product.min_sale_qty || 1;
+      const safeQty = Math.max(minQty, Math.max(0.01, quantity));
       const gross = safeQty * item.unit_price;
       const discAmt = (gross * item.discount_pct) / 100;
 
@@ -157,6 +163,13 @@ export const usePosStore = create<PosState>((set, get) => ({
       if (index < 0 || index >= state.cart.length) return state;
       const updatedCart = [...state.cart];
       const item = updatedCart[index];
+
+      const canOpen = item.product.allow_open_sale !== false && item.product.allow_open_sale !== 0;
+      // If currently box and open-sale is prohibited, prevent toggling to loose
+      if (!item.is_loose && !canOpen) {
+        return state;
+      }
+
       const nextIsLoose = !item.is_loose;
       const newPrice = nextIsLoose ? item.product.unit_retail_price : item.product.box_retail_price;
       const gross = item.quantity * newPrice;

@@ -49,7 +49,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
     location_rack: '',
     stock_boxes: 0,
     stock_loose: 0,
-    min_stock_alert: 10
+    min_stock_alert: 10,
+    allow_open_sale: true,
+    min_sale_qty: 1
   });
 
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -129,7 +131,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       location_rack: 'Rack-A1',
       stock_boxes: 10,
       stock_loose: 0,
-      min_stock_alert: 10
+      min_stock_alert: 10,
+      allow_open_sale: true,
+      min_sale_qty: 1
     });
     setIsProductModalOpen(true);
   };
@@ -153,7 +157,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       location_rack: prod.location_rack || '',
       stock_boxes: prod.stock_boxes,
       stock_loose: prod.stock_loose,
-      min_stock_alert: prod.min_stock_alert
+      min_stock_alert: prod.min_stock_alert,
+      allow_open_sale: prod.allow_open_sale === undefined ? true : (prod.allow_open_sale === 1 || prod.allow_open_sale === true),
+      min_sale_qty: prod.min_sale_qty || 1
     });
     setIsProductModalOpen(true);
   };
@@ -174,7 +180,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
         default_discount_pct: Number(productForm.default_discount_pct),
         stock_boxes: Number(productForm.stock_boxes),
         stock_loose: Number(productForm.stock_loose),
-        min_stock_alert: Number(productForm.min_stock_alert)
+        min_stock_alert: Number(productForm.min_stock_alert),
+        allow_open_sale: productForm.allow_open_sale ? 1 : 0,
+        min_sale_qty: Math.max(1, Number(productForm.min_sale_qty) || 1)
       };
 
       if (editingProduct) {
@@ -393,10 +401,21 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                               <div className="text-[10px] text-slate-500 dark:text-slate-400">{prod.generic_name}</div>
                             )}
                           </td>
-                          <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                              {prod.unit_type}
-                            </span>
+                          <td className="py-3 px-3">
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
+                                {prod.unit_type}
+                              </span>
+                              {prod.allow_open_sale === 0 || prod.allow_open_sale === false ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap" title="Must be sold in complete original packaging only">
+                                  Full Pack Only
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap" title={`Loose sales allowed (Min: ${prod.min_sale_qty || 1})`}>
+                                  Open Sale: Yes{prod.min_sale_qty && prod.min_sale_qty > 1 ? ` (Min ${prod.min_sale_qty})` : ''}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
                             {prod.packing}
@@ -601,38 +620,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Unit Type</label>
-              <select
-                value={productForm.unit_type}
-                onChange={(e) => setProductForm(prev => ({ ...prev, unit_type: e.target.value }))}
-                className="w-full pos-input"
-              >
-                <option value="Tablets">Tablets</option>
-                <option value="Capsules">Capsules</option>
-                <option value="Syrup">Syrup</option>
-                <option value="Suspension">Suspension</option>
-                <option value="Injection">Injection</option>
-                <option value="Drops">Drops</option>
-                <option value="Sachet">Sachet</option>
-                <option value="Ointment">Ointment</option>
-                <option value="Inhaler">Inhaler</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Packing (Units per Box)</label>
-              <input
-                type="number"
-                min="1"
-                required
-                value={productForm.packing}
-                onChange={(e) => handleProductBoxPricingChange(productForm.box_trade_price, productForm.box_retail_price, parseInt(e.target.value) || 1)}
-                className="w-full pos-input font-mono"
-              />
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Location Rack (Loc)</label>
               <input
@@ -642,6 +630,134 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                 placeholder="e.g. Rack-A1"
                 className="w-full pos-input font-mono"
               />
+            </div>
+          </div>
+
+          {/* Requirement 6: Packaging & Open-Sale Policy */}
+          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5" />
+                Packaging & Open-Sale Policy
+              </span>
+              {!(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product')) && (
+                <span className="text-[10px] text-amber-500 font-medium">Read-only (Authorization required)</span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Sale Unit
+                </label>
+                <select
+                  value={productForm.unit_type}
+                  disabled={!(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product'))}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, unit_type: e.target.value }))}
+                  className="w-full pos-input text-xs"
+                >
+                  <option value="Tablets">Tablets</option>
+                  <option value="Capsules">Capsules</option>
+                  <option value="Strip">Strip</option>
+                  <option value="Box">Box</option>
+                  <option value="Bottle">Bottle</option>
+                  <option value="Syrup">Syrup</option>
+                  <option value="Suspension">Suspension</option>
+                  <option value="Injection">Injection</option>
+                  <option value="Drops">Drops</option>
+                  <option value="Sachet">Sachet</option>
+                  <option value="Ointment">Ointment</option>
+                  <option value="Inhaler">Inhaler</option>
+                  <option value="Unit">Unit</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Units per Pack / Box
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  disabled={!(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product'))}
+                  value={productForm.packing}
+                  onChange={(e) => handleProductBoxPricingChange(productForm.box_trade_price, productForm.box_retail_price, parseInt(e.target.value) || 1)}
+                  className="w-full pos-input font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Allow Open Sale?
+                </label>
+                <select
+                  value={productForm.allow_open_sale ? 'yes' : 'no'}
+                  disabled={!(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product'))}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, allow_open_sale: e.target.value === 'yes' }))}
+                  className={`w-full pos-input text-xs font-semibold ${
+                    productForm.allow_open_sale
+                      ? 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
+                      : 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+                  }`}
+                >
+                  <option value="yes">Yes (Allow Loose Units)</option>
+                  <option value="no">No (Complete Packaging Only)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Min Sale Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  disabled={!(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product'))}
+                  value={productForm.min_sale_qty}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, min_sale_qty: Math.max(1, parseInt(e.target.value) || 1) }))}
+                  className="w-full pos-input font-mono text-xs"
+                  placeholder="1"
+                />
+              </div>
+            </div>
+
+            {/* Interactive Stock Conversion & Inventory Impact Card */}
+            <div className={`p-3 rounded-lg border text-xs transition-colors ${
+              productForm.allow_open_sale
+                ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200'
+                : 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200'
+            }`}>
+              <div className="font-bold flex items-center gap-1.5 mb-1.5">
+                <span className="text-sm">{productForm.allow_open_sale ? '⚡' : '🔒'}</span>
+                <span>Stock Conversion & Sales Rules:</span>
+              </div>
+              {productForm.allow_open_sale ? (
+                <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                  <p>
+                    • <strong>Full Pack:</strong> 1 Box contains <strong>{productForm.packing}</strong> individual {productForm.unit_type.toLowerCase()}. Selling 1 Box deducts 1 full box ({productForm.packing} units) from stock.
+                  </p>
+                  <p>
+                    • <strong>Loose Units:</strong> Cashiers can sell individual {productForm.unit_type.toLowerCase()} at <strong>{currency} {productForm.unit_retail_price.toFixed(2)}</strong> each. Loose sales deduct directly from loose stock (or auto-convert 1 whole box when loose stock is 0).
+                  </p>
+                  <p>
+                    • <strong>Minimum Sale Rule:</strong> Cashiers cannot sell less than <strong>{productForm.min_sale_qty}</strong> unit(s) per transaction.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+                  <p>
+                    • <strong>Complete Packaging Only:</strong> This medicine <em>cannot</em> be sold as individual loose units. Loose unit sales are strictly blocked at POS counter.
+                  </p>
+                  <p>
+                    • <strong>Stock Impact:</strong> Every sale deducts complete packs (1 pack = 1 box of {productForm.packing} units) at <strong>{currency} {productForm.box_retail_price.toFixed(2)}</strong>.
+                  </p>
+                  <p>
+                    • <strong>Minimum Sale Rule:</strong> Cashiers cannot sell less than <strong>{productForm.min_sale_qty}</strong> pack(s).
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
