@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
-import { SystemSettings, User, Role, RolePermissions } from '../types';
+import { SystemSettings, User, Role, RolePermissions, InvoiceTemplateType, SaleInvoice } from '../types';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { Modal } from '../components/common/Modal';
+import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import {
   Store,
   Receipt,
@@ -27,13 +28,94 @@ import {
   RotateCcw,
   Search,
   UserCheck,
-  Percent
+  Percent,
+  FileText,
+  LayoutDashboard,
+  Printer,
+  Eye,
+  Sliders,
+  Sparkles,
+  Check
 } from 'lucide-react';
 
 interface SettingsPageProps {
   settings?: SystemSettings | null;
   onRefreshSettings?: () => void;
 }
+
+const MOCK_PREVIEW_INVOICE: SaleInvoice = {
+  id: 9999,
+  invoice_no: 'INV-2026-0089',
+  sale_date: new Date().toISOString(),
+  customer_name: 'Muhammad Usman (VIP)',
+  customer_phone: '0300-1234567',
+  payment_type: 'Cash',
+  status: 'completed',
+  total_gross: 1450.00,
+  total_item_discount: 50.00,
+  bill_discount_pct: 5,
+  bill_discount_amt: 70.00,
+  net_total: 1330.00,
+  cash_tendered: 1500.00,
+  change_due: 170.00,
+  user_name: 'Usman Ali (Cashier)',
+  items: [
+    {
+      id: 1,
+      sale_id: 9999,
+      product_id: 101,
+      c_code: 'GSK',
+      product_name: 'Panadol Extra 500mg Tablets',
+      p_code: 'PAN-EXT-500',
+      quantity: 2,
+      unit_type: 'Box',
+      unit_price: 320.00,
+      unit_cost: 270.00,
+      gross_amount: 640.00,
+      discount_pct: 0,
+      discount_amount: 0,
+      net_amount: 640.00,
+      is_loose: 0,
+      location_rack: 'RACK-A1'
+    },
+    {
+      id: 2,
+      sale_id: 9999,
+      product_id: 102,
+      c_code: 'GSK',
+      product_name: 'Augmentin 625mg Tablets',
+      p_code: 'AUG-625-TAB',
+      quantity: 1,
+      unit_type: 'Box',
+      unit_price: 580.00,
+      unit_cost: 490.00,
+      gross_amount: 580.00,
+      discount_pct: 5,
+      discount_amount: 29.00,
+      net_amount: 551.00,
+      is_loose: 0,
+      location_rack: 'RACK-B4'
+    },
+    {
+      id: 3,
+      sale_id: 9999,
+      product_id: 103,
+      c_code: 'RB',
+      product_name: 'Disprin 300mg Soluble',
+      p_code: 'DIS-300-SOL',
+      quantity: 5,
+      unit_type: 'Tablet',
+      unit_price: 5.00,
+      unit_cost: 3.50,
+      gross_amount: 25.00,
+      discount_pct: 0,
+      discount_amount: 0,
+      net_amount: 25.00,
+      is_loose: 1,
+      location_rack: 'RACK-A2'
+    }
+  ]
+};
 
 const DEFAULT_BLANK_PERMISSIONS: RolePermissions = {
   dashboard: false,
@@ -147,7 +229,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   const { theme, setTheme } = useThemeStore();
   const { user: currentUser, updateCurrentUser, hasPermission } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<'store' | 'users' | 'roles'>('store');
+  const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles'>('store');
+  const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateType>('thermal');
 
   const [formData, setFormData] = useState<SystemSettings>({
     store_name: '',
@@ -163,7 +246,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
     auto_backup_enabled: 'true',
     low_stock_threshold: '10',
     paper_width: '80mm',
-    max_bill_discount_pct: '14'
+    max_bill_discount_pct: '14',
+    default_invoice_template: 'thermal',
+    invoice_paper_size: '80mm',
+    return_policy_text: 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.',
+    show_store_name: 'true',
+    show_store_phone: 'true',
+    show_store_address: 'true',
+    show_store_license: 'true',
+    show_invoice_no: 'true',
+    show_invoice_date: 'true',
+    show_cashier_name: 'true',
+    show_customer_name: 'true',
+    show_customer_phone: 'true',
+    show_col_product_name: 'true',
+    show_col_p_code: 'true',
+    show_col_unit: 'true',
+    show_col_unit_price: 'true',
+    show_col_discount: 'true',
+    show_col_tax: 'true',
+    show_col_total: 'true',
+    show_summary_item_count: 'true',
+    show_summary_gross: 'true',
+    show_summary_discount: 'true',
+    show_summary_tax: 'true',
+    show_summary_net: 'true',
+    show_summary_received: 'true',
+    show_summary_change: 'true',
+    show_terms: 'true',
+    show_footer_note: 'true',
+    show_return_policy: 'true',
+    show_developer_info: 'true'
   });
 
   const [users, setUsers] = useState<User[]>([]);
@@ -201,11 +314,97 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   useEffect(() => {
     if (settings) {
       setFormData(prev => ({ ...prev, ...settings }));
+      if (settings.default_invoice_template) {
+        setPreviewTemplate(settings.default_invoice_template as InvoiceTemplateType);
+      }
     }
-    api.getSettings().then(s => setFormData(prev => ({ ...prev, ...s })));
+    api.getSettings().then(s => {
+      setFormData(prev => ({ ...prev, ...s }));
+      if (s.default_invoice_template) {
+        setPreviewTemplate(s.default_invoice_template as InvoiceTemplateType);
+      }
+    });
     fetchUsers();
     fetchRoles();
   }, [settings]);
+
+  const handleToggleField = (fieldKey: string) => {
+    if (fieldKey === 'show_developer_info') return; // Strictly mandatory
+    setFormData(prev => ({
+      ...prev,
+      [fieldKey]: prev[fieldKey] === 'false' ? 'true' : 'false'
+    }));
+  };
+
+  const handleSelectAllFields = () => {
+    setFormData(prev => ({
+      ...prev,
+      show_store_name: 'true',
+      show_store_phone: 'true',
+      show_store_address: 'true',
+      show_store_license: 'true',
+      show_invoice_no: 'true',
+      show_invoice_date: 'true',
+      show_cashier_name: 'true',
+      show_customer_name: 'true',
+      show_customer_phone: 'true',
+      show_col_product_name: 'true',
+      show_col_p_code: 'true',
+      show_col_unit: 'true',
+      show_col_unit_price: 'true',
+      show_col_discount: 'true',
+      show_col_tax: 'true',
+      show_col_total: 'true',
+      show_summary_item_count: 'true',
+      show_summary_gross: 'true',
+      show_summary_discount: 'true',
+      show_summary_tax: 'true',
+      show_summary_net: 'true',
+      show_summary_received: 'true',
+      show_summary_change: 'true',
+      show_terms: 'true',
+      show_footer_note: 'true',
+      show_return_policy: 'true',
+      show_developer_info: 'true'
+    }));
+  };
+
+  const handleResetInvoiceDefaults = () => {
+    setFormData(prev => ({
+      ...prev,
+      default_invoice_template: 'thermal',
+      invoice_paper_size: '80mm',
+      return_policy_text: 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.',
+      show_store_name: 'true',
+      show_store_phone: 'true',
+      show_store_address: 'true',
+      show_store_license: 'true',
+      show_invoice_no: 'true',
+      show_invoice_date: 'true',
+      show_cashier_name: 'true',
+      show_customer_name: 'true',
+      show_customer_phone: 'true',
+      show_col_product_name: 'true',
+      show_col_p_code: 'true',
+      show_col_unit: 'true',
+      show_col_unit_price: 'true',
+      show_col_discount: 'true',
+      show_col_tax: 'true',
+      show_col_total: 'true',
+      show_summary_item_count: 'true',
+      show_summary_gross: 'true',
+      show_summary_discount: 'true',
+      show_summary_tax: 'true',
+      show_summary_net: 'true',
+      show_summary_received: 'true',
+      show_summary_change: 'true',
+      show_terms: 'true',
+      show_footer_note: 'true',
+      show_return_policy: 'true',
+      show_developer_info: 'true'
+    }));
+    setPreviewTemplate('thermal');
+  };
 
   const fetchUsers = async () => {
     try {
@@ -230,7 +429,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
     try {
       setSaving(true);
       await api.saveSettings(formData);
-      setSuccessMsg('Store settings updated successfully.');
+      setSuccessMsg('Settings updated successfully.');
       onRefreshSettings?.();
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
@@ -473,14 +672,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           </p>
         </div>
 
-        {activeTab === 'store' && (
+        {(activeTab === 'store' || activeTab === 'invoice') && (
           <button
             onClick={handleSaveSettings}
             disabled={saving}
             className="btn-save flex items-center space-x-1.5 px-5 py-2 text-xs"
           >
             <Save className="w-4 h-4" />
-            <span>{saving ? 'Saving...' : 'Save All Settings'}</span>
+            <span>{saving ? 'Saving...' : activeTab === 'invoice' ? 'Save Invoice Settings' : 'Save All Settings'}</span>
           </button>
         )}
       </div>
@@ -496,14 +695,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-800">
         <button
           onClick={() => setActiveTab('store')}
-          className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
+          className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
             activeTab === 'store'
               ? 'border-teal-500 text-teal-600 dark:text-teal-400'
               : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
           }`}
         >
           <Store className="w-4 h-4" />
-          <span>Pharmacy & Receipt Layout</span>
+          <span>Pharmacy & Store Identity</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('invoice')}
+          className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+            activeTab === 'invoice'
+              ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Invoice Settings & Templates</span>
         </button>
 
         {hasPermission('can_manage_users') && (
@@ -795,7 +1006,475 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
         </div>
       )}
 
-      {/* TAB 2: USER ACCOUNTS MANAGEMENT */}
+      {/* TAB 2: INVOICE SETTINGS & TEMPLATES */}
+      {activeTab === 'invoice' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-teal-900/40 via-slate-900 to-slate-900 border border-teal-800/40 rounded-2xl p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <FileText className="w-5 h-5 text-teal-400" />
+                  <h2 className="text-base font-bold text-white tracking-tight">
+                    Advanced Invoice Settings & Professional Templates
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Customize printable receipt layout, select default design, control visible columns, and test real-time printer output.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={handleSelectAllFields}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-800/50 text-xs font-semibold flex items-center space-x-1.5 cursor-pointer transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Enable All Fields</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetInvoiceDefaults}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 cursor-pointer transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Defaults</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Split-Screen Settings & Live Preview */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Controls & Configuration */}
+            <form onSubmit={handleSaveSettings} className="xl:col-span-7 space-y-6">
+              {/* Card 1: Template Selection */}
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Receipt className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Default Invoice Design Template</h3>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800/60">
+                    Active: {formData.default_invoice_template?.toUpperCase() || 'THERMAL'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  {/* Template 1: Thermal Receipt */}
+                  <div
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, default_invoice_template: 'thermal' }));
+                      setPreviewTemplate('thermal');
+                    }}
+                    className={`cursor-pointer rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
+                      (formData.default_invoice_template || 'thermal') === 'thermal'
+                        ? 'bg-teal-50/70 dark:bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
+                        : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300">
+                          <Receipt className="w-4 h-4" />
+                        </div>
+                        {(formData.default_invoice_template || 'thermal') === 'thermal' && (
+                          <span className="p-1 bg-teal-600 text-white rounded-full">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2.5">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white block">Thermal Receipt</span>
+                        <span className="text-[10px] text-teal-600 dark:text-teal-400 font-mono">80mm / 58mm Roll</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                        Continuous roll layout optimized for thermal printers with compact typography and simulated barcodes.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Template 2: Standard Invoice */}
+                  <div
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, default_invoice_template: 'standard' }));
+                      setPreviewTemplate('standard');
+                    }}
+                    className={`cursor-pointer rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
+                      formData.default_invoice_template === 'standard'
+                        ? 'bg-teal-50/70 dark:bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
+                        : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        {formData.default_invoice_template === 'standard' && (
+                          <span className="p-1 bg-teal-600 text-white rounded-full">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2.5">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white block">Standard Invoice</span>
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono">Sheet A4 / A5</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                        Clean document format with structured header, customer profile box, striped table, and signature line.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Template 3: Detailed Invoice */}
+                  <div
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, default_invoice_template: 'detailed' }));
+                      setPreviewTemplate('detailed');
+                    }}
+                    className={`cursor-pointer rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
+                      formData.default_invoice_template === 'detailed'
+                        ? 'bg-teal-50/70 dark:bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
+                        : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
+                          <LayoutDashboard className="w-4 h-4" />
+                        </div>
+                        {formData.default_invoice_template === 'detailed' && (
+                          <span className="p-1 bg-teal-600 text-white rounded-full">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2.5">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white block">Detailed Invoice</span>
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">Enterprise A4</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                        Comprehensive pharmaceutical enterprise layout with rack locations, SKU codes, and full audit breakdown.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Paper Size Configuration */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Print Paper Size & Layout Format
+                  </label>
+                  <select
+                    value={formData.invoice_paper_size || formData.paper_width || '80mm'}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        invoice_paper_size: e.target.value as any,
+                        paper_width: e.target.value
+                      }));
+                    }}
+                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  >
+                    <option value="80mm">80mm Thermal Paper (Standard POS Continuous Roll)</option>
+                    <option value="58mm">58mm Thermal Paper (Compact POS Continuous Roll)</option>
+                    <option value="A4">A4 Full Sheet Paper (210 × 297 mm Standard Sheet)</option>
+                    <option value="A5">A5 Half Sheet Paper (148 × 210 mm Half Sheet)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Card 2: Field Visibility Checkboxes */}
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-5 shadow-sm">
+                <div className="flex items-center space-x-2">
+                  <Sliders className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Printable Field Visibility Controls</h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Enable or disable individual fields on printed receipts. Hiding a field changes its presentation visibility only; all accounting calculations and transaction records remain 100% intact.
+                </p>
+
+                {/* Section 1: Store & Invoice Information */}
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                    1. Store & Invoice Information
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {[
+                      { key: 'show_store_name', label: 'Store / Pharmacy Name' },
+                      { key: 'show_store_phone', label: 'Store Phone / Helpline' },
+                      { key: 'show_store_address', label: 'Store Physical Address' },
+                      { key: 'show_store_license', label: 'Drug License & NTN Number' },
+                      { key: 'show_invoice_no', label: 'Invoice Number & Barcode' },
+                      { key: 'show_invoice_date', label: 'Invoice Date & Time' }
+                    ].map(field => {
+                      const isChecked = formData[field.key] !== 'false';
+                      return (
+                        <div
+                          key={field.key}
+                          onClick={() => handleToggleField(field.key)}
+                          className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-50 dark:bg-[#0d131f] hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800/70"
+                        >
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          )}
+                          <span className={`text-xs ${isChecked ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-500'}`}>
+                            {field.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 2: Cashier & Customer Information */}
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                    2. Cashier & Customer Information
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {[
+                      { key: 'show_cashier_name', label: 'Cashier / Dispenser Name' },
+                      { key: 'show_customer_name', label: 'Customer Name' },
+                      { key: 'show_customer_phone', label: 'Customer Contact Phone' }
+                    ].map(field => {
+                      const isChecked = formData[field.key] !== 'false';
+                      return (
+                        <div
+                          key={field.key}
+                          onClick={() => handleToggleField(field.key)}
+                          className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-50 dark:bg-[#0d131f] hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800/70"
+                        >
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          )}
+                          <span className={`text-xs ${isChecked ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-500'}`}>
+                            {field.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 3: Invoice Table Columns */}
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                    3. Itemized Table Columns
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {[
+                      { key: 'show_col_product_name', label: 'Product / Medicine Name' },
+                      { key: 'show_col_p_code', label: 'Product Code / Barcode / Loc' },
+                      { key: 'show_col_unit', label: 'Quantity & Packaging Unit' },
+                      { key: 'show_col_unit_price', label: 'Unit Price / Rate' },
+                      { key: 'show_col_discount', label: 'Discount Column' },
+                      { key: 'show_col_tax', label: 'Tax Column (If Applicable)' },
+                      { key: 'show_col_total', label: 'Line Total Net Amount' }
+                    ].map(field => {
+                      const isChecked = formData[field.key] !== 'false';
+                      return (
+                        <div
+                          key={field.key}
+                          onClick={() => handleToggleField(field.key)}
+                          className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-50 dark:bg-[#0d131f] hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800/70"
+                        >
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          )}
+                          <span className={`text-xs ${isChecked ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-500'}`}>
+                            {field.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 4: Financial Summary */}
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                    4. Financial Totals & Summary
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {[
+                      { key: 'show_summary_item_count', label: 'Total Items & Unit Count' },
+                      { key: 'show_summary_gross', label: 'Gross Total (Subtotal)' },
+                      { key: 'show_summary_discount', label: 'Total Discount Amount' },
+                      { key: 'show_summary_tax', label: 'Tax Amount (If Applicable)' },
+                      { key: 'show_summary_net', label: 'Net Payable Amount' },
+                      { key: 'show_summary_received', label: 'Received / Tendered Cash' },
+                      { key: 'show_summary_change', label: 'Change Due / Balance' }
+                    ].map(field => {
+                      const isChecked = formData[field.key] !== 'false';
+                      return (
+                        <div
+                          key={field.key}
+                          onClick={() => handleToggleField(field.key)}
+                          className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-50 dark:bg-[#0d131f] hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800/70"
+                        >
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          )}
+                          <span className={`text-xs ${isChecked ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-500'}`}>
+                            {field.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 5: Additional Information & Developer Info */}
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                    5. Regulatory Policies & Footer
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {[
+                      { key: 'show_terms', label: 'Terms & Conditions' },
+                      { key: 'show_return_policy', label: 'Return & Exchange Policy' },
+                      { key: 'show_footer_note', label: 'Custom Footer Note' }
+                    ].map(field => {
+                      const isChecked = formData[field.key] !== 'false';
+                      return (
+                        <div
+                          key={field.key}
+                          onClick={() => handleToggleField(field.key)}
+                          className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-50 dark:bg-[#0d131f] hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800/70"
+                        >
+                          {isChecked ? (
+                            <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          )}
+                          <span className={`text-xs ${isChecked ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-500'}`}>
+                            {field.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Developer Information (MANDATORY & LOCKED) */}
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs opacity-90 cursor-not-allowed">
+                      <div className="flex items-center space-x-2.5">
+                        <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                        <span className="font-semibold text-slate-900 dark:text-white">Developer Information</span>
+                      </div>
+                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                        <Lock className="w-2.5 h-2.5" />
+                        <span>Mandatory</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Return & Exchange Policy Editor */}
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3 shadow-sm">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Return & Exchange Policy Text (Printed on Invoices)
+                </label>
+                <textarea
+                  rows={3}
+                  value={formData.return_policy_text || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, return_policy_text: e.target.value }))}
+                  placeholder="Enter detailed pharmacy return and exchange instructions..."
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                />
+              </div>
+
+              {/* Save Button */}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="btn-save px-6 py-2.5 text-xs flex items-center space-x-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{saving ? 'Saving Settings...' : 'Save Invoice Configuration'}</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Right Column: Live Interactive Preview */}
+            <div className="xl:col-span-5 sticky top-6 space-y-4">
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center space-x-2">
+                    <Eye className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                      Live Print Preview
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-1">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTemplate('thermal')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        previewTemplate === 'thermal'
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      Thermal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTemplate('standard')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        previewTemplate === 'standard'
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      Standard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewTemplate('detailed')}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        previewTemplate === 'detailed'
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      Detailed
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Preview updating dynamically with selected fields, paper format, and template styling.
+                </div>
+
+                {/* Preview Paper Mount Area */}
+                <div className="bg-slate-100 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-center max-h-[750px] overflow-y-auto">
+                  <UnifiedInvoice
+                    invoice={MOCK_PREVIEW_INVOICE}
+                    settings={formData}
+                    templateOverride={previewTemplate}
+                    showControls={false}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: USER ACCOUNTS MANAGEMENT */}
       {activeTab === 'users' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">

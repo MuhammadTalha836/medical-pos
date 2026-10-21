@@ -2892,11 +2892,43 @@ app.get('/api/settings', async (_req: Request, res: Response) => {
   try {
     const rows = await prisma.systemSetting.findMany();
     const settings: Record<string, string> = {
-      max_bill_discount_pct: '14'
+      max_bill_discount_pct: '14',
+      default_invoice_template: 'thermal',
+      invoice_paper_size: '80mm',
+      return_policy_text: 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.',
+      show_store_name: 'true',
+      show_store_phone: 'true',
+      show_store_address: 'true',
+      show_store_license: 'true',
+      show_invoice_no: 'true',
+      show_invoice_date: 'true',
+      show_cashier_name: 'true',
+      show_customer_name: 'true',
+      show_customer_phone: 'true',
+      show_col_product_name: 'true',
+      show_col_p_code: 'true',
+      show_col_unit: 'true',
+      show_col_unit_price: 'true',
+      show_col_discount: 'true',
+      show_col_tax: 'true',
+      show_col_total: 'true',
+      show_summary_item_count: 'true',
+      show_summary_gross: 'true',
+      show_summary_discount: 'true',
+      show_summary_tax: 'true',
+      show_summary_net: 'true',
+      show_summary_received: 'true',
+      show_summary_change: 'true',
+      show_terms: 'true',
+      show_footer_note: 'true',
+      show_return_policy: 'true',
+      show_developer_info: 'true'
     };
     for (const r of rows) {
       settings[r.key] = r.value;
     }
+    // Developer information is mandatory and cannot be disabled
+    settings.show_developer_info = 'true';
     res.json(settings);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
@@ -2905,7 +2937,9 @@ app.get('/api/settings', async (_req: Request, res: Response) => {
 
 app.post('/api/settings', async (req: Request, res: Response) => {
   try {
-    const settings = req.body;
+    const settings = { ...req.body };
+    // Developer info is strictly mandatory
+    settings.show_developer_info = 'true';
 
     await prisma.$transaction(
       Object.entries(settings).map(([key, val]) =>

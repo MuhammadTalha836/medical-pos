@@ -119,7 +119,7 @@ input[type="number"]::-webkit-outer-spin-button {
   margin: 0;
 }
 
-/* Thermal Receipt Print Stylesheet */
+/* Comprehensive Print Stylesheet (Thermal Roll & Sheet Invoices) */
 @media print {
   body * {
     visibility: hidden;
@@ -134,19 +134,49 @@ input[type="number"]::-webkit-outer-spin-button {
     position: absolute;
     left: 0;
     top: 0;
-    width: 80mm;
     margin: 0;
     padding: 0;
     color: #000000 !important;
     background: #ffffff !important;
-    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace !important;
+    line-height: 1.3 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .print-paper-80mm {
+    width: 80mm !important;
+    max-width: 80mm !important;
     font-size: 11px !important;
-    line-height: 1.25 !important;
+    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace !important;
+    padding: 2mm !important;
+  }
+
+  .print-paper-58mm {
+    width: 58mm !important;
+    max-width: 58mm !important;
+    font-size: 9.5px !important;
+    font-family: 'JetBrains Mono', 'Courier New', Courier, monospace !important;
+    padding: 1mm !important;
+  }
+
+  .print-paper-a4 {
+    width: 100% !important;
+    max-width: 210mm !important;
+    font-size: 12px !important;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    padding: 8mm !important;
+  }
+
+  .print-paper-a5 {
+    width: 100% !important;
+    max-width: 148mm !important;
+    font-size: 10.5px !important;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    padding: 5mm !important;
   }
 
   @page {
-    size: 80mm auto;
-    margin: 2mm;
+    margin: 3mm;
   }
 }
 

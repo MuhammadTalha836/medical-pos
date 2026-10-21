@@ -604,6 +604,51 @@ async function runTestSuite() {
       assert(closeRes.backup && closeRes.backup.filename, 'Automated shift-closing backup triggered');
     });
 
+    // ---------------------------------------------------------
+    // 14. Advanced Invoice Settings & Three Templates (Requirement 9)
+    // ---------------------------------------------------------
+    await step('Advanced Invoice Settings, Templates & Developer Attribution Security', async () => {
+      // 1. Fetch initial invoice settings
+      const initialSettings = await request('/settings');
+      assert(initialSettings.default_invoice_template !== undefined, 'Default invoice template setting present');
+      assert(initialSettings.show_developer_info === 'true', 'Mandatory developer info is active');
+
+      // 2. Update invoice settings with custom template & try to disable developer credit
+      const updateRes = await request('/settings', {
+        method: 'POST',
+        body: JSON.stringify({
+          default_invoice_template: 'detailed',
+          invoice_paper_size: 'A4',
+          show_col_p_code: 'false',
+          show_summary_discount: 'false',
+          show_developer_info: 'false', // Attempted bypass
+          return_policy_text: 'Strict 3-day return policy for unopened items only.',
+        }),
+      });
+      assert(updateRes.success, 'Invoice settings saved successfully');
+
+      // 3. Verify settings persistence and mandatory developer info lock
+      const fetchedSettings = await request('/settings');
+      assert(fetchedSettings.default_invoice_template === 'detailed', 'Default template updated to detailed');
+      assert(fetchedSettings.invoice_paper_size === 'A4', 'Paper size updated to A4');
+      assert(fetchedSettings.show_col_p_code === 'false', 'Product code column visibility toggled off');
+      assert(fetchedSettings.show_summary_discount === 'false', 'Discount summary visibility toggled off');
+      assert(fetchedSettings.show_developer_info === 'true', 'Developer information remains strictly TRUE and locked');
+      assert(fetchedSettings.return_policy_text.includes('Strict 3-day return policy'), 'Custom return policy text persisted');
+
+      // 4. Reset back to clean thermal defaults
+      await request('/settings', {
+        method: 'POST',
+        body: JSON.stringify({
+          default_invoice_template: 'thermal',
+          invoice_paper_size: '80mm',
+          show_col_p_code: 'true',
+          show_summary_discount: 'true',
+          show_developer_info: 'true',
+        }),
+      });
+    });
+
     console.log(colors.bold(colors.green('\n======================================================')));
     console.log(colors.bold(colors.green(`  ALL ${testsPassed}/${testsTotal} FUNCTIONAL TESTS PASSED SUCCESSFULLY!  `)));
     console.log(colors.bold(colors.green('======================================================\n')));

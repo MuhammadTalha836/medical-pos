@@ -221,6 +221,9 @@ export interface PurchaseInvoice {
   items?: PurchaseItem[];
 }
 
+export type InvoiceTemplateType = 'thermal' | 'standard' | 'detailed';
+export type InvoicePaperSize = '80mm' | '58mm' | 'A4' | 'A5';
+
 export interface SystemSettings {
   store_name: string;
   store_address: string;
@@ -236,6 +239,45 @@ export interface SystemSettings {
   low_stock_threshold: string;
   paper_width: string;
   max_bill_discount_pct?: string;
+
+  // Requirement 9: Advanced Invoice Settings
+  default_invoice_template?: InvoiceTemplateType;
+  invoice_paper_size?: InvoicePaperSize;
+  return_policy_text?: string;
+
+  // Configurable Field Visibility Flags ('true' | 'false')
+  show_store_name?: string;
+  show_store_phone?: string;
+  show_store_address?: string;
+  show_store_license?: string;
+  show_invoice_no?: string;
+  show_invoice_date?: string;
+
+  show_cashier_name?: string;
+  show_customer_name?: string;
+  show_customer_phone?: string;
+
+  show_col_product_name?: string;
+  show_col_p_code?: string;
+  show_col_unit?: string;
+  show_col_unit_price?: string;
+  show_col_discount?: string;
+  show_col_tax?: string;
+  show_col_total?: string;
+
+  show_summary_item_count?: string;
+  show_summary_gross?: string;
+  show_summary_discount?: string;
+  show_summary_tax?: string;
+  show_summary_net?: string;
+  show_summary_received?: string;
+  show_summary_change?: string;
+
+  show_terms?: string;
+  show_footer_note?: string;
+  show_return_policy?: string;
+  show_developer_info?: string; // Strictly mandatory 'true'
+
   [key: string]: string | undefined;
 }
 
