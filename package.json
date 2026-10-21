@@ -11,6 +11,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:ui\"",
     "build": "prisma generate && tsc && vite build",
     "lint": "tsc --noEmit",
+    "test:functional": "tsx server/tests/functional_test.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
