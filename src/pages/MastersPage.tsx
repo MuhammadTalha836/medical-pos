@@ -245,7 +245,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
   };
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="page-container">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-4">
         <div>

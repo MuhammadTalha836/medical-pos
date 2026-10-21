@@ -473,21 +473,35 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-teal-600 dark:text-teal-400">{currency} {prod.box_retail_price.toFixed(2)} / Box</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400">{currency} {prod.unit_retail_price.toFixed(2)} / Unit</div>
+                    <div className="flex items-center space-x-2">
+                      <div className="text-right pr-1">
+                        <div className="text-xs font-bold text-teal-700 dark:text-teal-400 font-mono">{currency} {prod.box_retail_price.toFixed(2)}<span className="text-[10px] font-normal text-slate-400">/Bx</span></div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{currency} {prod.unit_retail_price.toFixed(2)}<span className="text-[9px] font-normal text-slate-400">/Unit</span></div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectProduct(prod, true);
-                        }}
-                        title="Add as loose unit"
-                        className="px-2.5 py-1 text-xs bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-800 font-semibold transition-colors"
-                      >
-                        + Loose
-                      </button>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectProduct(prod, false);
+                          }}
+                          title="Add Full Box/Strip to cart"
+                          className="px-2.5 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          + Box
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectProduct(prod, true);
+                          }}
+                          title="Add Loose Unit to cart"
+                          className="px-2.5 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                        >
+                          + Loose
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -513,7 +527,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                   <th className="py-2.5 px-3 w-8">#</th>
                   <th className="py-2.5 px-3">Product Name</th>
                   <th className="py-2.5 px-3 w-24">C / P Code</th>
-                  <th className="py-2.5 px-3 w-28 text-center">Unit Sale Type</th>
+                  <th className="py-2.5 px-3 w-32 text-center">Unit Sale Mode</th>
                   <th className="py-2.5 px-3 w-28 text-center">Qty</th>
                   <th className="py-2.5 px-3 w-24 text-right">Rate</th>
                   <th className="py-2.5 px-3 w-20 text-center">Disc %</th>
@@ -527,7 +541,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                     <td colSpan={9} className="py-20 text-center text-slate-400 dark:text-slate-500">
                       <ShoppingBag className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-700 mb-2 stroke-[1.5]" />
                       <div className="font-semibold text-slate-600 dark:text-slate-400">Cart is empty</div>
-                      <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Scan a barcode or search products using [F2]</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Scan a barcode or search medicines using [F2]</div>
                     </td>
                   </tr>
                 ) : (
@@ -570,18 +584,32 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                           <div className="text-[10px] text-slate-500 dark:text-slate-500">{item.product.p_code}</div>
                         </td>
 
-                        {/* Box vs Loose Unit Toggle */}
+                        {/* Dual Unit Sale Segmented Toggle */}
                         <td className="py-2.5 px-3 text-center">
-                          <button
-                            onClick={() => toggleLooseUnit(idx)}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border transition-all ${
-                              item.is_loose
-                                ? 'bg-amber-50 dark:bg-amber-950/70 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300'
-                                : 'bg-teal-50 dark:bg-teal-950/70 border-teal-300 dark:border-teal-700 text-teal-700 dark:text-teal-300'
-                            }`}
-                          >
-                            {item.is_loose ? 'Loose Unit' : 'Full Box/Pack'}
-                          </button>
+                          <div className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800">
+                            <button
+                              type="button"
+                              onClick={() => item.is_loose && toggleLooseUnit(idx)}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                                !item.is_loose
+                                  ? 'bg-teal-600 text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                              }`}
+                            >
+                              Box
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => !item.is_loose && toggleLooseUnit(idx)}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                                item.is_loose
+                                  ? 'bg-amber-600 text-white shadow-xs'
+                                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                              }`}
+                            >
+                              Loose
+                            </button>
+                          </div>
                         </td>
 
                         {/* Qty increment/decrement */}
@@ -676,7 +704,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       </div>
 
       {/* RIGHT: Bill Summary & Payment Settlement Panel */}
-      <div className="w-96 p-4 flex flex-col justify-between bg-white dark:bg-[#111827] border-l border-slate-200 dark:border-slate-800 overflow-y-auto space-y-4 shadow-sm">
+      <div className="w-80 xl:w-96 p-4 flex flex-col justify-between bg-white dark:bg-[#111827] border-l border-slate-200 dark:border-slate-800 overflow-y-auto space-y-4 shadow-sm flex-shrink-0">
         {/* Customer Information */}
         <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">

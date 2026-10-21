@@ -150,7 +150,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
   };
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="page-container">
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -167,7 +167,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       )}
 
       {/* Filter and Search Bar */}
-      <form onSubmit={handleSearch} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-wrap items-center gap-3 shadow-sm">
+      <form onSubmit={handleSearch} className="card-premium p-4 flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-[220px] relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
           <input
@@ -204,7 +204,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
 
         <button
           type="submit"
-          className="btn-save px-4 py-2 text-xs"
+          className="btn-primary px-4 py-2 text-xs"
         >
           Filter Invoices
         </button>
@@ -226,7 +226,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       </form>
 
       {/* Invoices Table */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+      <div className="table-container">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">

@@ -297,3 +297,15 @@ export interface ShiftSummary {
   returns_count: number;
   duration_formatted: string;
 }
+
+export interface ElectronAPI {
+  printThermal: (options?: { silent?: boolean; printerName?: string }) => Promise<{ success: boolean; error?: string }>;
+  selectBackupDir: () => Promise<string | null>;
+  selectRestoreFile: () => Promise<string | null>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}

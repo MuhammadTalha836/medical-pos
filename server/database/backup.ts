@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { db, DB_PATH } from './db';
 
 export const DEFAULT_BACKUP_DIR = path.resolve(process.cwd(), 'backups');
@@ -15,15 +16,30 @@ export interface BackupResult {
   sizeBytes: number;
   type: string;
   timestamp: string;
+  checksumSha256?: string;
+  secondaryPath?: string;
   message?: string;
 }
 
 /**
+ * Calculates SHA-256 checksum of a file for integrity verification.
+ */
+export function calculateFileChecksum(filePath: string): string {
+  if (!fs.existsSync(filePath)) return '';
+  const fileBuffer = fs.readFileSync(filePath);
+  const hashSum = crypto.createHash('sha256');
+  hashSum.update(fileBuffer);
+  return hashSum.digest('hex');
+}
+
+/**
  * Creates an atomic backup of the SQLite database using SQLite's backup API.
+ * Supports multi-destination sync to a secondary drive/folder (e.g. external USB).
  */
 export async function createBackup(
   backupType: 'manual' | 'auto_daily' | 'pre_restore' = 'manual',
-  customDir?: string
+  customDir?: string,
+  secondaryDir?: string
 ): Promise<BackupResult> {
   const targetDir = customDir ? path.resolve(customDir) : DEFAULT_BACKUP_DIR;
   if (!fs.existsSync(targetDir)) {
@@ -40,6 +56,30 @@ export async function createBackup(
     await db.backup(filepath);
 
     const stats = fs.statSync(filepath);
+    const checksum = calculateFileChecksum(filepath);
+
+    // Save SHA-256 sidecar file for offline verification
+    try {
+      fs.writeFileSync(`${filepath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
+    } catch {
+      // Non-fatal
+    }
+
+    // Multi-Destination: Copy to secondary destination (e.g. External USB drive) if configured
+    let secondaryPath: string | undefined = undefined;
+    if (secondaryDir && secondaryDir.trim()) {
+      try {
+        const secDirResolved = path.resolve(secondaryDir.trim());
+        if (!fs.existsSync(secDirResolved)) {
+          fs.mkdirSync(secDirResolved, { recursive: true });
+        }
+        secondaryPath = path.join(secDirResolved, filename);
+        fs.copyFileSync(filepath, secondaryPath);
+        fs.writeFileSync(`${secondaryPath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
+      } catch (secErr: any) {
+        console.warn('[Backup] Secondary destination copy warning:', secErr.message);
+      }
+    }
 
     // Record in backup history table
     const insertHistory = db.prepare(`
@@ -52,10 +92,14 @@ export async function createBackup(
       success: true,
       filename,
       filepath,
+      secondaryPath,
+      checksumSha256: checksum,
       sizeBytes: stats.size,
       type: backupType,
       timestamp: now.toISOString(),
-      message: 'Backup created successfully.'
+      message: secondaryPath
+        ? `Backup created successfully and synced to secondary external drive.`
+        : 'Backup created successfully.'
     };
   } catch (error: any) {
     console.error('Backup failed:', error);
@@ -76,11 +120,21 @@ export function getBackupList() {
         .map(f => {
           const fp = path.join(DEFAULT_BACKUP_DIR, f);
           const stat = fs.statSync(fp);
+          const shaFile = `${fp}.sha256`;
+          let checksum = '';
+          if (fs.existsSync(shaFile)) {
+            try {
+              checksum = fs.readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0];
+            } catch {
+              checksum = '';
+            }
+          }
           return {
             filename: f,
             path: fp,
             sizeBytes: stat.size,
-            mtime: stat.mtime
+            mtime: stat.mtime,
+            checksum
           };
         })
     : [];

@@ -998,6 +998,29 @@ app.get('/api/products/search', async (req: Request, res: Response) => {
   }
 });
 
+app.get('/api/products/:id', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const products: any[] = await prisma.$queryRaw`
+      SELECT p.id, p.company_id, p.c_code, p.p_code, p.barcode, p.name, p.generic_name,
+             p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
+             p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
+             p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.status, p.created_at, p.updated_at, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE p.id = ${id}
+      LIMIT 1
+    `;
+    if (!products || products.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json(products[0]);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
 app.post('/api/products', async (req: Request, res: Response) => {
   try {
     const {
@@ -1127,6 +1150,44 @@ app.post('/api/sales', async (req: Request, res: Response) => {
     });
     const invoiceNo = `INV-${today}-${String(countToday + 1).padStart(4, '0')}`;
 
+    // Compute item gross, discount, and net amounts defensively
+    let computedGross = 0;
+    let computedItemDiscount = 0;
+    const computedItems = items.map((item: any) => {
+      const qty = parseFloat(item.quantity) || 1;
+      const price = parseFloat(item.unit_price) || 0;
+      const grossAmt = item.gross_amount !== undefined && !isNaN(parseFloat(item.gross_amount))
+        ? parseFloat(item.gross_amount)
+        : (qty * price);
+      const discPct = parseFloat(item.discount_pct) || 0;
+      const discAmt = item.discount_amount !== undefined && !isNaN(parseFloat(item.discount_amount))
+        ? parseFloat(item.discount_amount)
+        : (grossAmt * (discPct / 100));
+      const netAmt = item.net_amount !== undefined && !isNaN(parseFloat(item.net_amount))
+        ? parseFloat(item.net_amount)
+        : (grossAmt - discAmt);
+
+      computedGross += grossAmt;
+      computedItemDiscount += discAmt;
+      return {
+        ...item,
+        quantity: qty,
+        unit_price: price,
+        gross_amount: grossAmt,
+        discount_pct: discPct,
+        discount_amount: discAmt,
+        net_amount: netAmt
+      };
+    });
+
+    const finalTotalGross = parseFloat(total_gross) || computedGross;
+    const finalItemDiscount = parseFloat(total_item_discount) || computedItemDiscount;
+    const billDiscPct = parseFloat(bill_discount_pct) || 0;
+    const billDiscAmt = parseFloat(bill_discount_amt) || ((finalTotalGross - finalItemDiscount) * (billDiscPct / 100));
+    const finalNetTotal = parseFloat(net_total) || Math.max(0, finalTotalGross - finalItemDiscount - billDiscAmt);
+    const tendered = parseFloat(cash_tendered) || parseFloat(req.body.tendered_amount) || finalNetTotal;
+    const finalChangeDue = parseFloat(change_due) || Math.max(0, tendered - finalNetTotal);
+
     const result = await prisma.$transaction(async (tx) => {
       // 1. Insert Sale Master
       const sale = await tx.sale.create({
@@ -1138,20 +1199,20 @@ app.post('/api/sales', async (req: Request, res: Response) => {
           userId: user_id ? Number(user_id) : null,
           userName: user_name || 'Cashier',
           shiftId: activeShiftId,
-          totalGross: parseFloat(total_gross) || 0,
-          totalItemDiscount: parseFloat(total_item_discount) || 0,
-          billDiscountPct: parseFloat(bill_discount_pct) || 0,
-          billDiscountAmt: parseFloat(bill_discount_amt) || 0,
-          netTotal: parseFloat(net_total) || 0,
-          cashTendered: parseFloat(cash_tendered) || (parseFloat(net_total) || 0),
-          changeDue: parseFloat(change_due) || 0,
+          totalGross: finalTotalGross,
+          totalItemDiscount: finalItemDiscount,
+          billDiscountPct: billDiscPct,
+          billDiscountAmt: billDiscAmt,
+          netTotal: finalNetTotal,
+          cashTendered: tendered,
+          changeDue: finalChangeDue,
           paymentType: payment_type || 'Cash',
           notes: notes || null
         }
       });
 
       // 2. Insert Sale Items & Deduct Stock
-      for (const item of items) {
+      for (const item of computedItems) {
         const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
         if (!prod) throw new Error(`Product ID ${item.product_id} not found.`);
 
@@ -1169,13 +1230,13 @@ app.post('/api/sales', async (req: Request, res: Response) => {
             unitType: prod.unitType,
             locationRack: prod.locationRack,
             isLoose,
-            quantity: parseFloat(item.quantity),
-            unitPrice: parseFloat(item.unit_price),
+            quantity: item.quantity,
+            unitPrice: item.unit_price,
             unitCost,
-            grossAmount: parseFloat(item.gross_amount),
-            discountPct: parseFloat(item.discount_pct) || 0,
-            discountAmount: parseFloat(item.discount_amount) || 0,
-            netAmount: parseFloat(item.net_amount),
+            grossAmount: item.gross_amount,
+            discountPct: item.discount_pct,
+            discountAmount: item.discount_amount,
+            netAmount: item.net_amount,
             batchId: item.batch_id ? Number(item.batch_id) : null
           }
         });
@@ -1202,12 +1263,17 @@ app.post('/api/sales', async (req: Request, res: Response) => {
         await tx.customer.update({
           where: { id: Number(customer_id) },
           data: {
-            currentBalance: { increment: parseFloat(net_total) || 0 }
+            currentBalance: { increment: finalNetTotal }
           }
         });
       }
 
-      return { saleId: sale.id, invoiceNo };
+      return {
+        saleId: sale.id,
+        invoiceNo,
+        netTotal: sale.netTotal,
+        changeDue: sale.changeDue
+      };
     });
 
     res.json({ success: true, ...result });
@@ -1430,12 +1496,16 @@ app.post('/api/purchases', async (req: Request, res: Response) => {
       for (const item of items) {
         const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
         if (prod) {
-          const totalBoxes = Number(item.quantity_boxes || 0) + Number(item.bonus_boxes || 0);
+          const qtyBoxes = Number(item.quantity_boxes ?? item.boxes ?? 0);
+          const bonusBoxes = Number(item.bonus_boxes || 0);
+          const totalBoxes = qtyBoxes + bonusBoxes;
           const packing = prod.packing || 1;
-          const boxCost = Number(item.box_cost_price);
-          const boxRetail = Number(item.box_retail_price);
-          const unitCost = boxCost / packing;
-          const unitRetail = boxRetail / packing;
+          const boxCost = Number(item.box_cost_price ?? item.box_trade_price ?? prod.boxTradePrice ?? 0);
+          const boxRetail = Number(item.box_retail_price ?? prod.boxRetailPrice ?? 0);
+          const unitCost = packing > 0 ? (boxCost / packing) : boxCost;
+          const unitRetail = packing > 0 ? (boxRetail / packing) : boxRetail;
+          const discPct = parseFloat(item.discount_pct) || 0;
+          const totalCost = item.total_cost !== undefined ? parseFloat(item.total_cost) : (qtyBoxes * boxCost * (1 - discPct / 100));
 
           await tx.purchaseItem.create({
             data: {
@@ -1444,12 +1514,12 @@ app.post('/api/purchases', async (req: Request, res: Response) => {
               productName: prod.name,
               batchNo: item.batch_no || 'NA',
               expiryDate: item.expiry_date || '',
-              quantityBoxes: Number(item.quantity_boxes),
-              bonusBoxes: Number(item.bonus_boxes || 0),
+              quantityBoxes: qtyBoxes,
+              bonusBoxes: bonusBoxes,
               boxCostPrice: boxCost,
               boxRetailPrice: boxRetail,
-              discountPct: parseFloat(item.discount_pct) || 0,
-              totalCost: parseFloat(item.total_cost) || 0
+              discountPct: discPct,
+              totalCost: totalCost
             }
           });
 
@@ -1683,14 +1753,76 @@ app.get('/api/utilities/backups', (_req: Request, res: Response) => {
 });
 
 app.post('/api/utilities/backup', async (req: Request, res: Response) => {
-  const { customDir } = req.body;
+  const { customDir, secondaryDir } = req.body;
   try {
-    const result = await createBackup('manual', customDir);
+    let finalSecondary = secondaryDir;
+    if (!finalSecondary) {
+      const secRow = await prisma.systemSetting.findUnique({ where: { key: 'secondary_backup_dir' } });
+      if (secRow && secRow.value) finalSecondary = secRow.value;
+    }
+
+    const result = await createBackup('manual', customDir, finalSecondary);
+
+    // Save timestamp & path in settings
+    await prisma.systemSetting.upsert({
+      where: { key: 'last_backup_time' },
+      update: { value: result.timestamp },
+      create: { key: 'last_backup_time', value: result.timestamp }
+    });
+    await prisma.systemSetting.upsert({
+      where: { key: 'last_backup_file' },
+      update: { value: result.filepath },
+      create: { key: 'last_backup_file', value: result.filepath }
+    });
+
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
+
+// Auto-Backup Background Scheduler (runs every 30 minutes)
+setInterval(async () => {
+  try {
+    const enabledRow = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_enabled' } });
+    if (enabledRow?.value !== 'true') return;
+
+    const intervalRow = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_interval_hours' } });
+    const intervalHours = Number(intervalRow?.value || '24');
+    const intervalMs = intervalHours * 60 * 60 * 1000;
+
+    const lastTimeRow = await prisma.systemSetting.findUnique({ where: { key: 'last_backup_time' } });
+    const lastBackupMs = lastTimeRow?.value ? new Date(lastTimeRow.value).getTime() : 0;
+    const now = Date.now();
+
+    if (now - lastBackupMs >= intervalMs) {
+      console.log('[Auto-Backup] Triggering scheduled database backup...');
+      const targetDirRow = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_dir' } });
+      const secondaryDirRow = await prisma.systemSetting.findUnique({ where: { key: 'secondary_backup_dir' } });
+
+      const result = await createBackup(
+        'auto_daily',
+        targetDirRow?.value || undefined,
+        secondaryDirRow?.value || undefined
+      );
+
+      await prisma.systemSetting.upsert({
+        where: { key: 'last_backup_time' },
+        update: { value: result.timestamp },
+        create: { key: 'last_backup_time', value: result.timestamp }
+      });
+      await prisma.systemSetting.upsert({
+        where: { key: 'last_backup_file' },
+        update: { value: result.filepath },
+        create: { key: 'last_backup_file', value: result.filepath }
+      });
+
+      console.log(`[Auto-Backup] Scheduled backup completed: ${result.filename} (${(result.sizeBytes / 1024).toFixed(1)} KB)`);
+    }
+  } catch (err: any) {
+    console.error('[Auto-Backup Daemon] Error:', err.message);
+  }
+}, 30 * 60 * 1000);
 
 app.post('/api/utilities/restore', async (req: Request, res: Response) => {
   const { backupFilePath } = req.body;

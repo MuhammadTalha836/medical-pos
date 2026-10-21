@@ -12,6 +12,7 @@ data/*.db-shm
 
 # Local backups
 backups/*.db
+backups/*.sha256
 
 # Local environment variables
 .env

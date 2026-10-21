@@ -77,7 +77,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
   const expiredCount = stats?.expiredCount || 0;
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="page-container">
       {/* Welcome Banner */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -87,7 +87,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
 
         <button
           onClick={() => onNavigateTab('pos')}
-          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/20 active:scale-95 transition-all"
+          className="btn-primary px-4 py-2 text-xs flex items-center space-x-2 shadow-lg shadow-teal-500/20"
         >
           <ShoppingCart className="w-4 h-4" />
           <span>Launch POS Counter Sale [F1]</span>
@@ -98,7 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Today's Sales */}
-        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-teal-500/40 transition-all shadow-sm">
+        <div className="card-premium p-4.5 flex flex-col justify-between hover:border-teal-500/40 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Today's Revenue</span>
             <div className="p-2 rounded-xl bg-teal-50 dark:bg-teal-950/80 border border-teal-200 dark:border-teal-800 text-teal-600 dark:text-teal-400">
@@ -126,7 +126,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Total Active Products */}
-        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-sm">
+        <div className="card-premium p-4.5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Products</span>
             <div className="p-2 rounded-xl bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
@@ -144,7 +144,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Low Stock Warning */}
-        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-amber-500/40 transition-all shadow-sm">
+        <div className="card-premium p-4.5 flex flex-col justify-between hover:border-amber-500/40 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Low Stock Alert</span>
             <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/80 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400">
@@ -166,7 +166,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Expired Products */}
-        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 flex flex-col justify-between hover:border-rose-500/40 transition-all shadow-sm">
+        <div className="card-premium p-4.5 flex flex-col justify-between hover:border-rose-500/40 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Expired Batches</span>
             <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400">
@@ -187,7 +187,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
       {/* Main Content: Low Stock Priority Table & Recent Invoices */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Low Stock Priority Table */}
-        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col">
+        <div className="card-premium p-5 space-y-4 flex flex-col">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -202,7 +202,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
             </button>
           </div>
 
-          <div className="overflow-x-auto flex-1">
+          <div className="table-container flex-1">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
@@ -260,7 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         </div>
 
         {/* Recent Sales Transactions */}
-        <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col">
+        <div className="card-premium p-5 space-y-4 flex flex-col">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Receipt className="w-4 h-4 text-teal-600 dark:text-teal-400" />
@@ -275,7 +275,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
             </button>
           </div>
 
-          <div className="overflow-x-auto flex-1">
+          <div className="table-container flex-1">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>

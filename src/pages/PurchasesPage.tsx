@@ -181,7 +181,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
   };
 
   return (
-    <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <div className="page-container">
       {/* Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
         <div>

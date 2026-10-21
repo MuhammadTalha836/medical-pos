@@ -182,11 +182,11 @@ export const api = {
 
   // Utilities & Local Backup
   getBackupList: () => fetch(`${API_BASE}/utilities/backups`).then(r => handleResponse<any>(r)),
-  createBackup: (customDir?: string) =>
+  createBackup: (customDir?: string, secondaryDir?: string) =>
     fetch(`${API_BASE}/utilities/backup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customDir })
+      body: JSON.stringify({ customDir, secondaryDir })
     }).then(r => handleResponse<any>(r)),
   restoreBackup: (backupFilePath: string) =>
     fetch(`${API_BASE}/utilities/restore`, {
