@@ -252,7 +252,7 @@ async function ensureDefaultRoles(): Promise<void> {
     const roleCount = await prisma.role.count();
     if (roleCount === 0) {
       const adminPerms = {
-        dashboard: true, pos: true, sales: true, khata: true, masters: true, purchases: true, reports: true, utilities: true, settings: true,
+        dashboard: true, pos: true, sales: true, shifts: true, khata: true, masters: true, purchases: true, reports: true, utilities: true, settings: true,
         can_add_product: true, can_edit_product: true, can_delete_product: true, can_add_company: true, can_edit_company: true, can_delete_company: true,
         can_delete_invoice: true, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: true, can_add_purchase: true,
         can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: true, can_discount: true,
@@ -260,7 +260,7 @@ async function ensureDefaultRoles(): Promise<void> {
       };
 
       const cashierPerms = {
-        dashboard: false, pos: true, sales: true, khata: true, masters: true, purchases: false, reports: false, utilities: false, settings: false,
+        dashboard: false, pos: true, sales: true, shifts: false, khata: true, masters: true, purchases: false, reports: false, utilities: false, settings: false,
         can_add_product: true, can_edit_product: false, can_delete_product: false, can_add_company: true, can_edit_company: false, can_delete_company: false,
         can_delete_invoice: false, can_return_sale: true, can_view_all_sales: false, can_view_financial_kpis: false, can_add_purchase: false,
         can_add_customer: true, can_receive_payment: true, can_edit_customer: false, can_delete_customer: false, can_discount: true,
@@ -268,7 +268,7 @@ async function ensureDefaultRoles(): Promise<void> {
       };
 
       const pharmacistPerms = {
-        dashboard: true, pos: true, sales: true, khata: true, masters: true, purchases: true, reports: false, utilities: false, settings: false,
+        dashboard: true, pos: true, sales: true, shifts: false, khata: true, masters: true, purchases: true, reports: false, utilities: false, settings: false,
         can_add_product: true, can_edit_product: true, can_delete_product: false, can_add_company: true, can_edit_company: true, can_delete_company: false,
         can_delete_invoice: false, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: false, can_add_purchase: true,
         can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: false, can_discount: true,
@@ -2166,30 +2166,92 @@ app.get('/api/shifts', async (req: Request, res: Response) => {
       orderBy: { id: 'desc' }
     });
 
-    res.json(shifts.map(s => ({
-      id: s.id,
-      shift_no: s.shiftNo,
-      user_id: s.userId,
-      user_name: s.userName,
-      start_time: s.startTime,
-      end_time: s.endTime,
-      duration_minutes: s.durationMinutes,
-      opening_cash: s.openingCash,
-      closing_cash: s.closingCash,
-      expected_cash: s.expectedCash,
-      cash_difference: s.cashDifference,
-      total_sales_count: s.totalSalesCount,
-      total_sales_amount: s.totalSalesAmount,
-      total_cash_sales: s.totalCashSales,
-      total_card_sales: s.totalCardSales,
-      total_credit_sales: s.totalCreditSales,
-      total_returns_amount: s.totalReturnsAmount,
-      total_customer_payments: s.totalCustomerPayments,
-      notes: s.notes,
-      status: s.status,
-      created_at: s.createdAt,
-      updated_at: s.updatedAt
-    })));
+    const result = await Promise.all(shifts.map(async (s) => {
+      if (s.status === 'open') {
+        const [sales, returns, customerPayments] = await Promise.all([
+          prisma.sale.findMany({
+            where: { shiftId: s.id },
+            select: { netTotal: true, paymentType: true }
+          }),
+          prisma.saleReturn.findMany({
+            where: { shiftId: s.id },
+            select: { refundAmount: true }
+          }),
+          prisma.customerPayment.findMany({
+            where: { shiftId: s.id },
+            select: { amount: true, paymentMethod: true }
+          })
+        ]);
+
+        let totalCashSales = 0;
+        let totalCardSales = 0;
+        let totalCreditSales = 0;
+        let totalSalesAmount = 0;
+        for (const sale of sales) {
+          totalSalesAmount += sale.netTotal;
+          if (sale.paymentType === 'Cash') totalCashSales += sale.netTotal;
+          else if (sale.paymentType === 'Card') totalCardSales += sale.netTotal;
+          else if (sale.paymentType === 'Credit') totalCreditSales += sale.netTotal;
+        }
+
+        const totalReturnsAmount = returns.reduce((sum, r) => sum + r.refundAmount, 0);
+        const totalCustomerPayments = customerPayments.filter(p => p.paymentMethod.toLowerCase() === 'cash').reduce((sum, p) => sum + p.amount, 0);
+        const expectedCash = s.openingCash + totalCashSales + totalCustomerPayments - totalReturnsAmount;
+        const durationMinutes = Math.max(0, Math.floor((Date.now() - new Date(s.startTime).getTime()) / 60000));
+
+        return {
+          id: s.id,
+          shift_no: s.shiftNo,
+          user_id: s.userId,
+          user_name: s.userName,
+          start_time: s.startTime,
+          end_time: s.endTime,
+          duration_minutes: durationMinutes,
+          opening_cash: s.openingCash,
+          closing_cash: s.closingCash,
+          expected_cash: expectedCash,
+          cash_difference: s.cashDifference,
+          total_sales_count: sales.length,
+          total_sales_amount: totalSalesAmount,
+          total_cash_sales: totalCashSales,
+          total_card_sales: totalCardSales,
+          total_credit_sales: totalCreditSales,
+          total_returns_amount: totalReturnsAmount,
+          total_customer_payments: totalCustomerPayments,
+          notes: s.notes,
+          status: s.status,
+          created_at: s.createdAt,
+          updated_at: s.updatedAt
+        };
+      }
+
+      return {
+        id: s.id,
+        shift_no: s.shiftNo,
+        user_id: s.userId,
+        user_name: s.userName,
+        start_time: s.startTime,
+        end_time: s.endTime,
+        duration_minutes: s.durationMinutes,
+        opening_cash: s.openingCash,
+        closing_cash: s.closingCash,
+        expected_cash: s.expectedCash,
+        cash_difference: s.cashDifference,
+        total_sales_count: s.totalSalesCount,
+        total_sales_amount: s.totalSalesAmount,
+        total_cash_sales: s.totalCashSales,
+        total_card_sales: s.totalCardSales,
+        total_credit_sales: s.totalCreditSales,
+        total_returns_amount: s.totalReturnsAmount,
+        total_customer_payments: s.totalCustomerPayments,
+        notes: s.notes,
+        status: s.status,
+        created_at: s.createdAt,
+        updated_at: s.updatedAt
+      };
+    }));
+
+    res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
@@ -2244,6 +2306,34 @@ app.get('/api/shifts/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Shift not found' });
     }
 
+    let totalSalesCount = shift.totalSalesCount;
+    let totalSalesAmount = shift.totalSalesAmount;
+    let totalCashSales = shift.totalCashSales;
+    let totalCardSales = shift.totalCardSales;
+    let totalCreditSales = shift.totalCreditSales;
+    let totalReturnsAmount = shift.totalReturnsAmount;
+    let totalCustomerPayments = shift.totalCustomerPayments;
+    let expectedCash = shift.expectedCash;
+    let durationMinutes = shift.durationMinutes;
+
+    if (shift.status === 'open') {
+      totalSalesCount = shift.sales.length;
+      totalSalesAmount = 0;
+      totalCashSales = 0;
+      totalCardSales = 0;
+      totalCreditSales = 0;
+      for (const s of shift.sales) {
+        totalSalesAmount += s.netTotal;
+        if (s.paymentType === 'Cash') totalCashSales += s.netTotal;
+        else if (s.paymentType === 'Card') totalCardSales += s.netTotal;
+        else if (s.paymentType === 'Credit') totalCreditSales += s.netTotal;
+      }
+      totalReturnsAmount = shift.saleReturns.reduce((sum, r) => sum + r.refundAmount, 0);
+      totalCustomerPayments = shift.customerPayments.filter(p => p.paymentMethod.toLowerCase() === 'cash').reduce((sum, p) => sum + p.amount, 0);
+      expectedCash = shift.openingCash + totalCashSales + totalCustomerPayments - totalReturnsAmount;
+      durationMinutes = Math.max(0, Math.floor((Date.now() - new Date(shift.startTime).getTime()) / 60000));
+    }
+
     res.json({
       shift: {
         id: shift.id,
@@ -2252,18 +2342,18 @@ app.get('/api/shifts/:id', async (req: Request, res: Response) => {
         user_name: shift.userName,
         start_time: shift.startTime,
         end_time: shift.endTime,
-        duration_minutes: shift.durationMinutes,
+        duration_minutes: durationMinutes,
         opening_cash: shift.openingCash,
         closing_cash: shift.closingCash,
-        expected_cash: shift.expectedCash,
+        expected_cash: expectedCash,
         cash_difference: shift.cashDifference,
-        total_sales_count: shift.totalSalesCount,
-        total_sales_amount: shift.totalSalesAmount,
-        total_cash_sales: shift.totalCashSales,
-        total_card_sales: shift.totalCardSales,
-        total_credit_sales: shift.totalCreditSales,
-        total_returns_amount: shift.totalReturnsAmount,
-        total_customer_payments: shift.totalCustomerPayments,
+        total_sales_count: totalSalesCount,
+        total_sales_amount: totalSalesAmount,
+        total_cash_sales: totalCashSales,
+        total_card_sales: totalCardSales,
+        total_credit_sales: totalCreditSales,
+        total_returns_amount: totalReturnsAmount,
+        total_customer_payments: totalCustomerPayments,
         notes: shift.notes,
         status: shift.status
       },
@@ -2417,6 +2507,121 @@ app.post('/api/shifts/:id/admin/correct', async (req: Request, res: Response) =>
         cash_difference: updated.cashDifference,
         status: updated.status,
         notes: updated.notes
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 9. Admin Force-Close an Active Shift (emergency recovery for abandoned shifts)
+app.post('/api/shifts/:id/admin/force-close', async (req: Request, res: Response) => {
+  try {
+    const shiftId = Number(req.params.id);
+    const { admin_id, admin_name, actual_cash, notes, reason } = req.body;
+
+    if (!reason || !String(reason).trim()) {
+      return res.status(400).json({ error: 'A mandatory administrative reason is required to force-close a shift.' });
+    }
+
+    const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId } });
+    if (!shift) {
+      return res.status(404).json({ error: 'Shift not found' });
+    }
+    if (shift.status !== 'open') {
+      return res.status(400).json({ error: 'Shift is already closed.' });
+    }
+
+    const [sales, returns, customerPayments] = await Promise.all([
+      prisma.sale.findMany({
+        where: { shiftId: shift.id },
+        select: { netTotal: true, paymentType: true }
+      }),
+      prisma.saleReturn.findMany({
+        where: { shiftId: shift.id },
+        select: { refundAmount: true }
+      }),
+      prisma.customerPayment.findMany({
+        where: { shiftId: shift.id },
+        select: { amount: true, paymentMethod: true }
+      })
+    ]);
+
+    let totalCashSales = 0, totalCardSales = 0, totalCreditSales = 0, totalSalesAmount = 0;
+    for (const s of sales) {
+      totalSalesAmount += s.netTotal;
+      if (s.paymentType === 'Cash') totalCashSales += s.netTotal;
+      else if (s.paymentType === 'Card') totalCardSales += s.netTotal;
+      else if (s.paymentType === 'Credit') totalCreditSales += s.netTotal;
+    }
+    let totalReturnsCash = 0;
+    for (const r of returns) totalReturnsCash += r.refundAmount;
+    let totalCustomerPaymentsCash = 0;
+    for (const cp of customerPayments) {
+      if (cp.paymentMethod.toLowerCase() === 'cash') totalCustomerPaymentsCash += cp.amount;
+    }
+
+    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
+    const actualCashNum = parseFloat(actual_cash) ?? expectedCash;
+    const difference = actualCashNum - expectedCash;
+    const now = new Date();
+    const durationMinutes = Math.max(1, Math.round((now.getTime() - new Date(shift.startTime).getTime()) / 60000));
+
+    const adminNote = `[Force-Closed by ${admin_name || 'Admin'}: ${String(reason).trim()}]`;
+    const updatedShift = await prisma.cashierShift.update({
+      where: { id: shift.id },
+      data: {
+        status: 'closed',
+        endTime: now,
+        durationMinutes,
+        closingCash: actualCashNum,
+        expectedCash,
+        cashDifference: difference,
+        totalSalesCount: sales.length,
+        totalSalesAmount,
+        totalCashSales,
+        totalCardSales,
+        totalCreditSales,
+        totalReturnsAmount: totalReturnsCash,
+        totalCustomerPayments: totalCustomerPaymentsCash,
+        notes: notes ? `${notes} | ${adminNote}` : adminNote
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'ADMIN_SHIFT_FORCE_CLOSE',
+        module: 'Shift Management',
+        details: `Shift ${shift.shiftNo} force-closed by Admin ${admin_name || 'Admin'} (ID #${admin_id}). Duration: ${formatShiftDuration(durationMinutes)}. Expected: ${expectedCash.toFixed(2)}, Actual: ${actualCashNum.toFixed(2)}, Variance: ${difference.toFixed(2)}. Reason: ${reason}`,
+        userId: admin_id ? Number(admin_id) : null,
+        userName: admin_name || 'Admin'
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Shift ${shift.shiftNo} has been force-closed by admin.`,
+      shift: {
+        id: updatedShift.id,
+        shift_no: updatedShift.shiftNo,
+        user_id: updatedShift.userId,
+        user_name: updatedShift.userName,
+        start_time: updatedShift.startTime,
+        end_time: updatedShift.endTime,
+        duration_minutes: updatedShift.durationMinutes,
+        opening_cash: updatedShift.openingCash,
+        closing_cash: updatedShift.closingCash,
+        expected_cash: updatedShift.expectedCash,
+        cash_difference: updatedShift.cashDifference,
+        total_sales_count: updatedShift.totalSalesCount,
+        total_sales_amount: updatedShift.totalSalesAmount,
+        total_cash_sales: updatedShift.totalCashSales,
+        total_card_sales: updatedShift.totalCardSales,
+        total_credit_sales: updatedShift.totalCreditSales,
+        total_returns_amount: updatedShift.totalReturnsAmount,
+        total_customer_payments: updatedShift.totalCustomerPayments,
+        notes: updatedShift.notes,
+        status: updatedShift.status
       }
     });
   } catch (error: unknown) {

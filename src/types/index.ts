@@ -9,6 +9,7 @@ export interface RolePermissions {
   reports: boolean;
   utilities: boolean;
   settings: boolean;
+  shifts: boolean; // Admin Shift Management page
 
   // Granular Actions
   can_add_product: boolean;

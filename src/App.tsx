@@ -10,6 +10,7 @@ import { PurchasesPage } from './pages/PurchasesPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { UtilitiesPage } from './pages/UtilitiesPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ShiftsAdminPage } from './pages/ShiftsAdminPage';
 import { api } from './services/apiService';
 import { SystemSettings } from './types';
 import { CheckCircle2, Download, Database } from 'lucide-react';
@@ -117,6 +118,9 @@ export const App: React.FC = () => {
           )}
           {currentTab === 'sales' && (
             <SalesHistoryPage settings={settings} />
+          )}
+          {currentTab === 'shifts' && (
+            <ShiftsAdminPage settings={settings} />
           )}
           {currentTab === 'khata' && (
             <CustomerKhataPage settings={settings} />

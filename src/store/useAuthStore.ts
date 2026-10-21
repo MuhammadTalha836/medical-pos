@@ -11,6 +11,7 @@ const DEFAULT_ADMIN_PERMISSIONS: RolePermissions = {
   reports: true,
   utilities: true,
   settings: true,
+  shifts: true,
   can_add_product: true,
   can_edit_product: true,
   can_delete_product: true,

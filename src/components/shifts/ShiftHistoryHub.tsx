@@ -65,7 +65,9 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
       const data = await api.getShifts({
         status: statusFilter !== 'all' ? statusFilter : undefined,
         date_from: dateFrom || undefined,
-        date_to: dateTo || undefined
+        date_to: dateTo || undefined,
+        // Non-managers see only their own shifts; admins/managers see all
+        user_id: hasPermission('can_manage_shifts') ? undefined : user?.id
       });
       setShifts(data);
     } catch (err: any) {

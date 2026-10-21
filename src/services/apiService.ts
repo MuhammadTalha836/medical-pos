@@ -248,6 +248,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift }>(r)),
+  adminForceCloseShift: (shiftId: number, data: { admin_id: number; admin_name: string; actual_cash: number; reason: string; notes?: string }) =>
+    fetch(`${API_BASE}/shifts/${shiftId}/admin/force-close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift }>(r)),
 
   // System Settings
   getSettings: () => fetch(`${API_BASE}/settings`).then(r => handleResponse<SystemSettings>(r)),

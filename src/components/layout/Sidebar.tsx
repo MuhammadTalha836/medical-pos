@@ -11,10 +11,11 @@ import {
   Settings,
   CreditCard,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Timer
 } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'pos' | 'sales' | 'masters' | 'purchases' | 'khata' | 'reports' | 'utilities' | 'settings';
+export type TabType = 'dashboard' | 'pos' | 'sales' | 'shifts' | 'masters' | 'purchases' | 'khata' | 'reports' | 'utilities' | 'settings';
 
 interface SidebarProps {
   currentTab: TabType;
@@ -29,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     { id: 'pos' as TabType, label: 'Counter Sale (POS)', icon: ShoppingCart, hotkey: 'F1', badge: 'Active' },
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'sales' as TabType, label: 'Sales & Returns', icon: Receipt },
+    { id: 'shifts' as TabType, label: 'Shift Management', icon: Timer, badge: 'Admin' },
     { id: 'khata' as TabType, label: 'Customer Credit (Khata)', icon: CreditCard },
     { id: 'masters' as TabType, label: 'Masters & Coding', icon: Package },
     { id: 'purchases' as TabType, label: 'Purchases & Stock', icon: Truck },
