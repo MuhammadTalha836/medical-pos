@@ -534,7 +534,55 @@ async function runTestSuite() {
     });
 
     // ---------------------------------------------------------
-    // 12. Close Shift & Trigger Automated Shift Backup
+    // 12. Fast Invoice Creation & Anti-Duplicate Validation (Requirement 7)
+    // ---------------------------------------------------------
+    await step('Fast Invoice Validation & Concurrency Protection', async () => {
+      // 1. Rejection of empty items list (Cart is empty)
+      let emptyCartRejected = false;
+      try {
+        await request('/sales', {
+          method: 'POST',
+          body: JSON.stringify({
+            shift_id: testShift.id,
+            customer_name: 'Empty Cart Test',
+            payment_type: 'Cash',
+            items: [],
+          }),
+        });
+      } catch (err: any) {
+        emptyCartRejected = true;
+        assert(err.message.includes('400') && err.message.includes('at least one item'), 'Empty cart returned HTTP 400 rejection');
+      }
+      assert(emptyCartRejected, 'Empty cart rejected successfully');
+
+      // 2. Parallel concurrent sales to verify sequential atomicity & unique invoice numbers
+      const payloadTemplate = (n: number) => ({
+        shift_id: testShift.id,
+        customer_name: `Concurrent Sale ${n}`,
+        payment_type: 'Cash',
+        user_id: adminUser.id,
+        items: [
+          {
+            product_id: testProduct.id,
+            is_loose: 0,
+            quantity: 1,
+            unit_price: 100,
+          },
+        ],
+      });
+
+      const [saleA, saleB] = await Promise.all([
+        request('/sales', { method: 'POST', body: JSON.stringify(payloadTemplate(1)) }),
+        request('/sales', { method: 'POST', body: JSON.stringify(payloadTemplate(2)) }),
+      ]);
+
+      assert(saleA.success && saleB.success, 'Both concurrent sales succeeded');
+      assert(saleA.invoiceNo !== saleB.invoiceNo, 'Concurrent sales assigned distinct unique invoice numbers');
+      assert(saleA.saleId !== saleB.saleId, 'Concurrent sales assigned unique IDs');
+    });
+
+    // ---------------------------------------------------------
+    // 13. Close Shift & Trigger Automated Shift Backup
     // ---------------------------------------------------------
     await step('Close Cashier Shift and Trigger Automated Backup', async () => {
       const summary = await request(`/shifts/${testShift.id}/summary`);

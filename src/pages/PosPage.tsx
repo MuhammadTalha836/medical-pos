@@ -23,7 +23,10 @@ import {
   Smartphone,
   Lock,
   PlayCircle,
-  ShieldAlert
+  ShieldAlert,
+  Keyboard,
+  HelpCircle,
+  FileText
 } from 'lucide-react';
 
 interface PosPageProps {
@@ -85,7 +88,7 @@ export function getDynamicCashTags(netTotal: number): number[] {
 }
 
 export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
   const {
     cart,
     customerName,
@@ -148,12 +151,17 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
   const maxBillDiscount = settings?.max_bill_discount_pct ? parseFloat(settings.max_bill_discount_pct) : 14;
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const tenderedInputRef = useRef<HTMLInputElement>(null);
   const discountInputRef = useRef<HTMLInputElement>(null);
+  const customerNameInputRef = useRef<HTMLInputElement>(null);
+  const isSubmittingRef = useRef<boolean>(false);
+  const lastCompletedSaleRef = useRef<SaleInvoice | null>(null);
 
+  const canDiscount = hasPermission('can_discount');
   const totals = getTotals();
   const currency = settings?.currency_symbol || 'Rs.';
 
@@ -162,38 +170,101 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     searchInputRef.current?.focus();
   }, []);
 
-  // Keyboard shortcuts
+  const handleStartNewInvoice = () => {
+    if (cart.length > 0) {
+      const confirmDiscard = window.confirm('Discard current cart items and start a fresh invoice?');
+      if (!confirmDiscard) return;
+    }
+    clearCart();
+    setSearchQuery('');
+    setSearchResults([]);
+    setErrorMessage(null);
+    setIsReceiptModalOpen(false);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 50);
+  };
+
+  // Keyboard shortcuts engine
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F1') {
+      // 1. F2: Start a new invoice
+      if (e.key === 'F2') {
         e.preventDefault();
-        clearCart();
+        handleStartNewInvoice();
+      }
+      // 2. F3: Focus the product search field
+      else if (e.key === 'F3') {
+        e.preventDefault();
         searchInputRef.current?.focus();
-      } else if (e.key === 'F2') {
+        searchInputRef.current?.select();
+      }
+      // 3. F4: Focus the customer selection field
+      else if (e.key === 'F4') {
         e.preventDefault();
-        searchInputRef.current?.focus();
-      } else if (e.key === 'F4') {
+        customerNameInputRef.current?.focus();
+        customerNameInputRef.current?.select();
+      }
+      // 4. F6: Apply a discount, subject to permissions
+      else if (e.key === 'F6') {
         e.preventDefault();
+        if (!hasPermission('can_discount')) {
+          setErrorMessage('Permission Denied: You do not have authorization to apply bill discounts. Please contact an administrator.');
+          return;
+        }
         discountInputRef.current?.focus();
-      } else if (e.key === 'F6') {
+        discountInputRef.current?.select();
+      }
+      // 5. F8: Open the payment section (Focus cash tendered)
+      else if (e.key === 'F8') {
         e.preventDefault();
         tenderedInputRef.current?.focus();
-      } else if (e.key === 'F9' || (e.ctrlKey && e.key === 'Enter')) {
+        tenderedInputRef.current?.select();
+      }
+      // 6. F9: Save or finalize the invoice, subject to validation
+      else if (e.key === 'F9' || (e.ctrlKey && e.key === 'Enter')) {
         e.preventDefault();
-        if (cart.length > 0 && !loadingSale) {
-          if (!activeShift) {
-            setErrorMessage('No active cashier shift. Please start a shift before finalizing sales.');
-            setStartModalOpen(true);
-            return;
-          }
+        if (e.repeat) return; // Prevent repeated submission when key is held down
+        if (isSubmittingRef.current || loadingSale) return;
+        handleCompleteSale(false);
+      }
+      // 7. F10: Print the invoice / direct receipt print
+      else if (e.key === 'F10') {
+        e.preventDefault();
+        if (e.repeat) return;
+        if (isReceiptModalOpen) {
+          window.print();
+        } else if (cart.length > 0) {
+          if (isSubmittingRef.current || loadingSale) return;
           handleCompleteSale(true);
+        } else if (lastCompletedSaleRef.current || createdInvoice) {
+          setCreatedInvoice(lastCompletedSaleRef.current || createdInvoice);
+          setIsReceiptModalOpen(true);
+          setTimeout(() => window.print(), 300);
+        }
+      }
+      // 8. Esc: Close a dialog or cancel current action where safe
+      else if (e.key === 'Escape') {
+        if (isReceiptModalOpen) {
+          e.preventDefault();
+          setIsReceiptModalOpen(false);
+          searchInputRef.current?.focus();
+        } else if (isShortcutsModalOpen) {
+          e.preventDefault();
+          setIsShortcutsModalOpen(false);
+        } else if (searchResults.length > 0) {
+          e.preventDefault();
+          setSearchResults([]);
+          setSearchQuery('');
+          searchInputRef.current?.focus();
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, loadingSale, totals, customerName, paymentType, activeShift]);
+  }, [cart, loadingSale, totals, customerName, paymentType, activeShift, isReceiptModalOpen, isShortcutsModalOpen, searchResults, createdInvoice, hasPermission]);
 
   // Product search with debounce
   useEffect(() => {
@@ -251,14 +322,19 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   };
 
   const handleCompleteSale = async (shouldPrint = true) => {
+    if (isSubmittingRef.current || loadingSale) {
+      return;
+    }
+
     if (!activeShift) {
-      setErrorMessage('Cashier shift is not active. Please start a shift first.');
+      setErrorMessage('Cannot finalize invoice: No active cashier shift found. Please start a shift first.');
       setStartModalOpen(true);
       return;
     }
 
     if (cart.length === 0) {
-      setErrorMessage('Please add at least one product to the invoice.');
+      setErrorMessage('Cannot finalize invoice: Cart is empty. Please search and add medicines first [F3].');
+      searchInputRef.current?.focus();
       return;
     }
 
@@ -276,7 +352,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       }
     }
 
+    if (paymentType === 'Credit' && !customerName.trim()) {
+      setErrorMessage('Customer name is required for Credit (Khata) sales. Please specify customer details [F4].');
+      customerNameInputRef.current?.focus();
+      return;
+    }
+
     try {
+      isSubmittingRef.current = true;
       setLoadingSale(true);
       setErrorMessage(null);
 
@@ -348,6 +431,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
         clearCart();
         setCreatedInvoice(invoiceObj);
+        lastCompletedSaleRef.current = invoiceObj;
         if (activeShift) {
           fetchShiftSummary(activeShift.id);
         }
@@ -359,12 +443,13 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to process sale');
     } finally {
+      isSubmittingRef.current = false;
       setLoadingSale(false);
     }
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200 relative">
+    <div className="flex-1 flex flex-col overflow-hidden bg-slate-100/60 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 transition-colors duration-200 relative">
       {/* Shift Inactive Lock Overlay */}
       {!activeShift && (
         <div className="absolute inset-0 z-40 bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4">
@@ -398,8 +483,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         </div>
       )}
 
-      {/* LEFT: Cart and Search Panel */}
-      <div className="flex-1 flex flex-col p-4 border-r border-slate-200 dark:border-slate-800 space-y-3 overflow-hidden">
+      {/* Main Workspace (Left Cart & Right Payment) */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* LEFT: Cart and Search Panel */}
+        <div className="flex-1 flex flex-col p-4 border-r border-slate-200 dark:border-slate-800 space-y-3 overflow-hidden">
         {/* Active Shift Header Ribbon */}
         {activeShift && (
           <div className="bg-white dark:bg-[#111827] border border-teal-500/30 dark:border-teal-500/20 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs shadow-sm flex-shrink-0">
@@ -450,9 +537,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Search by Barcode, P-Code (e.g. PAN-500), C-Code (GSK), or Medicine Name... [F2]"
+              placeholder="Search by Barcode, P-Code (e.g. PAN-500), C-Code (GSK), or Medicine Name... [F3]"
               className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none text-sm font-medium"
             />
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded border border-slate-300 dark:border-slate-700 mr-2 select-none shadow-xs">F3</kbd>
             {isSearching && (
               <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
             )}
@@ -742,11 +830,13 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             </div>
             {cart.length > 0 && (
               <button
-                onClick={clearCart}
-                className="flex items-center space-x-1 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors"
+                onClick={handleStartNewInvoice}
+                className="flex items-center space-x-1.5 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors"
+                title="Discard cart and start a fresh invoice [F2]"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Clear Cart [F1]</span>
+                <span>New Invoice</span>
+                <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded border border-rose-200 dark:border-rose-800">F2</kbd>
               </button>
             )}
           </div>
@@ -761,16 +851,18 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             <span className="flex items-center space-x-1.5">
               <User className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               <span>Customer Details</span>
+              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-700">F4</kbd>
             </span>
             <span className="text-[10px] text-slate-500 dark:text-slate-400">Counter Sale</span>
           </div>
 
           <div className="space-y-2">
             <input
+              ref={customerNameInputRef}
               type="text"
               value={customerName}
               onChange={(e) => setCustomer(null, e.target.value, customerPhone)}
-              placeholder="Customer Name (e.g. Counter Customer)"
+              placeholder="Customer Name (e.g. Counter Customer) [F4]"
               className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
             />
             <input
@@ -797,9 +889,15 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
           {/* Overall Bill Discount */}
           <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <span className="text-xs text-slate-700 dark:text-slate-300 flex items-center space-x-1 font-medium">
+            <span className="text-xs text-slate-700 dark:text-slate-300 flex items-center space-x-1.5 font-medium">
               <Percent className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-              <span>Bill Disc [F4]:</span>
+              <span>Bill Disc:</span>
+              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-700">F6</kbd>
+              {!canDiscount && (
+                <span title="Discount permission required">
+                  <Lock className="w-3 h-3 text-amber-500" />
+                </span>
+              )}
             </span>
             <div className="flex items-center space-x-1.5">
               <input
@@ -807,8 +905,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                 type="number"
                 min="0"
                 max={maxBillDiscount}
+                disabled={!canDiscount}
                 value={billDiscountPct || ''}
                 onChange={(e) => {
+                  if (!canDiscount) return;
                   let val = parseFloat(e.target.value) || 0;
                   if (val > maxBillDiscount) {
                     val = maxBillDiscount;
@@ -817,7 +917,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                   setBillDiscountPct(val, maxBillDiscount);
                 }}
                 placeholder="%"
-                className="w-14 text-center bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg py-1 px-1 text-teal-700 dark:text-teal-300 font-mono text-xs font-bold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                title={!canDiscount ? "Discount permission required" : "Enter bill discount %"}
+                className={`w-14 text-center rounded-lg py-1 px-1 font-mono text-xs font-bold focus:outline-none focus:ring-1 ${
+                  !canDiscount
+                    ? 'bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                    : 'bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 text-teal-700 dark:text-teal-300 focus:border-teal-500 focus:ring-teal-500'
+                }`}
               />
               <span className="text-xs text-slate-500 dark:text-slate-400">%</span>
               <span className="text-[10px] text-teal-700 dark:text-teal-300 font-bold bg-teal-50 dark:bg-teal-950/70 border border-teal-200 dark:border-teal-800 px-1.5 py-0.5 rounded">
@@ -872,7 +977,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         {/* Cash Tendered & Change calculator */}
         <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold">Cash Received [F6]:</span>
+            <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold flex items-center space-x-1.5">
+              <span>Cash Received:</span>
+              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-700">F8</kbd>
+            </span>
             <input
               ref={tenderedInputRef}
               type="number"
@@ -921,21 +1029,47 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           <button
             onClick={() => handleCompleteSale(true)}
             disabled={cart.length === 0 || loadingSale}
-            className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg shadow-teal-500/20 active:scale-[0.99] transition-all flex items-center justify-center space-x-2"
+            className="w-full py-3.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg shadow-teal-500/20 active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer"
           >
             <Printer className="w-4 h-4" />
-            <span>{loadingSale ? 'Processing Sale...' : 'Save & Print Invoice [F9]'}</span>
+            <span>{loadingSale ? 'Processing Sale...' : 'Save & Print Invoice'}</span>
+            <kbd className="ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold bg-teal-800/60 text-white rounded border border-teal-400/30">F10</kbd>
           </button>
 
           <button
             onClick={() => handleCompleteSale(false)}
             disabled={cart.length === 0 || loadingSale}
-            className="w-full py-2 bg-slate-100 dark:bg-[#162032] hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1.5"
+            className="w-full py-2 bg-slate-100 dark:bg-[#162032] hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
             <span>Save Without Print</span>
+            <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-700">F9</kbd>
           </button>
         </div>
+      </div>
+    </div>
+
+      {/* Persistent Keyboard Shortcuts Bottom Ribbon */}
+      <div className="bg-slate-900 text-slate-300 dark:bg-[#070b12] border-t border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs select-none shadow-lg flex-shrink-0 z-20">
+        <div className="flex items-center space-x-3 overflow-x-auto py-0.5">
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded border border-slate-700 shadow-xs">F2</kbd><span className="text-[11px] font-medium text-slate-300">New Sale</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded border border-slate-700 shadow-xs">F3</kbd><span className="text-[11px] font-medium text-slate-300">Search</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded border border-slate-700 shadow-xs">F4</kbd><span className="text-[11px] font-medium text-slate-300">Customer</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded border border-slate-700 shadow-xs">F6</kbd><span className="text-[11px] font-medium text-slate-300">Discount</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded border border-slate-700 shadow-xs">F8</kbd><span className="text-[11px] font-medium text-slate-300">Payment</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-emerald-400 rounded border border-slate-700 shadow-xs">F9</kbd><span className="text-[11px] font-medium text-slate-300">Save</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-amber-400 rounded border border-slate-700 shadow-xs">F10</kbd><span className="text-[11px] font-medium text-slate-300">Print</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-rose-400 rounded border border-slate-700 shadow-xs">Esc</kbd><span className="text-[11px] font-medium text-slate-300">Close / Cancel</span></span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsShortcutsModalOpen(true)}
+          className="text-teal-400 hover:text-teal-300 font-medium text-[11px] flex items-center space-x-1 transition-colors px-2 py-0.5 rounded hover:bg-slate-800 cursor-pointer"
+        >
+          <Keyboard className="w-3.5 h-3.5" />
+          <span>Shortcuts Guide</span>
+        </button>
       </div>
 
       {/* Printable Thermal Receipt Modal */}
@@ -952,6 +1086,86 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             onClose={() => setIsReceiptModalOpen(false)}
           />
         )}
+      </Modal>
+
+      {/* Keyboard Shortcuts Reference Modal */}
+      <Modal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+        title="POS Keyboard Shortcuts Reference"
+        maxWidth="max-w-xl"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Speed up your pharmacy checkout operations with these dedicated hotkeys. All shortcuts are active across the sales screen.
+          </p>
+
+          <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden text-xs">
+            <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-[#0d131f] font-semibold text-slate-700 dark:text-slate-300">
+              <span className="w-20">Shortcut</span>
+              <span className="w-40">Action</span>
+              <span className="flex-1 text-slate-500">Details</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">F2</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Start New Invoice</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Clears cart & customer, resets form, and focuses search input.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">F3</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Focus Product Search</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Focuses search box and selects all text for instant barcode re-scan.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">F4</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Focus Customer Field</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Directly jumps to customer name input for credit or counter tagging.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">F6</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Apply Bill Discount</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Focuses discount % input. Restricted to authorized cashiers/admins.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">F8</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Payment & Tender</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Jumps focus to cash received field to enter tendered cash.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-emerald-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">F9</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Save Invoice</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Finalizes and saves invoice with anti-duplicate debounce protection.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-amber-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">F10</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Print Receipt</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Saves & prints thermal receipt, or reprints receipt if already saved.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-rose-400 font-bold px-2 py-0.5 rounded font-mono text-[11px] border border-slate-700">Esc</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Cancel / Close</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Closes active dialog or clears search dropdown without clearing cart.</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => setIsShortcutsModalOpen(false)}
+              className="btn-cancel text-xs"
+            >
+              Close Guide
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

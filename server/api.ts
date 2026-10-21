@@ -1152,13 +1152,6 @@ app.post('/api/sales', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'This shift is closed and locked. Sales cannot be added to a closed shift.' });
     }
 
-    // Generate Invoice No (e.g., INV-20261016-0001)
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const countToday = await prisma.sale.count({
-      where: { invoiceNo: { startsWith: `INV-${today}-` } }
-    });
-    const invoiceNo = `INV-${today}-${String(countToday + 1).padStart(4, '0')}`;
-
     // Compute item gross, discount, and net amounts defensively
     let computedGross = 0;
     let computedItemDiscount = 0;
@@ -1197,28 +1190,48 @@ app.post('/api/sales', async (req: Request, res: Response) => {
     const tendered = parseFloat(cash_tendered) || parseFloat(req.body.tendered_amount) || finalNetTotal;
     const finalChangeDue = parseFloat(change_due) || Math.max(0, tendered - finalNetTotal);
 
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. Insert Sale Master
-      const sale = await tx.sale.create({
-        data: {
-          invoiceNo,
-          customerId: customer_id ? Number(customer_id) : null,
-          customerName: customer_name || 'Counter Customer',
-          customerPhone: customer_phone || null,
-          userId: user_id ? Number(user_id) : null,
-          userName: user_name || 'Cashier',
-          shiftId: activeShiftId,
-          totalGross: finalTotalGross,
-          totalItemDiscount: finalItemDiscount,
-          billDiscountPct: billDiscPct,
-          billDiscountAmt: billDiscAmt,
-          netTotal: finalNetTotal,
-          cashTendered: tendered,
-          changeDue: finalChangeDue,
-          paymentType: payment_type || 'Cash',
-          notes: notes || null
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    const executeSaleTransaction = async () => {
+      return await prisma.$transaction(async (tx) => {
+        // Query latest invoice sequence today inside transaction
+        const latestSale = await tx.sale.findFirst({
+          where: { invoiceNo: { startsWith: `INV-${today}-` } },
+          orderBy: { id: 'desc' },
+          select: { invoiceNo: true }
+        });
+
+        let nextSeq = 1;
+        if (latestSale?.invoiceNo) {
+          const parts = latestSale.invoiceNo.split('-');
+          const lastNum = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(lastNum)) {
+            nextSeq = lastNum + 1;
+          }
         }
-      });
+        const invoiceNo = `INV-${today}-${String(nextSeq).padStart(4, '0')}`;
+
+        // 1. Insert Sale Master
+        const sale = await tx.sale.create({
+          data: {
+            invoiceNo,
+            customerId: customer_id ? Number(customer_id) : null,
+            customerName: customer_name || 'Counter Customer',
+            customerPhone: customer_phone || null,
+            userId: user_id ? Number(user_id) : null,
+            userName: user_name || 'Cashier',
+            shiftId: activeShiftId,
+            totalGross: finalTotalGross,
+            totalItemDiscount: finalItemDiscount,
+            billDiscountPct: billDiscPct,
+            billDiscountAmt: billDiscAmt,
+            netTotal: finalNetTotal,
+            cashTendered: tendered,
+            changeDue: finalChangeDue,
+            paymentType: payment_type || 'Cash',
+            notes: notes || null
+          }
+        });
 
       // 2. Validate Open-Sale Rules & Deduct Stock
       for (const item of computedItems) {
@@ -1290,13 +1303,30 @@ app.post('/api/sales', async (req: Request, res: Response) => {
         });
       }
 
-      return {
-        saleId: sale.id,
-        invoiceNo,
-        netTotal: sale.netTotal,
-        changeDue: sale.changeDue
-      };
-    });
+        return {
+          saleId: sale.id,
+          invoiceNo,
+          netTotal: sale.netTotal,
+          changeDue: sale.changeDue
+        };
+      });
+    };
+
+    let result: any = null;
+    let attempts = 0;
+    while (attempts < 5) {
+      try {
+        attempts++;
+        result = await executeSaleTransaction();
+        break;
+      } catch (err: any) {
+        if ((err.code === 'P2002' || err.message?.includes('Unique constraint') || err.message?.includes('SQLITE_BUSY')) && attempts < 5) {
+          await new Promise((r) => setTimeout(r, 25 * attempts));
+          continue;
+        }
+        throw err;
+      }
+    }
 
     res.json({ success: true, ...result });
   } catch (error: unknown) {
