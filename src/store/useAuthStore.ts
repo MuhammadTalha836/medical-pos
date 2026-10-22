@@ -128,6 +128,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
     hasModuleAccess: (moduleKey: string) => {
       const { user, permissions } = get();
       if (!user) return false;
+      if (moduleKey === 'developer') {
+        return user.role === 'developer';
+      }
       if (user.role === 'admin' || user.role === 'developer') return true;
       if (!permissions) return false;
       return Boolean((permissions as any)[moduleKey]);

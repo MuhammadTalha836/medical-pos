@@ -20,6 +20,8 @@ export async function initPrisma(): Promise<void> {
     try { await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN totp_secret TEXT;`); } catch {}
     try { await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;`); } catch {}
     try { await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN locked_until DATETIME;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE audit_logs ADD COLUMN affected_user TEXT;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE audit_logs ADD COLUMN status TEXT DEFAULT 'SUCCESS';`); } catch {}
   } catch (error) {
     console.error('[Prisma] Failed to apply SQLite pragmas:', error);
   }

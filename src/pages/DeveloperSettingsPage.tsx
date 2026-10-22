@@ -1,0 +1,915 @@
+import React, { useState, useEffect } from 'react';
+import { api } from '../services/apiService';
+import { useAuthStore } from '../store/useAuthStore';
+import { DeveloperSettingsPayload, AuditLogEntry, User } from '../types';
+import { Modal } from '../components/common/Modal';
+import {
+  ShieldAlert,
+  ShieldCheck,
+  KeyRound,
+  FileText,
+  Sliders,
+  Database,
+  Building,
+  Save,
+  RefreshCw,
+  Search,
+  CheckCircle2,
+  AlertTriangle,
+  Lock,
+  UserCheck,
+  Eye,
+  EyeOff,
+  Filter,
+  Check,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+
+export const DeveloperSettingsPage: React.FC = () => {
+  const { user } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<'policies' | 'store' | 'backups' | 'passwords' | 'audit'>('policies');
+
+  // Developer settings state
+  const [settings, setSettings] = useState<DeveloperSettingsPayload>({
+    backup_retention_limit: '30',
+    backup_frequency: 'daily',
+    backup_scheduled_time: '23:00',
+    allow_admin_create_cashier: 'true',
+    allow_admin_create_admin: 'false',
+    allow_admin_edit_store_identity: 'false',
+    store_name: 'PharmaCare Pharmacy',
+    store_address: 'Main Boulevard, Healthcare City',
+    developer_invoice_footer: 'Software maintained by System Developer',
+    developer_email: ''
+  });
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
+
+  // Users for password reset
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedUserForReset, setSelectedUserForReset] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
+  const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
+
+  // Audit Logs state
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [auditPage, setAuditPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [filterModule, setFilterModule] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterUser, setFilterUser] = useState('');
+
+  // Fetch developer settings
+  const fetchSettings = async () => {
+    setLoadingSettings(true);
+    try {
+      const res = await api.getDeveloperSettings();
+      setSettings(prev => ({ ...prev, ...res }));
+    } catch (err: any) {
+      setSaveErrorMsg(err.message || 'Failed to load developer settings');
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  // Fetch users
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await api.getUsers();
+      setUsers(res);
+    } catch (err: any) {
+      console.error('Failed to load users:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // Fetch audit logs
+  const fetchAuditLogs = async (page = 1) => {
+    setAuditLoading(true);
+    try {
+      const res = await api.getDeveloperAuditLogs({
+        page,
+        limit: 20,
+        module: filterModule || undefined,
+        status: filterStatus || undefined,
+        user: filterUser || undefined
+      });
+      setAuditLogs(res.logs);
+      setTotalLogs(res.total);
+      setAuditPage(res.page);
+      setTotalPages(res.totalPages);
+    } catch (err: any) {
+      console.error('Failed to load audit logs:', err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === 'developer') {
+      fetchSettings();
+      fetchUsers();
+      fetchAuditLogs(1);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'audit' && user?.role === 'developer') {
+      fetchAuditLogs(1);
+    }
+  }, [filterModule, filterStatus, activeTab]);
+
+  // Handle Save Settings
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaveSuccessMsg(null);
+    setSaveErrorMsg(null);
+    try {
+      const res = await api.updateDeveloperSettings(settings);
+      setSaveSuccessMsg(res.message || 'Developer settings updated successfully');
+      setTimeout(() => setSaveSuccessMsg(null), 4000);
+      fetchAuditLogs(1);
+    } catch (err: any) {
+      setSaveErrorMsg(err.message || 'Failed to save developer settings');
+    }
+  };
+
+  // Handle Password Reset
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForReset) return;
+    if (newPassword.trim().length < 6) {
+      setResetErrorMsg('Password must be at least 6 characters long');
+      return;
+    }
+
+    setResettingPassword(true);
+    setResetSuccessMsg(null);
+    setResetErrorMsg(null);
+    try {
+      const res = await api.developerResetPassword(selectedUserForReset.id, newPassword.trim());
+      setResetSuccessMsg(res.message || `Password reset successfully for ${selectedUserForReset.username}`);
+      setNewPassword('');
+      setTimeout(() => {
+        setSelectedUserForReset(null);
+        setResetSuccessMsg(null);
+      }, 2000);
+      fetchAuditLogs(1);
+    } catch (err: any) {
+      setResetErrorMsg(err.message || 'Failed to reset password');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  if (!user || user.role !== 'developer') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">
+          <ShieldAlert className="w-8 h-8 text-rose-500" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Developer Access Restricted</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-md">
+          This system configuration area is cryptographically protected and strictly reserved for authorized System Developers.
+        </p>
+      </div>
+    );
+  }
+
+  const filteredUsers = users.filter(u =>
+    u.username.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.full_name.toLowerCase().includes(userSearch.toLowerCase()) ||
+    u.role.toLowerCase().includes(userSearch.toLowerCase())
+  );
+
+  return (
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div className="flex items-center space-x-2">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+              Developer Console
+            </span>
+            <span className="text-xs text-slate-400 font-mono">Offline RFC 6238 Secured</span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
+            System & Security Master Control
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Manage system-level policies, backup retention limits, staff credentials, and view real-time audit logs.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => {
+              fetchSettings();
+              fetchUsers();
+              fetchAuditLogs(auditPage);
+            }}
+            className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Sync Live Data</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex overflow-x-auto space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab('policies')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'policies'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Sliders className="w-4 h-4" />
+          <span>RBAC Policies</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('store')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'store'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Building className="w-4 h-4" />
+          <span>Protected Store Identity</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('backups')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'backups'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          <span>Backup Retention</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('passwords')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'passwords'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <KeyRound className="w-4 h-4" />
+          <span>Staff Password Reset</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('audit')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'audit'
+              ? 'bg-purple-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>Security Audit Trail</span>
+          {totalLogs > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 bg-purple-500/20 text-purple-300 rounded-full text-[10px]">
+              {totalLogs}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Global Alerts */}
+      {saveSuccessMsg && (
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          <span>{saveSuccessMsg}</span>
+        </div>
+      )}
+      {saveErrorMsg && (
+        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-rose-600 dark:text-rose-400 animate-fadeIn">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <span>{saveErrorMsg}</span>
+        </div>
+      )}
+
+      {/* TAB 1: RBAC POLICIES */}
+      {activeTab === 'policies' && (
+        <form onSubmit={handleSaveSettings} className="space-y-6">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <ShieldCheck className="w-5 h-5 text-purple-500" />
+                <span>Role Enforcement & Creation Policies</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Configure administrative privileges and account generation rights. These policies are enforced at the database level.
+              </p>
+            </div>
+
+            <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+              {/* Toggle 1: Allow Admin create cashier */}
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+                <div className="space-y-1 pr-4">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <span>Allow Administrator to Create Cashier Accounts</span>
+                    {settings.allow_admin_create_cashier === 'true' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500">Restricted</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    When enabled, store administrators can create, update, and manage cashier user accounts. When disabled, only the Developer can register new cashiers.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.allow_admin_create_cashier === 'true'}
+                    onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_create_cashier: e.target.checked ? 'true' : 'false' }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle 2: Allow Admin create admin */}
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+                <div className="space-y-1 pr-4">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <span>Allow Administrator to Create Administrator Accounts</span>
+                    {settings.allow_admin_create_admin === 'true' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500">Disabled (Recommended)</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Controls whether an existing administrator can spawn secondary administrator accounts. Keep disabled to prevent unauthorized privilege escalation.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.allow_admin_create_admin === 'true'}
+                    onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_create_admin: e.target.checked ? 'true' : 'false' }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle 3: Allow Admin edit store identity */}
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+                <div className="space-y-1 pr-4">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <span>Allow Administrator to Edit Store Name & Address</span>
+                    {settings.allow_admin_edit_store_identity === 'true' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    When disabled, Store Name and Address are protected against modifications by local store staff to guarantee brand integrity and licensed store identity.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.allow_admin_edit_store_identity === 'true'}
+                    onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_edit_store_identity: e.target.checked ? 'true' : 'false' }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={loadingSettings}
+                className="flex items-center space-x-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition shadow-md disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save RBAC Policies</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 2: PROTECTED STORE IDENTITY & DEVELOPER FOOTER */}
+      {activeTab === 'store' && (
+        <form onSubmit={handleSaveSettings} className="space-y-6">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <Building className="w-5 h-5 text-purple-500" />
+                <span>Protected Store Profile & Developer Attribution</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Store identity fields configured here persist on all POS receipts and invoices. Developer footer attribution is mandatory.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Pharmacy / Store Name (Protected)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={settings.store_name}
+                  onChange={(e) => setSettings(prev => ({ ...prev, store_name: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Developer Contact / Recovery Email
+                </label>
+                <input
+                  type="email"
+                  value={settings.developer_email || ''}
+                  onChange={(e) => setSettings(prev => ({ ...prev, developer_email: e.target.value }))}
+                  placeholder="developer@localdomain.com"
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Store Street Address (Protected)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={settings.store_address}
+                  onChange={(e) => setSettings(prev => ({ ...prev, store_address: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1.5">
+                  <Lock className="w-3.5 h-3.5 text-purple-500" />
+                  <span>Developer Invoice Footer Text (Mandatory Attribution)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={settings.developer_invoice_footer}
+                  onChange={(e) => setSettings(prev => ({ ...prev, developer_invoice_footer: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  This text prints at the bottom of Thermal, Standard, and Detailed receipts and cannot be removed by local administrators.
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={loadingSettings}
+                className="flex items-center space-x-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition shadow-md disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Store Identity & Footer</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 3: BACKUP RETENTION & SCHEDULING */}
+      {activeTab === 'backups' && (
+        <form onSubmit={handleSaveSettings} className="space-y-6">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                <Database className="w-5 h-5 text-purple-500" />
+                <span>Database Backup Retention & Automation Rules</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Configure local disk snapshot retention. Older SQLite snapshots beyond the retention threshold are automatically pruned to preserve disk capacity.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Backup Retention Limit (Files to Keep)
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  max="365"
+                  required
+                  value={settings.backup_retention_limit}
+                  onChange={(e) => setSettings(prev => ({ ...prev, backup_retention_limit: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">Default: 30 snapshots</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Backup Frequency
+                </label>
+                <select
+                  value={settings.backup_frequency}
+                  onChange={(e) => setSettings(prev => ({ ...prev, backup_frequency: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                >
+                  <option value="daily">Daily Snapshot</option>
+                  <option value="twice_daily">Twice Daily (Every 12h)</option>
+                  <option value="on_shift_close">On Cashier Shift Close</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Daily Scheduled Time
+                </label>
+                <input
+                  type="time"
+                  value={settings.backup_scheduled_time || '23:00'}
+                  onChange={(e) => setSettings(prev => ({ ...prev, backup_scheduled_time: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">24-hour format (e.g. 23:00)</span>
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end">
+              <button
+                type="submit"
+                disabled={loadingSettings}
+                className="flex items-center space-x-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl transition shadow-md disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Retention Policy</span>
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 4: STAFF PASSWORD RESET */}
+      {activeTab === 'passwords' && (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <KeyRound className="w-5 h-5 text-purple-500" />
+                  <span>Developer Staff Password Reset Hub</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Directly override forgotten administrator or cashier passwords using bcrypt offline hashing.
+                </p>
+              </div>
+
+              <div className="w-full sm:w-64 relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Filter staff accounts..."
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto pt-2">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
+                    <th className="py-2.5 px-3">Username</th>
+                    <th className="py-2.5 px-3">Full Name</th>
+                    <th className="py-2.5 px-3">Role</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {loadingUsers ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400">
+                        Loading staff users...
+                      </td>
+                    </tr>
+                  ) : filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400">
+                        No users found matching query.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white">
+                          {u.username}
+                        </td>
+                        <td className="py-3 px-3 text-slate-700 dark:text-slate-300 font-semibold">
+                          {u.full_name}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                            u.role === 'developer'
+                              ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                              : u.role === 'admin'
+                              ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                              : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                          }`}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`inline-flex items-center space-x-1 text-[11px] font-semibold ${
+                            u.status === 'active' ? 'text-emerald-500' : 'text-rose-500'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                            <span>{u.status}</span>
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedUserForReset(u);
+                              setNewPassword('');
+                              setResetErrorMsg(null);
+                              setResetSuccessMsg(null);
+                            }}
+                            className="inline-flex items-center space-x-1 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold rounded-lg transition"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>Reset Password</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: SECURITY AUDIT TRAIL */}
+      {activeTab === 'audit' && (
+        <div className="space-y-4">
+          {/* Audit Filters Bar */}
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <div className="flex items-center space-x-1 text-xs text-slate-500">
+                <Filter className="w-3.5 h-3.5 text-purple-500" />
+                <span>Filters:</span>
+              </div>
+
+              <select
+                value={filterModule}
+                onChange={(e) => setFilterModule(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none"
+              >
+                <option value="">All Modules</option>
+                <option value="AUTH">AUTH</option>
+                <option value="USERS">USERS</option>
+                <option value="SETTINGS">SETTINGS</option>
+                <option value="DEVELOPER_SETTINGS">DEVELOPER_SETTINGS</option>
+                <option value="Inventory">Inventory</option>
+                <option value="Shifts">Shifts</option>
+              </select>
+
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none"
+              >
+                <option value="">All Statuses</option>
+                <option value="SUCCESS">SUCCESS</option>
+                <option value="FAILED">FAILED</option>
+              </select>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={filterUser}
+                  onChange={(e) => setFilterUser(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchAuditLogs(1)}
+                  placeholder="Filter by user..."
+                  className="bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none w-36"
+                />
+              </div>
+
+              <button
+                onClick={() => fetchAuditLogs(1)}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1"
+              >
+                <Search className="w-3 h-3" />
+                <span>Filter</span>
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400 self-end md:self-center">
+              Total Records: <span className="font-mono font-bold text-slate-900 dark:text-white">{totalLogs}</span>
+            </div>
+          </div>
+
+          {/* Audit Logs Table */}
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d131f]/50 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
+                    <th className="py-3 px-3">Timestamp</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-3">Action</th>
+                    <th className="py-3 px-3">Module</th>
+                    <th className="py-3 px-3">Acting User</th>
+                    <th className="py-3 px-3">Affected Account</th>
+                    <th className="py-3 px-3">Details</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono">
+                  {auditLoading ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 font-sans">
+                        Loading security audit trail...
+                      </td>
+                    </tr>
+                  ) : auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 font-sans">
+                        No audit events recorded matching current criteria.
+                      </td>
+                    </tr>
+                  ) : (
+                    auditLogs.map(log => (
+                      <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                        <td className="py-2.5 px-3 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">
+                          {new Date(log.created_at).toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            log.status === 'SUCCESS'
+                              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                              : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                          }`}>
+                            {log.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap font-bold text-slate-900 dark:text-white">
+                          {log.action}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap text-purple-600 dark:text-purple-400">
+                          {log.module}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap text-slate-700 dark:text-slate-300">
+                          {log.user_name || 'System'}
+                        </td>
+                        <td className="py-2.5 px-3 whitespace-nowrap text-slate-500 dark:text-slate-400">
+                          {log.affected_user || '-'}
+                        </td>
+                        <td className="py-2.5 px-3 text-[11px] text-slate-600 dark:text-slate-300 max-w-xs truncate" title={log.details || ''}>
+                          {log.details || '-'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500">
+                  Page <span className="font-bold text-slate-900 dark:text-white">{auditPage}</span> of {totalPages}
+                </span>
+
+                <div className="flex items-center space-x-1">
+                  <button
+                    disabled={auditPage <= 1 || auditLoading}
+                    onClick={() => fetchAuditLogs(auditPage - 1)}
+                    className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    disabled={auditPage >= totalPages || auditLoading}
+                    onClick={() => fetchAuditLogs(auditPage + 1)}
+                    className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RESET PASSWORD */}
+      <Modal
+        isOpen={!!selectedUserForReset}
+        onClose={() => {
+          if (!resettingPassword) {
+            setSelectedUserForReset(null);
+            setResetErrorMsg(null);
+            setResetSuccessMsg(null);
+          }
+        }}
+        title={`Reset Password for ${selectedUserForReset?.username}`}
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={handleResetPasswordSubmit} className="space-y-4 text-xs">
+          <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs">
+            You are setting a new password for account: <strong className="font-mono">{selectedUserForReset?.username}</strong> ({selectedUserForReset?.role}). This action will be logged in the security audit trail.
+          </div>
+
+          <div>
+            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+              New Password (Minimum 6 characters)
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new strong password..."
+                className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {resetErrorMsg && (
+            <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-xs font-semibold flex items-center space-x-1.5">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>{resetErrorMsg}</span>
+            </div>
+          )}
+
+          {resetSuccessMsg && (
+            <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-xs font-semibold flex items-center space-x-1.5">
+              <Check className="w-3.5 h-3.5" />
+              <span>{resetSuccessMsg}</span>
+            </div>
+          )}
+
+          <div className="pt-2 flex justify-end space-x-2">
+            <button
+              type="button"
+              disabled={resettingPassword}
+              onClick={() => setSelectedUserForReset(null)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={resettingPassword}
+              className="flex items-center space-x-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition shadow disabled:opacity-50"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>{resettingPassword ? 'Updating...' : 'Confirm Reset'}</span>
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+export default DeveloperSettingsPage;

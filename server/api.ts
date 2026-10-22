@@ -9,7 +9,8 @@ import {
   getBackupList,
   restoreDatabase,
   resetStockZero,
-  optimizeDatabase
+  optimizeDatabase,
+  pruneBackupsByRetentionLimit
 } from './database/backup';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
@@ -22,6 +23,7 @@ import {
   encryptTotpSecret,
   decryptTotpSecret
 } from './security/totp';
+import { logSecurityAudit } from './security/audit';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -44,6 +46,26 @@ BigInt.prototype.toJSON = function (): number {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+// Helper to reliably extract and verify acting user from request headers
+async function getActingUser(req: Request): Promise<{ id: number; username: string; role: string; fullName: string } | null> {
+  const rawUserId = req.headers['x-user-id'];
+  if (!rawUserId) return null;
+  const userId = Number(rawUserId);
+  if (isNaN(userId)) return null;
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return null;
+    return {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      fullName: user.fullName
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Initialize SQLite WAL mode and busy timeout via Prisma
@@ -640,15 +662,40 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     });
 
     if (!user) {
+      await logSecurityAudit({
+        action: 'LOGIN',
+        module: 'AUTH',
+        status: 'FAILED',
+        details: `Failed login attempt for username: ${cleanUsername}`,
+        affectedUser: cleanUsername
+      });
       return res.status(401).json({ error: 'Invalid username or password' });
     }
     if (user.status !== 'active') {
+      await logSecurityAudit({
+        action: 'LOGIN',
+        module: 'AUTH',
+        status: 'FAILED',
+        details: `Login attempt on disabled account: ${cleanUsername}`,
+        affectedUser: cleanUsername,
+        userId: user.id,
+        userName: user.username
+      });
       return res.status(403).json({ error: 'This user account has been disabled. Please contact Administrator.' });
     }
 
     // Verify password with bcrypt + legacy auto-rehash
     const { valid, needsRehash } = await verifyPassword(password, user.password);
     if (!valid) {
+      await logSecurityAudit({
+        action: 'LOGIN',
+        module: 'AUTH',
+        status: 'FAILED',
+        details: `Failed login attempt (invalid password) for user: ${cleanUsername}`,
+        affectedUser: cleanUsername,
+        userId: user.id,
+        userName: user.username
+      });
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
@@ -664,6 +711,16 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
         console.error('[Auth] Failed to rehash password:', rehashErr);
       }
     }
+
+    await logSecurityAudit({
+      action: 'LOGIN',
+      module: 'AUTH',
+      status: 'SUCCESS',
+      details: `User ${user.username} logged in successfully (role: ${user.role})`,
+      affectedUser: user.username,
+      userId: user.id,
+      userName: user.username
+    });
 
     const roleRow = await prisma.role.findUnique({ where: { name: user.role } });
     let permissions = null;
@@ -819,13 +876,62 @@ app.get('/api/users', async (_req: Request, res: Response) => {
 
 app.post('/api/users', async (req: Request, res: Response) => {
   try {
+    const actingUser = await getActingUser(req);
     const { username, password, full_name, role } = req.body;
+    const targetRole = (role || 'cashier').toLowerCase();
+
     if (!username || !password || !full_name) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    if (role && role.toLowerCase() === 'developer') {
+    if (targetRole === 'developer') {
+      await logSecurityAudit({
+        action: 'USER_CREATE',
+        module: 'USERS',
+        status: 'FAILED',
+        details: 'Attempt to register developer role via standard user creation',
+        affectedUser: username,
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
       return res.status(400).json({ error: 'Developer role cannot be registered via standard user creation' });
+    }
+
+    // If acting user is NOT developer, enforce developer-configured policies
+    if (actingUser?.role !== 'developer') {
+      if (targetRole === 'cashier') {
+        const cashierSetting = await prisma.systemSetting.findUnique({
+          where: { key: 'allow_admin_create_cashier' }
+        });
+        if (cashierSetting?.value === 'false') {
+          await logSecurityAudit({
+            action: 'USER_CREATE',
+            module: 'USERS',
+            status: 'FAILED',
+            details: 'Policy violation: Admin attempted to create cashier while disabled by developer policy',
+            affectedUser: username,
+            userId: actingUser?.id,
+            userName: actingUser?.username
+          });
+          return res.status(403).json({ error: 'Creation of cashier accounts is disabled by Developer policy' });
+        }
+      } else if (targetRole === 'admin') {
+        const adminSetting = await prisma.systemSetting.findUnique({
+          where: { key: 'allow_admin_create_admin' }
+        });
+        if (adminSetting?.value !== 'true') {
+          await logSecurityAudit({
+            action: 'USER_CREATE',
+            module: 'USERS',
+            status: 'FAILED',
+            details: 'Policy violation: Admin attempted to create administrator while disabled by developer policy',
+            affectedUser: username,
+            userId: actingUser?.id,
+            userName: actingUser?.username
+          });
+          return res.status(403).json({ error: 'Creation of administrator accounts is disabled by Developer policy' });
+        }
+      }
     }
 
     const duplicate = await prisma.user.findUnique({
@@ -841,10 +947,21 @@ app.post('/api/users', async (req: Request, res: Response) => {
         username: username.trim(),
         password: hashedPassword,
         fullName: full_name.trim(),
-        role: role || 'cashier',
+        role: targetRole,
         status: 'active'
       }
     });
+
+    await logSecurityAudit({
+      action: 'USER_CREATE',
+      module: 'USERS',
+      status: 'SUCCESS',
+      details: `Created user ${newUser.username} with role ${newUser.role}`,
+      affectedUser: newUser.username,
+      userId: actingUser?.id,
+      userName: actingUser?.username
+    });
+
     res.json({ success: true, id: newUser.id });
   } catch (error: unknown) {
     res.status(400).json({ error: getErrorMessage(error) });
@@ -853,6 +970,7 @@ app.post('/api/users', async (req: Request, res: Response) => {
 
 app.put('/api/users/:id', async (req: Request, res: Response) => {
   try {
+    const actingUser = await getActingUser(req);
     const idNum = Number(req.params.id);
     const { username, full_name, role, status, password } = req.body;
 
@@ -861,9 +979,33 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Only developer can modify a developer account
+    if (existing.role === 'developer' && actingUser?.role !== 'developer') {
+      await logSecurityAudit({
+        action: 'USER_UPDATE',
+        module: 'USERS',
+        status: 'FAILED',
+        details: `Unauthorized attempt by ${actingUser?.username || 'unknown'} to modify Developer account ${existing.username}`,
+        affectedUser: existing.username,
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
+      return res.status(403).json({ error: 'Only developer can modify developer accounts' });
+    }
+
     if (role && role.toLowerCase() === 'developer' && existing.role !== 'developer') {
+      await logSecurityAudit({
+        action: 'USER_UPDATE',
+        module: 'USERS',
+        status: 'FAILED',
+        details: `Attempt to escalate role to developer for ${existing.username}`,
+        affectedUser: existing.username,
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
       return res.status(400).json({ error: 'Cannot escalate user role to Developer' });
     }
+
     if (existing.role === 'developer' && role && role.toLowerCase() !== 'developer') {
       return res.status(400).json({ error: 'Developer role cannot be downgraded' });
     }
@@ -895,6 +1037,16 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
       data: updateData
     });
 
+    await logSecurityAudit({
+      action: (password && password.trim() !== '') ? 'PASSWORD_CHANGE' : 'USER_UPDATE',
+      module: 'USERS',
+      status: 'SUCCESS',
+      details: `Updated user ${existing.username} (role: ${updateData.role})`,
+      affectedUser: existing.username,
+      userId: actingUser?.id,
+      userName: actingUser?.username
+    });
+
     res.json({ success: true, message: 'User updated successfully' });
   } catch (error: unknown) {
     res.status(400).json({ error: getErrorMessage(error) });
@@ -903,6 +1055,7 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
 
 app.delete('/api/users/:id', async (req: Request, res: Response) => {
   try {
+    const actingUser = await getActingUser(req);
     const idNum = Number(req.params.id);
     const targetUser = await prisma.user.findUnique({ where: { id: idNum } });
     if (!targetUser) {
@@ -910,6 +1063,15 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
     }
 
     if (targetUser.role === 'developer') {
+      await logSecurityAudit({
+        action: 'USER_DELETE',
+        module: 'USERS',
+        status: 'FAILED',
+        details: `Attempt to delete developer account ${targetUser.username}`,
+        affectedUser: targetUser.username,
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
       return res.status(400).json({ error: 'Developer account cannot be deleted' });
     }
 
@@ -918,9 +1080,248 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
     }
 
     await prisma.user.delete({ where: { id: idNum } });
+
+    await logSecurityAudit({
+      action: 'USER_DELETE',
+      module: 'USERS',
+      status: 'SUCCESS',
+      details: `Deleted user ${targetUser.username} with role ${targetUser.role}`,
+      affectedUser: targetUser.username,
+      userId: actingUser?.id,
+      userName: actingUser?.username
+    });
+
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(400).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 2.2b Dedicated Protected Developer Endpoints
+app.get('/api/developer/settings', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await getActingUser(req);
+    if (!actingUser || actingUser.role !== 'developer') {
+      return res.status(403).json({ error: 'Access denied: Developer role required' });
+    }
+
+    const settingsRows = await prisma.systemSetting.findMany({
+      where: {
+        key: {
+          in: [
+            'backup_retention_limit',
+            'backup_frequency',
+            'backup_scheduled_time',
+            'allow_admin_create_cashier',
+            'allow_admin_create_admin',
+            'allow_admin_edit_store_identity',
+            'store_name',
+            'store_address',
+            'developer_invoice_footer',
+            'developer_email'
+          ]
+        }
+      }
+    });
+
+    const devSettings: Record<string, string> = {
+      backup_retention_limit: '30',
+      backup_frequency: 'daily',
+      backup_scheduled_time: '23:00',
+      allow_admin_create_cashier: 'true',
+      allow_admin_create_admin: 'false',
+      allow_admin_edit_store_identity: 'false',
+      store_name: 'PharmaCare Pharmacy',
+      store_address: 'Main Boulevard, Healthcare City',
+      developer_invoice_footer: 'Software maintained by System Developer',
+      developer_email: ''
+    };
+
+    for (const row of settingsRows) {
+      devSettings[row.key] = row.value;
+    }
+
+    res.json(devSettings);
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.put('/api/developer/settings', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await getActingUser(req);
+    if (!actingUser || actingUser.role !== 'developer') {
+      await logSecurityAudit({
+        action: 'DEVELOPER_SETTINGS_UPDATE',
+        module: 'DEVELOPER_SETTINGS',
+        status: 'FAILED',
+        details: 'Unauthorized attempt to modify developer settings without developer role',
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
+      return res.status(403).json({ error: 'Access denied: Developer role required' });
+    }
+
+    const allowedKeys = [
+      'backup_retention_limit',
+      'backup_frequency',
+      'backup_scheduled_time',
+      'allow_admin_create_cashier',
+      'allow_admin_create_admin',
+      'allow_admin_edit_store_identity',
+      'store_name',
+      'store_address',
+      'developer_invoice_footer',
+      'developer_email'
+    ];
+
+    const updates: Record<string, string> = {};
+    for (const key of allowedKeys) {
+      if (req.body[key] !== undefined) {
+        updates[key] = String(req.body[key]);
+      }
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await prisma.$transaction(
+        Object.entries(updates).map(([k, v]) =>
+          prisma.systemSetting.upsert({
+            where: { key: k },
+            update: { value: v },
+            create: { key: k, value: v }
+          })
+        )
+      );
+    }
+
+    // Trigger backup pruning if retention limit was changed
+    if (updates.backup_retention_limit) {
+      const limit = parseInt(updates.backup_retention_limit, 10);
+      if (!isNaN(limit)) {
+        pruneBackupsByRetentionLimit(limit);
+      }
+    }
+
+    await logSecurityAudit({
+      action: 'DEVELOPER_SETTINGS_UPDATE',
+      module: 'DEVELOPER_SETTINGS',
+      status: 'SUCCESS',
+      details: `Updated developer settings keys: ${Object.keys(updates).join(', ')}`,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+
+    res.json({ success: true, message: 'Developer settings updated successfully' });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/developer/users/:id/reset-password', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await getActingUser(req);
+    if (!actingUser || actingUser.role !== 'developer') {
+      await logSecurityAudit({
+        action: 'DEVELOPER_PASSWORD_RESET',
+        module: 'USERS',
+        status: 'FAILED',
+        details: 'Unauthorized attempt to reset user password without developer role',
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
+      return res.status(403).json({ error: 'Access denied: Developer role required' });
+    }
+
+    const targetId = Number(req.params.id);
+    const { new_password } = req.body;
+    if (!new_password || typeof new_password !== 'string' || new_password.trim().length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: targetId } });
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    const hashedPassword = await hashPassword(new_password.trim());
+    await prisma.user.update({
+      where: { id: targetId },
+      data: { password: hashedPassword }
+    });
+
+    await logSecurityAudit({
+      action: 'DEVELOPER_PASSWORD_RESET',
+      module: 'USERS',
+      status: 'SUCCESS',
+      details: `Developer reset password for user ${targetUser.username} (${targetUser.role})`,
+      affectedUser: targetUser.username,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+
+    res.json({ success: true, message: `Password reset successfully for ${targetUser.username}` });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.get('/api/developer/audit-logs', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await getActingUser(req);
+    if (!actingUser || actingUser.role !== 'developer') {
+      return res.status(403).json({ error: 'Access denied: Developer role required' });
+    }
+
+    const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+    const limit = Math.max(1, Math.min(200, parseInt(String(req.query.limit || '50'), 10)));
+    const skip = (page - 1) * limit;
+
+    const whereClause: Prisma.AuditLogWhereInput = {};
+    if (req.query.module) {
+      whereClause.module = String(req.query.module);
+    }
+    if (req.query.action) {
+      whereClause.action = String(req.query.action);
+    }
+    if (req.query.status) {
+      whereClause.status = String(req.query.status);
+    }
+    if (req.query.user) {
+      const u = String(req.query.user);
+      whereClause.OR = [
+        { userName: { contains: u } },
+        { affectedUser: { contains: u } }
+      ];
+    }
+
+    const [total, logs] = await Promise.all([
+      prisma.auditLog.count({ where: whereClause }),
+      prisma.auditLog.findMany({
+        where: whereClause,
+        orderBy: { id: 'desc' },
+        skip,
+        take: limit
+      })
+    ]);
+
+    res.json({
+      logs: logs.map(l => ({
+        id: l.id,
+        action: l.action,
+        module: l.module,
+        details: l.details,
+        affected_user: l.affectedUser,
+        status: l.status,
+        user_id: l.userId,
+        user_name: l.userName,
+        created_at: l.createdAt.toISOString()
+      })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -3323,19 +3724,50 @@ app.get('/api/settings', async (_req: Request, res: Response) => {
 
 app.post('/api/settings', async (req: Request, res: Response) => {
   try {
+    const actingUser = await getActingUser(req);
     const settings = { ...req.body };
     // Developer info is strictly mandatory
     settings.show_developer_info = 'true';
 
-    await prisma.$transaction(
-      Object.entries(settings).map(([key, val]) =>
-        prisma.systemSetting.upsert({
-          where: { key },
-          update: { value: String(val) },
-          create: { key, value: String(val) }
-        })
-      )
-    );
+    // If acting user is NOT developer, protect developer-managed keys & store identity
+    if (actingUser?.role !== 'developer') {
+      delete settings.developer_invoice_footer;
+      delete settings.allow_admin_create_cashier;
+      delete settings.allow_admin_create_admin;
+      delete settings.allow_admin_edit_store_identity;
+      delete settings.backup_retention_limit;
+      delete settings.backup_frequency;
+      delete settings.backup_scheduled_time;
+
+      const allowEditIdentity = await prisma.systemSetting.findUnique({
+        where: { key: 'allow_admin_edit_store_identity' }
+      });
+      if (allowEditIdentity?.value !== 'true') {
+        delete settings.store_name;
+        delete settings.store_address;
+      }
+    }
+
+    if (Object.keys(settings).length > 0) {
+      await prisma.$transaction(
+        Object.entries(settings).map(([key, val]) =>
+          prisma.systemSetting.upsert({
+            where: { key },
+            update: { value: String(val) },
+            create: { key, value: String(val) }
+          })
+        )
+      );
+    }
+
+    await logSecurityAudit({
+      action: 'SETTINGS_UPDATE',
+      module: 'SETTINGS',
+      status: 'SUCCESS',
+      details: `Settings updated by ${actingUser?.username || 'system'}`,
+      userId: actingUser?.id,
+      userName: actingUser?.username
+    });
 
     res.json({ success: true, message: 'Settings saved successfully' });
   } catch (error: unknown) {

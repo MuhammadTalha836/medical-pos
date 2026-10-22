@@ -13,6 +13,7 @@
     "lint": "tsc --noEmit",
     "test:functional": "tsx server/tests/functional_test.ts",
     "test:phase1": "tsx server/tests/phase1_test.ts",
+    "test:phase2": "tsx server/tests/phase2_test.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",

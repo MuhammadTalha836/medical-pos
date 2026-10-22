@@ -11,6 +11,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { UtilitiesPage } from './pages/UtilitiesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ShiftsAdminPage } from './pages/ShiftsAdminPage';
+import { DeveloperSettingsPage } from './pages/DeveloperSettingsPage';
 import { api } from './services/apiService';
 import { SystemSettings } from './types';
 import { CheckCircle2, Download, Database } from 'lucide-react';
@@ -152,6 +153,9 @@ export const App: React.FC = () => {
           )}
           {currentTab === 'settings' && (
             <SettingsPage settings={settings} onRefreshSettings={loadSettings} />
+          )}
+          {currentTab === 'developer' && user?.role === 'developer' && (
+            <DeveloperSettingsPage />
           )}
         </main>
       </div>

@@ -39,26 +39,26 @@ Copy and paste the structured prompts below into Antigravity using the Ralph Loo
 **Objective:** Build the protected Developer Settings page and enforce backend authorization across all roles and actions.
 
 ### Task 2.1: Protected Developer Settings Page UI & Logic
-- [ ] Build a dedicated Developer Settings page accessible *only* to authenticated Developer accounts.
-- [ ] Implement controls for:
+- [x] Build a dedicated Developer Settings page accessible *only* to authenticated Developer accounts.
+- [x] Implement controls for:
   - Database backup retention limit (number of versions to retain).
   - Admin permissions to create additional Cashier accounts.
   - Admin permissions to create additional Admin accounts (if multi-admin is enabled).
   - Protected Medical Store Name and Address management.
   - Developer-controlled Invoice Footer information.
-- [ ] Ensure backend validation enforces that only the Developer can alter these configurations.
+- [x] Ensure backend validation enforces that only the Developer can alter these configurations.
 
 ### Task 2.2: User & Password Management Rules
-- [ ] Allow the Developer to create, manage, or change passwords for Admin and Cashier accounts.
-- [ ] Restrict Admin account creation capabilities based on explicit Developer toggles.
-- [ ] Prevent Admin and Cashier accounts from modifying Developer credentials, granting themselves Developer privileges, or altering restricted settings.
+- [x] Allow the Developer to create, manage, or change passwords for Admin and Cashier accounts.
+- [x] Restrict Admin account creation capabilities based on explicit Developer toggles.
+- [x] Prevent Admin and Cashier accounts from modifying Developer credentials, granting themselves Developer privileges, or altering restricted settings.
 
 ### Task 2.3: Security Audit Log
-- [ ] Implement a comprehensive security audit log recording sensitive actions:
+- [x] Implement a comprehensive security audit log recording sensitive actions:
   - Account creations, deletions, and password changes.
   - Changes to role permissions, store identity, and invoice footers.
   - Timestamp, acting account, affected account, action performed, and result status.
-- [ ] Ensure plaintext passwords and TOTP secrets are strictly excluded from logs.
+- [x] Ensure plaintext passwords and TOTP secrets are strictly excluded from logs.
 
 ---
 
@@ -100,11 +100,11 @@ Copy and paste the structured prompts below into Antigravity using the Ralph Loo
 ### Acceptance Criteria Checklist
 - [ ] **TC-01:** Only 58 mm and 80 mm thermal invoice templates are offered; A3/A4/A5 are removed.
 - [ ] **TC-02:** Admin can preview/select thermal templates, persisting across restarts.
-- [ ] **TC-03:** Developer has a dedicated protected settings page with valid input validations.
-- [ ] **TC-04:** Backup retention limits and Admin account-creation permissions are strictly controlled by the Developer.
-- [ ] **TC-05:** Developer manages Admin/Cashier passwords; unauthorized roles cannot modify Developer credentials.
-- [ ] **TC-06:** Medical store name, address, and invoice footer are protected by Developer settings and enforced on backend rendering.
-- [ ] **TC-07:** RBAC is enforced on backend API endpoints/actions, with actions recorded in the audit log.
+- [x] **TC-03:** Developer has a dedicated protected settings page with valid input validations.
+- [x] **TC-04:** Backup retention limits and Admin account-creation permissions are strictly controlled by the Developer.
+- [x] **TC-05:** Developer manages Admin/Cashier passwords; unauthorized roles cannot modify Developer credentials.
+- [x] **TC-06:** Medical store name, address, and invoice footer are protected by Developer settings and enforced on backend rendering.
+- [x] **TC-07:** RBAC is enforced on backend API endpoints/actions, with actions recorded in the audit log.
 - [x] **TC-08:** Initial setup captures Developer email and successfully validates TOTP authenticator setup.
 - [x] **TC-09:** Developer login requires a valid current TOTP code and operates fully offline.
 - [x] **TC-10:** Setup wizard cannot be re-run by unauthorized users to overwrite credentials.

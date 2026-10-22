@@ -282,6 +282,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action TEXT NOT NULL,
   module TEXT NOT NULL,
   details TEXT,
+  affected_user TEXT,
+  status TEXT NOT NULL DEFAULT 'SUCCESS',
   user_id INTEGER REFERENCES users(id),
   user_name TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP

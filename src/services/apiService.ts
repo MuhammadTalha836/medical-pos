@@ -11,10 +11,32 @@ import {
   ShiftSummary,
   SetupStatusResponse,
   SetupInitializeResponse,
-  SetupVerifyResponse
+  SetupVerifyResponse,
+  AuditLogEntry,
+  DeveloperSettingsPayload
 } from '../types';
 
 const API_BASE = '/api';
+
+export function getAuthHeaders(customHeaders?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...customHeaders
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('pharmacare_user_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.user?.id) {
+          headers['x-user-id'] = String(parsed.user.id);
+          headers['x-user-role'] = String(parsed.user.role);
+        }
+      }
+    } catch {}
+  }
+  return headers;
+}
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -31,7 +53,7 @@ export const api = {
   initializeSetup: (data: { developerEmail: string; storeName?: string; storeAddress?: string }) =>
     fetch(`${API_BASE}/setup/initialize`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     }).then(r => handleResponse<SetupInitializeResponse>(r)),
   verifySetup: (data: {
@@ -44,13 +66,13 @@ export const api = {
   }) =>
     fetch(`${API_BASE}/setup/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     }).then(r => handleResponse<SetupVerifyResponse>(r)),
 
   // Auth & Status
   getStatus: () => fetch(`${API_BASE}/status`).then(r => handleResponse<{ status: string; time: string }>(r)),
-  getDashboardStats: () => fetch(`${API_BASE}/dashboard/stats`).then(r => handleResponse<any>(r)),
+  getDashboardStats: () => fetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() }).then(r => handleResponse<any>(r)),
   login: (credentials: { username: string; password: string }) =>
     fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
@@ -66,27 +88,28 @@ export const api = {
   updateProfile: (data: { userId: number; username: string; full_name: string; currentPassword?: string; newPassword?: string }) =>
     fetch(`${API_BASE}/auth/profile`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     }).then(r => handleResponse<{ success: boolean; user: User; message: string }>(r)),
 
   // Users Management
-  getUsers: () => fetch(`${API_BASE}/users`).then(r => handleResponse<User[]>(r)),
+  getUsers: () => fetch(`${API_BASE}/users`, { headers: getAuthHeaders() }).then(r => handleResponse<User[]>(r)),
   createUser: (data: any) =>
     fetch(`${API_BASE}/users`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     }).then(r => handleResponse<{ success: boolean; id: number }>(r)),
   updateUser: (id: number, data: any) =>
     fetch(`${API_BASE}/users/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data)
     }).then(r => handleResponse<{ success: boolean }>(r)),
   deleteUser: (id: number) =>
     fetch(`${API_BASE}/users/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: getAuthHeaders()
     }).then(r => handleResponse<{ success: boolean }>(r)),
 
   // Roles & Permissions
@@ -303,7 +326,37 @@ export const api = {
   saveSettings: (settings: Partial<SystemSettings>) =>
     fetch(`${API_BASE}/settings`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(settings)
     }).then(r => handleResponse<{ success: boolean; message: string }>(r)),
+
+  // Developer Protected Settings & RBAC
+  getDeveloperSettings: () =>
+    fetch(`${API_BASE}/developer/settings`, {
+      headers: getAuthHeaders()
+    }).then(r => handleResponse<DeveloperSettingsPayload>(r)),
+  updateDeveloperSettings: (data: Partial<DeveloperSettingsPayload>) =>
+    fetch(`${API_BASE}/developer/settings`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<{ success: boolean; message: string }>(r)),
+  developerResetPassword: (userId: number, newPassword: string) =>
+    fetch(`${API_BASE}/developer/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ new_password: newPassword })
+    }).then(r => handleResponse<{ success: boolean; message: string }>(r)),
+  getDeveloperAuditLogs: (params?: { page?: number; limit?: number; module?: string; action?: string; status?: string; user?: string }) => {
+    const url = new URL(`${API_BASE}/developer/audit-logs`, window.location.origin);
+    if (params?.page) url.searchParams.append('page', String(params.page));
+    if (params?.limit) url.searchParams.append('limit', String(params.limit));
+    if (params?.module) url.searchParams.append('module', params.module);
+    if (params?.action) url.searchParams.append('action', params.action);
+    if (params?.status) url.searchParams.append('status', params.status);
+    if (params?.user) url.searchParams.append('user', params.user);
+    return fetch(url.toString(), {
+      headers: getAuthHeaders()
+    }).then(r => handleResponse<{ logs: AuditLogEntry[]; total: number; page: number; totalPages: number }>(r));
+  },
 };

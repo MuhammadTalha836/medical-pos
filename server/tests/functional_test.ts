@@ -1,13 +1,14 @@
-/**
- * PharmaCare Pro - End-to-End Functional Test Suite
- * Covers: Auth, Cashier Shifts, POS Sales (Box + Loose), Returns, Khata, Purchases, Reports, Multi-Destination Backups & SHA-256
- */
+process.env.NODE_ENV = 'test';
+process.env.TEST_MODE = 'true';
 
+import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { app } from '../api';
 
-const BASE_URL = 'http://localhost:3001/api';
+let BASE_URL = 'http://localhost:3001/api';
+let server: http.Server | null = null;
 
 // ANSI color helpers
 const colors = {
@@ -49,6 +50,29 @@ async function request(url: string, options?: RequestInit) {
 }
 
 async function runTestSuite() {
+  // Check if port 3001 is already running, else start ephemeral server
+  try {
+    const probe = await fetch('http://localhost:3001/api/status').catch(() => null);
+    if (probe && probe.ok) {
+      BASE_URL = 'http://localhost:3001/api';
+    } else {
+      await new Promise<void>((resolve) => {
+        server = app.listen(0, () => {
+          const addr = server!.address() as any;
+          BASE_URL = `http://localhost:${addr.port}/api`;
+          resolve();
+        });
+      });
+    }
+  } catch {
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, () => {
+        const addr = server!.address() as any;
+        BASE_URL = `http://localhost:${addr.port}/api`;
+        resolve();
+      });
+    });
+  }
   console.log(colors.bold(colors.cyan('\n======================================================')));
   console.log(colors.bold(colors.cyan('  PharmaCare Pro - Automated Functional Test Suite   ')));
   console.log(colors.bold(colors.cyan('======================================================\n')));
@@ -657,7 +681,10 @@ async function runTestSuite() {
     console.log(colors.bold(colors.red('\n======================================================')));
     console.log(colors.bold(colors.red(`  TEST SUITE TERMINATED WITH ERROR (${testsPassed}/${testsTotal} passed)  `)));
     console.log(colors.bold(colors.red('======================================================\n')));
+    if (server) server.close();
     process.exit(1);
+  } finally {
+    if (server) server.close();
   }
 }
 

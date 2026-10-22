@@ -12,10 +12,11 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
-  Timer
+  Timer,
+  ShieldAlert
 } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'pos' | 'sales' | 'shifts' | 'masters' | 'purchases' | 'khata' | 'reports' | 'utilities' | 'settings';
+export type TabType = 'dashboard' | 'pos' | 'sales' | 'shifts' | 'masters' | 'purchases' | 'khata' | 'reports' | 'utilities' | 'settings' | 'developer';
 
 interface SidebarProps {
   currentTab: TabType;
@@ -24,7 +25,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => {
   const [collapsed, setCollapsed] = useState(false);
-  const { hasModuleAccess } = useAuthStore();
+  const { user, hasModuleAccess } = useAuthStore();
 
   interface NavItem {
     id: TabType;
@@ -50,12 +51,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     { id: 'settings', label: 'System Settings', icon: Settings },
   ];
 
+  const developerNavItems: NavItem[] = [
+    { id: 'developer', label: 'Developer Console', icon: ShieldAlert, badge: 'Dev' },
+  ];
+
   const visibleCashierItems = cashierNavItems.filter(item => hasModuleAccess(item.id));
   const visibleAdminItems = adminNavItems.filter(item => hasModuleAccess(item.id));
 
   const renderNavButton = (item: NavItem) => {
     const Icon = item.icon;
     const isActive = currentTab === item.id;
+    const isDev = item.id === 'developer';
+
     return (
       <button
         key={item.id}
@@ -63,12 +70,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         title={collapsed ? item.label : undefined}
         className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} rounded-xl text-xs font-semibold transition-all cursor-pointer ${
           isActive
-            ? 'bg-teal-50 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/80 shadow-xs'
+            ? isDev
+              ? 'bg-purple-50 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 shadow-xs'
+              : 'bg-teal-50 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/80 shadow-xs'
             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#111827]'
         }`}
       >
         <div className="flex items-center space-x-2.5 truncate">
-          <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-teal-600 dark:text-teal-400' : 'text-slate-400 dark:text-slate-500'}`} />
+          <Icon className={`w-4 h-4 flex-shrink-0 ${
+            isActive
+              ? isDev
+                ? 'text-purple-600 dark:text-purple-400'
+                : 'text-teal-600 dark:text-teal-400'
+              : 'text-slate-400 dark:text-slate-500'
+          }`} />
           {!collapsed && <span className="truncate">{item.label}</span>}
         </div>
         {!collapsed && item.hotkey && (
@@ -78,6 +93,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
               : 'bg-slate-200 dark:bg-[#162032] text-slate-500 dark:text-slate-400'
           }`}>
             {item.hotkey}
+          </span>
+        )}
+        {!collapsed && item.badge && !item.hotkey && (
+          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
+            isDev
+              ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300'
+              : 'bg-slate-200 dark:bg-[#162032] text-slate-500 dark:text-slate-400'
+          }`}>
+            {item.badge}
           </span>
         )}
       </button>
@@ -120,6 +144,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
               </div>
             )}
             {visibleAdminItems.map(renderNavButton)}
+          </div>
+        )}
+
+        {/* Section 3: Developer Controls */}
+        {user?.role === 'developer' && (
+          <div className="space-y-1 pt-1 border-t border-purple-500/20 dark:border-purple-500/20">
+            {!collapsed && (
+              <div className="px-2 pt-2 pb-1 text-[9px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                Developer Master Control
+              </div>
+            )}
+            {developerNavItems.map(renderNavButton)}
           </div>
         )}
       </div>

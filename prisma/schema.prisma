@@ -366,15 +366,17 @@ model BackupHistory {
 }
 
 model AuditLog {
-  id        Int      @id @default(autoincrement())
-  action    String
-  module    String
-  details   String?
-  userId    Int?     @map("user_id")
-  userName  String?  @map("user_name")
-  createdAt DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  action       String
+  module       String
+  details      String?
+  affectedUser String?  @map("affected_user")
+  status       String   @default("SUCCESS")
+  userId       Int?     @map("user_id")
+  userName     String?  @map("user_name")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("audit_logs")
 }

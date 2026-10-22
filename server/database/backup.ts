@@ -88,6 +88,13 @@ export async function createBackup(
     `);
     insertHistory.run(filename, filepath, backupType, stats.size);
 
+    // Prune old backups according to retention limit
+    try {
+      pruneBackupsByRetentionLimit();
+    } catch {
+      // Non-fatal pruning error
+    }
+
     return {
       success: true,
       filename,
@@ -104,6 +111,49 @@ export async function createBackup(
   } catch (error: any) {
     console.error('Backup failed:', error);
     throw new Error(`Backup failed: ${error.message}`);
+  }
+}
+
+/**
+ * Prunes backups exceeding retention limit.
+ */
+export function pruneBackupsByRetentionLimit(customLimit?: number): number {
+  try {
+    let maxKeep = customLimit;
+    if (maxKeep === undefined || maxKeep === null) {
+      const row = db.prepare("SELECT value FROM system_settings WHERE key = 'backup_retention_limit'").get() as { value?: string } | undefined;
+      maxKeep = row?.value ? parseInt(row.value, 10) : 30;
+    }
+    if (isNaN(maxKeep) || maxKeep <= 0) maxKeep = 30;
+
+    if (!fs.existsSync(DEFAULT_BACKUP_DIR)) return 0;
+    const dbFiles = fs.readdirSync(DEFAULT_BACKUP_DIR)
+      .filter(f => f.endsWith('.db'))
+      .map(f => {
+        const fp = path.join(DEFAULT_BACKUP_DIR, f);
+        return { filename: f, filepath: fp, mtime: fs.statSync(fp).mtime.getTime() };
+      })
+      .sort((a, b) => b.mtime - a.mtime); // newest first
+
+    let deletedCount = 0;
+    if (dbFiles.length > maxKeep) {
+      const toDelete = dbFiles.slice(maxKeep);
+      for (const item of toDelete) {
+        try {
+          if (fs.existsSync(item.filepath)) fs.unlinkSync(item.filepath);
+          const sha = `${item.filepath}.sha256`;
+          if (fs.existsSync(sha)) fs.unlinkSync(sha);
+          db.prepare('DELETE FROM backup_history WHERE backup_filename = ?').run(item.filename);
+          deletedCount++;
+        } catch (e) {
+          console.warn('[Backup Prune] Error removing file:', item.filename, e);
+        }
+      }
+    }
+    return deletedCount;
+  } catch (err) {
+    console.warn('[Backup Prune] Warning:', err);
+    return 0;
   }
 }
 

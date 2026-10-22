@@ -363,6 +363,31 @@ export interface ShiftSummary {
   duration_formatted: string;
 }
 
+export interface AuditLogEntry {
+  id: number;
+  action: string;
+  module: string;
+  details?: string | null;
+  affected_user?: string | null;
+  status: 'SUCCESS' | 'FAILED';
+  user_id?: number | null;
+  user_name?: string | null;
+  created_at: string;
+}
+
+export interface DeveloperSettingsPayload {
+  backup_retention_limit: string;
+  backup_frequency: string;
+  backup_scheduled_time?: string;
+  allow_admin_create_cashier: string;
+  allow_admin_create_admin: string;
+  allow_admin_edit_store_identity: string;
+  store_name: string;
+  store_address: string;
+  developer_invoice_footer: string;
+  developer_email?: string;
+}
+
 export interface ElectronAPI {
   printThermal: (options?: { silent?: boolean; printerName?: string }) => Promise<{ success: boolean; error?: string }>;
   selectBackupDir: () => Promise<string | null>;

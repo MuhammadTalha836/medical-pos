@@ -34,6 +34,8 @@ export function initDatabase(customPath?: string): Database.Database {
   try { db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;`); } catch {}
   try { db.exec(`ALTER TABLE users ADD COLUMN locked_until DATETIME;`); } catch {}
+  try { db.exec(`ALTER TABLE audit_logs ADD COLUMN affected_user TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE audit_logs ADD COLUMN status TEXT DEFAULT 'SUCCESS';`); } catch {}
 
   // Seed default data if database is fresh
   seedInitialData(db);
