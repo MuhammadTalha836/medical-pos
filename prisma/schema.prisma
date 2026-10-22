@@ -20,19 +20,23 @@ model Role {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  username      String         @unique
-  password      String
-  fullName      String         @map("full_name")
-  role          String         @default("cashier")
-  status        String         @default("active")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  sales         Sale[]
-  saleReturns   SaleReturn[]
-  purchases     Purchase[]
-  dailyClosings DailyClosing[]
-  cashierShifts CashierShift[]
-  auditLogs     AuditLog[]
+  id                  Int            @id @default(autoincrement())
+  username            String         @unique
+  email               String?        @unique
+  password            String
+  fullName            String         @map("full_name")
+  role                String         @default("cashier")
+  status              String         @default("active")
+  totpSecret          String?        @map("totp_secret")
+  failedLoginAttempts Int            @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?      @map("locked_until")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  sales               Sale[]
+  saleReturns         SaleReturn[]
+  purchases           Purchase[]
+  dailyClosings       DailyClosing[]
+  cashierShifts       CashierShift[]
+  auditLogs           AuditLog[]
 
   @@map("users")
 }

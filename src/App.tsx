@@ -18,12 +18,14 @@ import { useThemeStore } from './store/useThemeStore';
 import { useAuthStore } from './store/useAuthStore';
 import { useShiftStore } from './store/useShiftStore';
 import { LoginModal } from './components/auth/LoginModal';
+import { SetupWizardModal } from './components/setup/SetupWizardModal';
 import { ShiftStartModal } from './components/pos/ShiftStartModal';
 import { ShiftClosingModal } from './components/pos/ShiftClosingModal';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('pos');
   const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const [isSetupCompleted, setIsSetupCompleted] = useState<boolean | null>(null);
   const [quickNotification, setQuickNotification] = useState<string | null>(null);
   const { theme } = useThemeStore();
   const { user, isAuthenticated, hasModuleAccess } = useAuthStore();
@@ -45,7 +47,18 @@ export const App: React.FC = () => {
     }
   };
 
+  const checkSetupStatus = async () => {
+    try {
+      const res = await api.getSetupStatus();
+      setIsSetupCompleted(res.isSetupCompleted);
+    } catch (e) {
+      console.error('Failed to check setup status:', e);
+      setIsSetupCompleted(true);
+    }
+  };
+
   useEffect(() => {
+    checkSetupStatus();
     loadSettings();
   }, []);
 
@@ -170,8 +183,21 @@ export const App: React.FC = () => {
         }}
       />
 
-      {/* Persistent Authentication Modal */}
-      <LoginModal isOpen={!isAuthenticated || !user} />
+      {/* First-Time Setup Wizard Modal (only if initial setup is pending) */}
+      {isSetupCompleted === false && (
+        <SetupWizardModal
+          isOpen={true}
+          onCompleted={() => {
+            setIsSetupCompleted(true);
+            loadSettings();
+            setQuickNotification('System setup completed and secured with TOTP!');
+            setTimeout(() => setQuickNotification(null), 5000);
+          }}
+        />
+      )}
+
+      {/* Persistent Authentication Modal (when setup is done but user is not signed in) */}
+      <LoginModal isOpen={isSetupCompleted !== false && (!isAuthenticated || !user)} />
     </div>
   );
 };

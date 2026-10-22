@@ -11,6 +11,17 @@ import {
   resetStockZero,
   optimizeDatabase
 } from './database/backup';
+import crypto from 'crypto';
+import QRCode from 'qrcode';
+import { hashPassword, verifyPassword } from './security/passwords';
+import {
+  generateTotpSecret,
+  generateTotpCode,
+  verifyTotpCode,
+  generateTotpUri,
+  encryptTotpSecret,
+  decryptTotpSecret
+} from './security/totp';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -277,11 +288,26 @@ async function ensureDefaultRoles(): Promise<void> {
 
       await prisma.role.createMany({
         data: [
+          { name: 'developer', displayName: 'System Developer', description: 'Master system configuration, security rules, and TOTP authentication', isSystem: 1, permissions: JSON.stringify(adminPerms) },
           { name: 'admin', displayName: 'Administrator', description: 'Full system access and master privileges', isSystem: 1, permissions: JSON.stringify(adminPerms) },
           { name: 'cashier', displayName: 'Counter Cashier', description: 'POS sales, customer credit recoveries, and view/add medicines. Cannot delete/edit records.', isSystem: 0, permissions: JSON.stringify(cashierPerms) },
           { name: 'pharmacist', displayName: 'Pharmacist', description: 'Dispensing, master coding, and inventory purchases.', isSystem: 0, permissions: JSON.stringify(pharmacistPerms) }
         ]
       });
+    } else {
+      const devRole = await prisma.role.findUnique({ where: { name: 'developer' } });
+      if (!devRole) {
+        const adminRole = await prisma.role.findUnique({ where: { name: 'admin' } });
+        await prisma.role.create({
+          data: {
+            name: 'developer',
+            displayName: 'System Developer',
+            description: 'Master system configuration, security rules, and TOTP authentication',
+            isSystem: 1,
+            permissions: adminRole?.permissions || '{}'
+          }
+        });
+      }
     }
   } catch (error) {
     console.error('[Prisma] Role seeding check failed:', error);
@@ -291,13 +317,326 @@ ensureDefaultRoles().catch(err => {
   console.error('[Prisma] Role seeding error:', err);
 });
 
+// -------------------------------------------------------------
+// 2.0 First-Time Setup Wizard & Offline TOTP Setup
+// -------------------------------------------------------------
+app.get('/api/setup/status', async (_req: Request, res: Response) => {
+  try {
+    const setupSetting = await prisma.systemSetting.findUnique({ where: { key: 'setup_completed' } });
+    const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
+
+    const isSetupCompleted = setupSetting?.value === 'true' && !!devUser;
+    res.json({
+      success: true,
+      isSetupCompleted,
+      developerEmail: devUser?.email || null
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/setup/initialize', async (req: Request, res: Response) => {
+  try {
+    const setupSetting = await prisma.systemSetting.findUnique({ where: { key: 'setup_completed' } });
+    const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
+    if (setupSetting?.value === 'true' && devUser) {
+      return res.status(403).json({ error: 'Setup wizard is permanently locked. System is already initialized.' });
+    }
+
+    const { developerEmail } = req.body;
+    if (!developerEmail || typeof developerEmail !== 'string' || !developerEmail.includes('@')) {
+      return res.status(400).json({ error: 'Valid developer email address is required' });
+    }
+
+    const cleanEmail = developerEmail.trim().toLowerCase();
+    const secret = generateTotpSecret();
+    const uri = generateTotpUri(cleanEmail, secret, 'PharmaCare Pro');
+    const qrCodeDataUrl = await QRCode.toDataURL(uri, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      scale: 6
+    });
+
+    const tempToken = encryptTotpSecret(secret);
+
+    res.json({
+      success: true,
+      secret,
+      qrCodeDataUrl,
+      uri,
+      tempToken
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/setup/verify', async (req: Request, res: Response) => {
+  try {
+    const setupSetting = await prisma.systemSetting.findUnique({ where: { key: 'setup_completed' } });
+    const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
+    if (setupSetting?.value === 'true' && devUser) {
+      return res.status(403).json({ error: 'Setup wizard is permanently locked. System is already initialized.' });
+    }
+
+    const { developerEmail, code, tempToken, storeName, storeAddress, adminPassword } = req.body;
+    if (!developerEmail || !code || !tempToken) {
+      return res.status(400).json({ error: 'Developer email, 6-digit TOTP code, and setup session token are required' });
+    }
+
+    const secret = decryptTotpSecret(tempToken);
+    if (!secret) {
+      return res.status(400).json({ error: 'Invalid or expired setup session token' });
+    }
+
+    const isValid = verifyTotpCode(secret, String(code).trim(), 1);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Invalid verification code. Please check your authenticator app and try again.' });
+    }
+
+    const cleanEmail = developerEmail.trim().toLowerCase();
+    const encryptedSecret = encryptTotpSecret(secret);
+
+    // Save or update developer user
+    const existingDev = await prisma.user.findFirst({
+      where: { OR: [{ role: 'developer' }, { email: cleanEmail }, { username: 'developer' }] }
+    });
+
+    let savedDevUser;
+    if (existingDev) {
+      savedDevUser = await prisma.user.update({
+        where: { id: existingDev.id },
+        data: {
+          username: 'developer',
+          email: cleanEmail,
+          fullName: 'System Developer',
+          role: 'developer',
+          status: 'active',
+          totpSecret: encryptedSecret,
+          failedLoginAttempts: 0,
+          lockedUntil: null
+        }
+      });
+    } else {
+      savedDevUser = await prisma.user.create({
+        data: {
+          username: 'developer',
+          email: cleanEmail,
+          password: await hashPassword(crypto.randomBytes(16).toString('hex')),
+          fullName: 'System Developer',
+          role: 'developer',
+          status: 'active',
+          totpSecret: encryptedSecret
+        }
+      });
+    }
+
+    // If initial admin password provided, update admin account with bcrypt hash
+    if (adminPassword && typeof adminPassword === 'string' && adminPassword.trim().length > 0) {
+      const hashedAdminPassword = await hashPassword(adminPassword.trim());
+      const adminAcc = await prisma.user.findFirst({ where: { username: 'admin' } });
+      if (adminAcc) {
+        await prisma.user.update({
+          where: { id: adminAcc.id },
+          data: { password: hashedAdminPassword }
+        });
+      }
+    } else {
+      // Ensure existing admin account password is secure
+      const adminAcc = await prisma.user.findFirst({ where: { username: 'admin' } });
+      if (adminAcc && !/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(adminAcc.password)) {
+        await prisma.user.update({
+          where: { id: adminAcc.id },
+          data: { password: await hashPassword(adminAcc.password) }
+        });
+      }
+    }
+
+    // Update store settings if provided
+    if (storeName && typeof storeName === 'string' && storeName.trim()) {
+      await prisma.systemSetting.upsert({
+        where: { key: 'store_name' },
+        update: { value: storeName.trim() },
+        create: { key: 'store_name', value: storeName.trim() }
+      });
+    }
+    if (storeAddress && typeof storeAddress === 'string' && storeAddress.trim()) {
+      await prisma.systemSetting.upsert({
+        where: { key: 'store_address' },
+        update: { value: storeAddress.trim() },
+        create: { key: 'store_address', value: storeAddress.trim() }
+      });
+    }
+
+    // Save developer settings and lock setup
+    await prisma.systemSetting.upsert({
+      where: { key: 'setup_completed' },
+      update: { value: 'true' },
+      create: { key: 'setup_completed', value: 'true' }
+    });
+    await prisma.systemSetting.upsert({
+      where: { key: 'developer_email' },
+      update: { value: cleanEmail },
+      create: { key: 'developer_email', value: cleanEmail }
+    });
+
+    // Record in audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'SETUP_COMPLETED',
+        module: 'SECURITY',
+        details: `Initial setup completed. Developer account registered: ${cleanEmail}`,
+        userId: savedDevUser.id,
+        userName: savedDevUser.fullName
+      }
+    });
+
+    const roleRow = await prisma.role.findUnique({ where: { name: 'developer' } });
+    let permissions = null;
+    if (roleRow && roleRow.permissions) {
+      try { permissions = JSON.parse(roleRow.permissions); } catch {}
+    }
+
+    res.json({
+      success: true,
+      message: 'Setup verified and locked successfully',
+      user: {
+        id: savedDevUser.id,
+        username: savedDevUser.username,
+        email: savedDevUser.email,
+        full_name: savedDevUser.fullName,
+        role: savedDevUser.role,
+        status: savedDevUser.status,
+        role_display: 'System Developer',
+        permissions
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// -------------------------------------------------------------
 // 2.1 Authentication & Profile
+// -------------------------------------------------------------
+
+// 2.1a Developer Offline TOTP Login
+app.post('/api/auth/developer-login', async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body;
+    if (!email || !code) {
+      return res.status(400).json({ error: 'Developer email and 6-digit TOTP code are required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const devUser = await prisma.user.findFirst({
+      where: { email: cleanEmail, role: 'developer' }
+    });
+
+    if (!devUser) {
+      return res.status(401).json({ error: 'Invalid developer credentials' });
+    }
+
+    if (devUser.status !== 'active') {
+      return res.status(403).json({ error: 'Developer account is deactivated.' });
+    }
+
+    // Check rate limit lockout
+    if (devUser.lockedUntil && new Date(devUser.lockedUntil) > new Date()) {
+      const remainingMs = new Date(devUser.lockedUntil).getTime() - Date.now();
+      const remainingMins = Math.max(1, Math.ceil(remainingMs / 60000));
+      return res.status(429).json({
+        error: `Account is temporarily locked due to repeated failed login attempts. Please wait ${remainingMins} minute(s).`
+      });
+    }
+
+    if (!devUser.totpSecret) {
+      return res.status(500).json({ error: 'Developer TOTP secret not configured on this system.' });
+    }
+
+    const secret = decryptTotpSecret(devUser.totpSecret);
+    const isValid = verifyTotpCode(secret, String(code).trim(), 1);
+
+    if (!isValid) {
+      const attempts = (devUser.failedLoginAttempts || 0) + 1;
+      let lockedUntil: Date | null = null;
+      let errorMsg = `Invalid TOTP code. (${Math.max(0, 5 - attempts)} attempt(s) remaining)`;
+
+      if (attempts >= 5) {
+        lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
+        errorMsg = 'Too many failed login attempts. Developer access is temporarily locked for 15 minutes.';
+      }
+
+      await prisma.user.update({
+        where: { id: devUser.id },
+        data: { failedLoginAttempts: attempts, lockedUntil }
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          action: 'DEV_LOGIN_FAILED',
+          module: 'AUTH',
+          details: `Failed TOTP login attempt for developer ${cleanEmail}. Consecutive attempts: ${attempts}`,
+          userId: devUser.id,
+          userName: devUser.fullName
+        }
+      });
+
+      return res.status(attempts >= 5 ? 429 : 401).json({ error: errorMsg });
+    }
+
+    // Reset failed attempts on success
+    await prisma.user.update({
+      where: { id: devUser.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'DEV_LOGIN_SUCCESS',
+        module: 'AUTH',
+        details: `Developer ${cleanEmail} logged in successfully via offline TOTP`,
+        userId: devUser.id,
+        userName: devUser.fullName
+      }
+    });
+
+    const roleRow = await prisma.role.findUnique({ where: { name: 'developer' } });
+    let permissions = null;
+    if (roleRow && roleRow.permissions) {
+      try { permissions = JSON.parse(roleRow.permissions); } catch {}
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: devUser.id,
+        username: devUser.username,
+        email: devUser.email,
+        full_name: devUser.fullName,
+        role: devUser.role,
+        status: devUser.status,
+        role_display: 'System Developer',
+        permissions
+      }
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 2.1b Staff Login (Admin / Cashier) with bcrypt password verification
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    const cleanUsername = username.trim();
     const user = await prisma.user.findFirst({
-      where: { username, password },
-      select: { id: true, username: true, fullName: true, role: true, status: true }
+      where: { username: cleanUsername }
     });
 
     if (!user) {
@@ -305,6 +644,25 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
     }
     if (user.status !== 'active') {
       return res.status(403).json({ error: 'This user account has been disabled. Please contact Administrator.' });
+    }
+
+    // Verify password with bcrypt + legacy auto-rehash
+    const { valid, needsRehash } = await verifyPassword(password, user.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    // Transparently upgrade legacy plaintext password to bcrypt hash
+    if (needsRehash) {
+      try {
+        const hashedPassword = await hashPassword(password);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { password: hashedPassword }
+        });
+      } catch (rehashErr) {
+        console.error('[Auth] Failed to rehash password:', rehashErr);
+      }
     }
 
     const roleRow = await prisma.role.findUnique({ where: { name: user.role } });
@@ -322,6 +680,7 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       user: {
         id: user.id,
         username: user.username,
+        email: user.email,
         full_name: user.fullName,
         role: user.role,
         status: user.status,
@@ -361,15 +720,17 @@ app.put('/api/auth/profile', async (req: Request, res: Response) => {
       if (!currentPassword) {
         return res.status(400).json({ error: 'Current password is required to change password' });
       }
-      if (existingUser.password !== currentPassword) {
+      const { valid } = await verifyPassword(currentPassword, existingUser.password);
+      if (!valid) {
         return res.status(400).json({ error: 'Current password does not match' });
       }
+      const hashedNewPassword = await hashPassword(newPassword);
       await prisma.user.update({
         where: { id: idNum },
         data: {
           username: username.trim(),
           fullName: full_name.trim(),
-          password: newPassword
+          password: hashedNewPassword
         }
       });
     } else {
@@ -391,6 +752,7 @@ app.put('/api/auth/profile', async (req: Request, res: Response) => {
       user: {
         id: updatedUser!.id,
         username: updatedUser!.username,
+        email: updatedUser!.email,
         full_name: updatedUser!.fullName,
         role: updatedUser!.role,
         status: updatedUser!.status,
@@ -407,16 +769,22 @@ app.post('/api/auth/change-password', async (req: Request, res: Response) => {
   try {
     const { userId, oldPassword, newPassword } = req.body;
     const idNum = Number(userId);
-    const user = await prisma.user.findFirst({
-      where: { id: idNum, password: oldPassword }
+    const user = await prisma.user.findUnique({
+      where: { id: idNum }
     });
     if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { valid } = await verifyPassword(oldPassword, user.password);
+    if (!valid) {
       return res.status(400).json({ error: 'Current password does not match' });
     }
 
+    const hashedPassword = await hashPassword(newPassword);
     await prisma.user.update({
       where: { id: idNum },
-      data: { password: newPassword }
+      data: { password: hashedPassword }
     });
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error: unknown) {
@@ -433,9 +801,11 @@ app.get('/api/users', async (_req: Request, res: Response) => {
     const roles = await prisma.role.findMany();
     const roleMap = new Map(roles.map(r => [r.name, r.displayName]));
 
+    // Strictly exclude password and totpSecret
     res.json(users.map(u => ({
       id: u.id,
       username: u.username,
+      email: u.email,
       full_name: u.fullName,
       role: u.role,
       status: u.status,
@@ -454,6 +824,10 @@ app.post('/api/users', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    if (role && role.toLowerCase() === 'developer') {
+      return res.status(400).json({ error: 'Developer role cannot be registered via standard user creation' });
+    }
+
     const duplicate = await prisma.user.findUnique({
       where: { username: username.trim() }
     });
@@ -461,10 +835,11 @@ app.post('/api/users', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Username is already in use' });
     }
 
+    const hashedPassword = await hashPassword(password);
     const newUser = await prisma.user.create({
       data: {
         username: username.trim(),
-        password,
+        password: hashedPassword,
         fullName: full_name.trim(),
         role: role || 'cashier',
         status: 'active'
@@ -486,6 +861,13 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    if (role && role.toLowerCase() === 'developer' && existing.role !== 'developer') {
+      return res.status(400).json({ error: 'Cannot escalate user role to Developer' });
+    }
+    if (existing.role === 'developer' && role && role.toLowerCase() !== 'developer') {
+      return res.status(400).json({ error: 'Developer role cannot be downgraded' });
+    }
+
     if (username && username.trim() !== existing.username) {
       const duplicate = await prisma.user.findFirst({
         where: {
@@ -505,7 +887,7 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
       status: status || existing.status,
     };
     if (password && password.trim() !== '') {
-      updateData.password = password;
+      updateData.password = await hashPassword(password.trim());
     }
 
     await prisma.user.update({
@@ -525,6 +907,10 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
     const targetUser = await prisma.user.findUnique({ where: { id: idNum } });
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (targetUser.role === 'developer') {
+      return res.status(400).json({ error: 'Developer account cannot be deleted' });
     }
 
     if (targetUser.id === 1 || targetUser.username === 'admin') {
@@ -2957,6 +3343,10 @@ app.post('/api/settings', async (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`[PharmaCare Server] Running locally on http://localhost:${PORT}`);
-});
+export { app };
+
+if (process.env.NODE_ENV !== 'test' && !process.env.TEST_MODE && (process.argv[1]?.endsWith('api.ts') || process.argv[1]?.endsWith('api.js'))) {
+  app.listen(PORT, () => {
+    console.log(`[PharmaCare Server] Running locally on http://localhost:${PORT}`);
+  });
+}

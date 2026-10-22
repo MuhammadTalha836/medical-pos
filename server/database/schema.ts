@@ -17,10 +17,14 @@ CREATE TABLE IF NOT EXISTS roles (
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE,
   password TEXT NOT NULL,
   full_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'cashier',
   status TEXT NOT NULL DEFAULT 'active',
+  totp_secret TEXT,
+  failed_login_attempts INTEGER DEFAULT 0,
+  locked_until DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

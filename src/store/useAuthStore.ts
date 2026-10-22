@@ -90,7 +90,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     isAuthenticated: initial.user !== null,
 
     setUser: (user) => {
-      const perms = user?.permissions || (user?.role === 'admin' ? DEFAULT_ADMIN_PERMISSIONS : null);
+      const perms = user?.permissions || (user?.role === 'admin' || user?.role === 'developer' ? DEFAULT_ADMIN_PERMISSIONS : null);
       if (typeof window !== 'undefined') {
         if (user) {
           localStorage.setItem('pharmacare_user_session', JSON.stringify({ user: { ...user, permissions: perms } }));
@@ -128,7 +128,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     hasModuleAccess: (moduleKey: string) => {
       const { user, permissions } = get();
       if (!user) return false;
-      if (user.role === 'admin') return true;
+      if (user.role === 'admin' || user.role === 'developer') return true;
       if (!permissions) return false;
       return Boolean((permissions as any)[moduleKey]);
     },
@@ -136,7 +136,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     hasPermission: (permissionKey: keyof RolePermissions) => {
       const { user, permissions } = get();
       if (!user) return false;
-      if (user.role === 'admin') return true;
+      if (user.role === 'admin' || user.role === 'developer') return true;
       if (!permissions) return false;
       return Boolean(permissions[permissionKey]);
     }

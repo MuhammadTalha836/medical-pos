@@ -1,4 +1,18 @@
-import { Company, Product, SaleInvoice, PurchaseInvoice, SystemSettings, User, Customer, Role, CashierShift, ShiftSummary } from '../types';
+import {
+  Company,
+  Product,
+  SaleInvoice,
+  PurchaseInvoice,
+  SystemSettings,
+  User,
+  Customer,
+  Role,
+  CashierShift,
+  ShiftSummary,
+  SetupStatusResponse,
+  SetupInitializeResponse,
+  SetupVerifyResponse
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -11,11 +25,40 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 export const api = {
+  // Setup & First-Time Initialization
+  getSetupStatus: () =>
+    fetch(`${API_BASE}/setup/status`).then(r => handleResponse<SetupStatusResponse>(r)),
+  initializeSetup: (data: { developerEmail: string; storeName?: string; storeAddress?: string }) =>
+    fetch(`${API_BASE}/setup/initialize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<SetupInitializeResponse>(r)),
+  verifySetup: (data: {
+    developerEmail: string;
+    code: string;
+    tempToken: string;
+    storeName?: string;
+    storeAddress?: string;
+    adminPassword?: string;
+  }) =>
+    fetch(`${API_BASE}/setup/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(r => handleResponse<SetupVerifyResponse>(r)),
+
   // Auth & Status
   getStatus: () => fetch(`${API_BASE}/status`).then(r => handleResponse<{ status: string; time: string }>(r)),
   getDashboardStats: () => fetch(`${API_BASE}/dashboard/stats`).then(r => handleResponse<any>(r)),
   login: (credentials: { username: string; password: string }) =>
     fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    }).then(r => handleResponse<{ success: boolean; user: User }>(r)),
+  developerLogin: (credentials: { email: string; code: string }) =>
+    fetch(`${API_BASE}/auth/developer-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials)

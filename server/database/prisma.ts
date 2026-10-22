@@ -14,6 +14,12 @@ export async function initPrisma(): Promise<void> {
     await prisma.$queryRaw`PRAGMA synchronous = NORMAL;`;
     await prisma.$queryRaw`PRAGMA foreign_keys = ON;`;
     await prisma.$queryRaw`PRAGMA busy_timeout = 5000;`;
+
+    // Safe migrations for user model additions
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN email TEXT;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN totp_secret TEXT;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN locked_until DATETIME;`); } catch {}
   } catch (error) {
     console.error('[Prisma] Failed to apply SQLite pragmas:', error);
   }

@@ -30,6 +30,10 @@ export function initDatabase(customPath?: string): Database.Database {
   try { db.exec(`ALTER TABLE customer_payments ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
   try { db.exec(`ALTER TABLE products ADD COLUMN allow_open_sale INTEGER NOT NULL DEFAULT 1;`); } catch {}
   try { db.exec(`ALTER TABLE products ADD COLUMN min_sale_qty INTEGER NOT NULL DEFAULT 1;`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN email TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;`); } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN locked_until DATETIME;`); } catch {}
 
   // Seed default data if database is fresh
   seedInitialData(db);

@@ -51,12 +51,33 @@ export interface Role {
 export interface User {
   id: number;
   username: string;
+  email?: string;
   full_name: string;
   role: string;
   role_display?: string;
   status: 'active' | 'inactive';
   permissions?: RolePermissions;
   created_at?: string;
+}
+
+export interface SetupStatusResponse {
+  success: boolean;
+  isSetupCompleted: boolean;
+  developerEmail?: string | null;
+}
+
+export interface SetupInitializeResponse {
+  success: boolean;
+  secret: string;
+  qrCodeDataUrl: string;
+  uri: string;
+  tempToken: string;
+}
+
+export interface SetupVerifyResponse {
+  success: boolean;
+  message: string;
+  user: User;
 }
 
 export interface Company {

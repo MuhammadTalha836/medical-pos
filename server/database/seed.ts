@@ -46,7 +46,16 @@ export function seedInitialData(db: Database.Database) {
     show_terms: 'true',
     show_footer_note: 'true',
     show_return_policy: 'true',
-    show_developer_info: 'true'
+    show_developer_info: 'true',
+    setup_completed: 'false',
+    developer_email: '',
+    backup_retention_limit: '10',
+    backup_frequency: 'daily',
+    backup_scheduled_time: '23:00',
+    developer_invoice_footer: 'Software maintained by System Developer',
+    allow_admin_create_cashier: 'true',
+    allow_admin_create_admin: 'false',
+    allow_admin_edit_store_identity: 'false'
   };
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)');
@@ -167,9 +176,18 @@ export function seedInitialData(db: Database.Database) {
       can_manage_roles: false
     };
 
+    insertRole.run('developer', 'System Developer', 'Master system configuration, security rules, and TOTP authentication', 1, JSON.stringify(adminPerms));
     insertRole.run('admin', 'Administrator', 'Full system access and master privileges', 1, JSON.stringify(adminPerms));
     insertRole.run('cashier', 'Counter Cashier', 'POS sales, customer credit recoveries, and view/add medicines. Cannot delete/edit records.', 0, JSON.stringify(cashierPerms));
     insertRole.run('pharmacist', 'Pharmacist', 'Dispensing, master coding, and inventory purchases.', 0, JSON.stringify(pharmacistPerms));
+  } else {
+    // Ensure developer role exists even on existing databases
+    const insertOrIgnoreRole = db.prepare(`
+      INSERT OR IGNORE INTO roles (name, display_name, description, is_system, permissions)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const devPerms = (db.prepare("SELECT permissions FROM roles WHERE name = 'admin'").get() as any)?.permissions || '{}';
+    insertOrIgnoreRole.run('developer', 'System Developer', 'Master system configuration, security rules, and TOTP authentication', 1, devPerms);
   }
 
   // 2b. Seed Default Users
