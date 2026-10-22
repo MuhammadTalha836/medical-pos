@@ -1,23 +1,46 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# Production builds
+# Production build outputs
 dist/
 dist-electron/
 dist-server/
 
-# SQLite WAL & temporary files
+# SQLite Databases & WAL/SHM Runtime Files
+data/*.db
 data/*.db-wal
 data/*.db-shm
+*.sqlite
+*.sqlite3
 
-# Local backups
+# Keep data & backup folders in git while ignoring their contents
+!data/.gitkeep
+!backups/.gitkeep
+
+# Local backups & SHA-256 sidecars
 backups/*.db
 backups/*.sha256
+backups/pharmacy_backup_*
 
-# Local environment variables
+# Environment variables & local credentials
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Operating System files
+# Logs & debugging
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor & OS metadata
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
