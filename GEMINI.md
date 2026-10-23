@@ -34,14 +34,18 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Admin Shift Hub**: Dedicated admin section with cashier, date range, and status filters, and line-item invoice inspector.
    - **Automated Backup on Shift Closure**: Shift closing automatically triggers an atomic SQLite snapshot backup to the local filesystem.
 
-3. **Advanced Invoice Settings & Three Professional Templates (`UnifiedInvoice.tsx`, `SettingsPage.tsx`)**:
-   - **Design 1: Thermal Receipt (`thermal`)**: Optimized for 80mm and 58mm continuous roll POS printers with monospace typography (`JetBrains Mono`), dashed section dividers, barcode simulation, and paper-saving compact tables.
-   - **Design 2: Standard Invoice (`standard`)**: Full-page / half-page sheet format (A4 / A5) featuring branded pharmacy header banner, customer "Bill To" card, striped product table, financial summary block, and customer signature line.
-   - **Design 3: Detailed Invoice (`detailed`)**: Enterprise pharmaceutical layout with full store contact, drug license & tax NTN headers, dual-column customer metadata, rack locations (`Loc`), unit conversion details, detailed financial audit breakdown, dual regulatory policy boxes, and pharmacist stamp block.
+3. **Thermal-Only Invoice Templates & Protected Store Identity (`UnifiedInvoice.tsx`, `SettingsPage.tsx`, `server/invoice/invoiceSettings.ts`)**:
+   - **Thermal-only**: Receipts print exclusively on **58 mm** or **80 mm** rolls (`invoice_paper_size`, mirrored into legacy `paper_width`). A3/A4/A5 sheet formats were removed; `POST /api/settings` rejects them with HTTP 400 and startup migration (`migrateLegacyInvoiceSettings`) rewrites old values (`A4` → `80mm`, `thermal`/`standard` → `classic`).
+   - **Design 1: Classic (`classic`)**: Full column table on 80 mm, two-line rows on 58 mm, barcode, terms and footer note.
+   - **Design 2: Compact (`compact`)**: Paper-saving two-line item rows with net / tendered / change totals only.
+   - **Design 3: Detailed (`detailed`)**: Numbered lines with code & rack, split line/bill discounts, terms and return policy.
+   - **58 mm layout**: Every design switches to two-line item rows and a smaller font scale so nothing overflows the 48 mm printable width.
+   - **Admin selection**: Admins choose the design and roll width in Invoice Settings with a live preview (design + width switches). The choice is stored in SQLite and is authoritative; there is no template switcher at print time.
+   - **Protected store identity**: Store name/address come from the Developer-protected settings. Admins cannot hide them unless the Developer enables `allow_admin_hide_store_identity` (enforced in `GET`/`POST /api/settings`).
+   - **Developer invoice footer**: `developer_invoice_footer` (max 500 chars, multi-line) prints on every design and width, wrapping long text with `overflow-wrap: anywhere`.
+   - **Sale snapshots**: Each sale stores `store_name_snapshot`, `store_address_snapshot` and `invoice_footer_snapshot`, so reprints match the original receipt. Older sales without a snapshot fall back to current settings.
    - **Granular Field Visibility Controls**: Admin checkboxes across Store Info, Cashier/Customer Info, Itemized Table Columns, Financial Summary, and Regulatory Policies.
-   - **Mandatory Developer Attribution**: Permanently locked and enforced on both frontend and backend (`show_developer_info = 'true'`), displaying the developer credit banner unconditionally across all templates.
-   - **Live Interactive Preview**: Split-screen preview panel inside Admin Settings updating in real time with template switcher tabs and direct "Test Print" action.
-   - **Multi-Paper Print Stylesheets**: Responsive `@media print` rules for `.print-paper-80mm`, `.print-paper-58mm`, `.print-paper-a4`, and `.print-paper-a5`.
+   - **Settings authorization**: `POST /api/settings` requires Admin, Developer, or a role with the `settings` permission; developer-only keys (footer, RBAC toggles, backup policy) are stripped for non-developers and `setup_completed` / `developer_email` can never be written through it.
 
 4. **Product-Level Open-Sale & Minimum Quantity Enforcement (`MastersPage.tsx`, `PosPage.tsx`, `server/api.ts`)**:
    - **Product Creation Settings**: Fields for Sale Unit (`unit_type`), Units per Pack (`packing`), Allow Open Sale switch (`allow_open_sale`), and Minimum Sale Quantity (`min_sale_qty`).
@@ -56,7 +60,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 
 6. **Sales History & Returns (`SalesHistoryPage.tsx`)**:
    - Filterable invoice history by invoice number, customer, and date range.
-   - Multi-format invoice reprint capability inheriting current settings.
+   - Invoice reprints using the store identity & footer snapshot captured at sale time.
    - Line-item and full sale return engine that automatically restores returned units back into SQLite inventory while respecting open-sale restrictions.
 
 7. **Coding & Masters (`MastersPage.tsx`)**:
@@ -99,7 +103,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 | **Runtime Environment** | Node.js (ES Module: `"type": "module"`) | Unified runtime for local API, desktop scripts, and build tooling. |
 | **Frontend Framework** | React 18 (`react`, `react-dom`) | Declarative, component-driven user interface. |
 | **Build & Bundler** | Vite 6 (`vite`, `@vitejs/plugin-react`) | Ultra-fast dev server and optimized production packaging. |
-| **Styling & CSS** | Tailwind CSS 3, PostCSS, Autoprefixer | Utility-first styling with custom medical dark theme and thermal/sheet print CSS. |
+| **Styling & CSS** | Tailwind CSS 3, PostCSS, Autoprefixer | Utility-first styling with custom medical dark theme and 58/80mm thermal print CSS. |
 | **Icons** | Lucide React (`lucide-react`) | Clean, accessible iconography. |
 | **State Management** | Zustand 5 (`zustand`) | Lightweight reactive stores for POS cart, auth, and cache. |
 | **Database & ORM** | SQLite via `better-sqlite3` & Prisma (`@prisma/client`) | Zero-latency, ACID embedded database executing locally on machine with typed queries. |
@@ -144,7 +148,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 │   │   │   ├── ShiftStartModal.tsx    # Shift opening float modal
 │   │   │   ├── ShiftThermalReceipt.tsx# Printable shift summary receipt
 │   │   │   ├── ThermalReceipt.tsx     # Backwards-compatible receipt wrapper
-│   │   │   └── UnifiedInvoice.tsx     # Multi-template renderer (Thermal, Standard, Detailed)
+│   │   │   └── UnifiedInvoice.tsx     # Thermal receipt renderer (Classic, Compact, Detailed × 58/80mm)
 │   │   └── shifts/
 │   │       └── ShiftHistoryHub.tsx    # Shift history inspection hub
 │   ├── pages/                  # Page-level route views
@@ -224,10 +228,10 @@ When modifying or extending this project, you **MUST** follow these strict rules
 - **Theme**: Medical-grade dark interface using the tailored `pharmacy` Teal/Emerald palette (`#14b8a6`, `#0d9488`) combined with high-contrast `slate-900` / `slate-950` backgrounds, and a calibrated soft light mode for daylight counters.
 - **POS Ergonomics**: Pharmacy sales staff work under high transaction volume. Keep inputs autofocus-ready, provide visual stock warnings (Green = in stock, Amber = low stock, Red = out of stock), and preserve keyboard shortcuts (`F2`-`F10`, `Esc`).
 - **Invoice & Print Integrity**:
-  - Multi-template printing must remain strictly formatted for 80mm/58mm thermal rolls and A4/A5 sheets.
+  - Printing is thermal-only: every template must render correctly on both 58mm and 80mm rolls (no sheet formats).
   - Receipt styles in `@media print` must hide the app chrome (`body * { visibility: hidden; }`) and isolate `#thermal-receipt-printable`.
   - Use monospace typography (`JetBrains Mono` / `Courier`) for tabular receipts.
-  - Software developer attribution is strictly mandatory and cannot be hidden on printed receipts.
+  - The Developer invoice footer is strictly mandatory and cannot be hidden on printed receipts.
 
 ### 5. Error Handling & User Feedback
 - Wrap asynchronous operations in `try / catch` blocks.
@@ -251,6 +255,13 @@ Or run individually:
 Execute the complete end-to-end integration test suite (15 core tests covering auth, shifts, dual-unit sales, open-sale rules, returns, khata, purchases, P&L, backups, anti-duplicate concurrency, and invoice settings):
 ```bash
 npm run test:functional
+```
+
+Phase-specific security suites:
+```bash
+npm run test:phase1   # Developer setup wizard & TOTP login
+npm run test:phase2   # RBAC, developer settings, audit log
+npm run test:phase3   # Thermal-only templates, protected identity, footer, sale snapshots
 ```
 
 ### Type Checking & Linting

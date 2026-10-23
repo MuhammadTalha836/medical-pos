@@ -119,7 +119,7 @@ input[type="number"]::-webkit-outer-spin-button {
   margin: 0;
 }
 
-/* Comprehensive Print Stylesheet (Thermal Roll & Sheet Invoices) */
+/* Print Stylesheet (58mm / 80mm Thermal Rolls only) */
 @media print {
   body * {
     visibility: hidden;
@@ -141,6 +141,7 @@ input[type="number"]::-webkit-outer-spin-button {
     line-height: 1.3 !important;
     box-shadow: none !important;
     border: none !important;
+    overflow-wrap: anywhere;
   }
 
   .print-paper-80mm {
@@ -159,24 +160,8 @@ input[type="number"]::-webkit-outer-spin-button {
     padding: 1mm !important;
   }
 
-  .print-paper-a4 {
-    width: 100% !important;
-    max-width: 210mm !important;
-    font-size: 12px !important;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    padding: 8mm !important;
-  }
-
-  .print-paper-a5 {
-    width: 100% !important;
-    max-width: 148mm !important;
-    font-size: 10.5px !important;
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    padding: 5mm !important;
-  }
-
   @page {
-    margin: 3mm;
+    margin: 0;
   }
 }
 

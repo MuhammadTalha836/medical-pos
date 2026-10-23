@@ -1,6 +1,7 @@
 import React from 'react';
 import { CashierShift, SystemSettings } from '../../types';
 import { Printer, CheckCircle } from 'lucide-react';
+import { normalizePaperSize } from '../../utils/invoice';
 
 interface ShiftThermalReceiptProps {
   shift: CashierShift;
@@ -20,6 +21,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
   const storePhone = settings?.store_phone || '+92 300 9876543 / 051-4567890';
   const drugLicenseNo = settings?.drug_license_no || 'DL-PHARM-2024-9981';
   const currency = settings?.currency_symbol || 'Rs.';
+  const is58 = normalizePaperSize(settings?.invoice_paper_size ?? settings?.paper_width) === '58mm';
 
   const handlePrint = () => {
     if (onPrint) {
@@ -51,7 +53,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
       <div className="w-full flex justify-between items-center mb-4 no-print">
         <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
           <CheckCircle className="w-4 h-4 text-emerald-500" />
-          <span>Shift Summary Receipt (80mm Thermal)</span>
+          <span>Shift Summary Receipt ({is58 ? '58mm' : '80mm'} Thermal)</span>
         </div>
         <div className="flex space-x-2">
           <button
@@ -75,7 +77,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
       {/* Printable Receipt DOM */}
       <div
         id="thermal-receipt-printable"
-        className="w-[80mm] bg-white text-black p-4 font-mono text-[11px] leading-tight border border-slate-300 shadow-sm select-text"
+        className={`bg-white text-black font-mono leading-tight border border-slate-300 shadow-sm select-text ${is58 ? 'print-paper-58mm w-[58mm] p-2 text-[10px]' : 'print-paper-80mm w-[80mm] p-4 text-[11px]'}`}
         style={{ fontFamily: "'JetBrains Mono', 'Courier New', Courier, monospace" }}
       >
         {/* Pharmacy Header */}

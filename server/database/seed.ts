@@ -17,7 +17,7 @@ export function seedInitialData(db: Database.Database) {
     low_stock_threshold: '10',
     paper_width: '80mm',
     max_bill_discount_pct: '14',
-    default_invoice_template: 'thermal',
+    default_invoice_template: 'classic',
     invoice_paper_size: '80mm',
     return_policy_text: 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose items are non-returnable.',
     show_store_name: 'true',
@@ -55,7 +55,8 @@ export function seedInitialData(db: Database.Database) {
     developer_invoice_footer: 'Software maintained by System Developer',
     allow_admin_create_cashier: 'true',
     allow_admin_create_admin: 'false',
-    allow_admin_edit_store_identity: 'false'
+    allow_admin_edit_store_identity: 'false',
+    allow_admin_hide_store_identity: 'false'
   };
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO system_settings (key, value) VALUES (?, ?)');

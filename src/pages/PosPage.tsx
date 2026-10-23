@@ -426,7 +426,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             discount_pct: i.discount_pct,
             discount_amount: i.discount_amount,
             net_amount: i.net_amount
-          }))
+          })),
+          store_name_snapshot: result.store_name_snapshot ?? null,
+          store_address_snapshot: result.store_address_snapshot ?? null,
+          invoice_footer_snapshot: result.invoice_footer_snapshot ?? null
         };
 
         clearCart();

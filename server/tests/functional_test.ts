@@ -629,20 +629,36 @@ async function runTestSuite() {
     });
 
     // ---------------------------------------------------------
-    // 14. Advanced Invoice Settings & Three Templates (Requirement 9)
+    // 14. Thermal Invoice Settings & Templates (Requirement 9 / Phase 3)
     // ---------------------------------------------------------
-    await step('Advanced Invoice Settings, Templates & Developer Attribution Security', async () => {
+    await step('Thermal Invoice Settings, Templates & Developer Attribution Security', async () => {
+      const adminHeaders = { 'x-user-id': String(adminUser.id) };
+
       // 1. Fetch initial invoice settings
       const initialSettings = await request('/settings');
       assert(initialSettings.default_invoice_template !== undefined, 'Default invoice template setting present');
       assert(initialSettings.show_developer_info === 'true', 'Mandatory developer info is active');
 
-      // 2. Update invoice settings with custom template & try to disable developer credit
+      // 2. A4 sheet invoices are no longer supported
+      let a4Rejected = false;
+      try {
+        await request('/settings', {
+          method: 'POST',
+          headers: adminHeaders,
+          body: JSON.stringify({ invoice_paper_size: 'A4' }),
+        });
+      } catch (err: any) {
+        a4Rejected = String(err.message).includes('HTTP 400');
+      }
+      assert(a4Rejected, 'A4 paper size is rejected with HTTP 400');
+
+      // 3. Update invoice settings with a thermal template & try to disable developer credit
       const updateRes = await request('/settings', {
         method: 'POST',
+        headers: adminHeaders,
         body: JSON.stringify({
           default_invoice_template: 'detailed',
-          invoice_paper_size: 'A4',
+          invoice_paper_size: '58mm',
           show_col_p_code: 'false',
           show_summary_discount: 'false',
           show_developer_info: 'false', // Attempted bypass
@@ -651,24 +667,25 @@ async function runTestSuite() {
       });
       assert(updateRes.success, 'Invoice settings saved successfully');
 
-      // 3. Verify settings persistence and mandatory developer info lock
+      // 4. Verify settings persistence and mandatory developer info lock
       const fetchedSettings = await request('/settings');
       assert(fetchedSettings.default_invoice_template === 'detailed', 'Default template updated to detailed');
-      assert(fetchedSettings.invoice_paper_size === 'A4', 'Paper size updated to A4');
+      assert(fetchedSettings.invoice_paper_size === '58mm', 'Paper size updated to 58mm');
+      assert(fetchedSettings.paper_width === '58mm', 'Legacy paper_width mirrors invoice_paper_size');
       assert(fetchedSettings.show_col_p_code === 'false', 'Product code column visibility toggled off');
       assert(fetchedSettings.show_summary_discount === 'false', 'Discount summary visibility toggled off');
       assert(fetchedSettings.show_developer_info === 'true', 'Developer information remains strictly TRUE and locked');
       assert(fetchedSettings.return_policy_text.includes('Strict 3-day return policy'), 'Custom return policy text persisted');
 
-      // 4. Reset back to clean thermal defaults
+      // 5. Reset back to clean thermal defaults
       await request('/settings', {
         method: 'POST',
+        headers: adminHeaders,
         body: JSON.stringify({
-          default_invoice_template: 'thermal',
+          default_invoice_template: 'classic',
           invoice_paper_size: '80mm',
           show_col_p_code: 'true',
           show_summary_discount: 'true',
-          show_developer_info: 'true',
         }),
       });
     });

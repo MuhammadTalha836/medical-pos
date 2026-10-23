@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
-import { DeveloperSettingsPayload, AuditLogEntry, User } from '../types';
+import { DeveloperSettingsPayload, AuditLogEntry, User, SaleInvoice } from '../types';
 import { Modal } from '../components/common/Modal';
+import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
+import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../utils/invoice';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -26,6 +28,41 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+// Minimal sale used to preview how the developer footer wraps on the narrowest (58mm) roll
+const FOOTER_PREVIEW_INVOICE: SaleInvoice = {
+  id: 0,
+  invoice_no: 'INV-PREVIEW-0001',
+  sale_date: new Date().toISOString(),
+  customer_name: 'Counter Customer',
+  user_name: 'Cashier',
+  payment_type: 'Cash',
+  status: 'completed',
+  total_gross: 640,
+  total_item_discount: 0,
+  bill_discount_pct: 0,
+  bill_discount_amt: 0,
+  net_total: 640,
+  cash_tendered: 700,
+  change_due: 60,
+  items: [
+    {
+      product_id: 1,
+      c_code: 'GSK',
+      p_code: 'PAN-EXT-500',
+      product_name: 'Panadol Extra 500mg Tablets',
+      unit_type: 'Box',
+      is_loose: 0,
+      quantity: 2,
+      unit_price: 320,
+      unit_cost: 270,
+      discount_pct: 0,
+      discount_amount: 0,
+      gross_amount: 640,
+      net_amount: 640
+    }
+  ]
+};
+
 export const DeveloperSettingsPage: React.FC = () => {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'policies' | 'store' | 'backups' | 'passwords' | 'audit'>('policies');
@@ -38,9 +75,10 @@ export const DeveloperSettingsPage: React.FC = () => {
     allow_admin_create_cashier: 'true',
     allow_admin_create_admin: 'false',
     allow_admin_edit_store_identity: 'false',
+    allow_admin_hide_store_identity: 'false',
     store_name: 'PharmaCare Pharmacy',
     store_address: 'Main Boulevard, Healthcare City',
-    developer_invoice_footer: 'Software maintained by System Developer',
+    developer_invoice_footer: DEFAULT_DEVELOPER_FOOTER,
     developer_email: ''
   });
   const [loadingSettings, setLoadingSettings] = useState(false);
@@ -401,6 +439,32 @@ export const DeveloperSettingsPage: React.FC = () => {
                   <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
+
+              {/* Toggle 4: Allow Admin to hide store identity on receipts */}
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+                <div className="space-y-1 pr-4">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <span>Allow Administrator to Hide Store Name & Address on Receipts</span>
+                    {settings.allow_admin_hide_store_identity === 'true' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    When disabled, the Store Name and Address always print on 58 mm and 80 mm receipts, and the visibility switches in Invoice Settings are locked for administrators.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.allow_admin_hide_store_identity === 'true'}
+                    onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_hide_store_identity: e.target.checked ? 'true' : 'false' }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
             </div>
 
             <div className="pt-4 flex justify-end">
@@ -476,16 +540,42 @@ export const DeveloperSettingsPage: React.FC = () => {
                   <Lock className="w-3.5 h-3.5 text-purple-500" />
                   <span>Developer Invoice Footer Text (Mandatory Attribution)</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={settings.developer_invoice_footer}
-                  onChange={(e) => setSettings(prev => ({ ...prev, developer_invoice_footer: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  This text prints at the bottom of Thermal, Standard, and Detailed receipts and cannot be removed by local administrators.
-                </span>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+                  <div>
+                    <textarea
+                      required
+                      rows={4}
+                      maxLength={FOOTER_MAX_LENGTH}
+                      value={settings.developer_invoice_footer}
+                      onChange={(e) => setSettings(prev => ({ ...prev, developer_invoice_footer: e.target.value }))}
+                      className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    />
+                    <div className="flex justify-between gap-2 mt-1 text-[10px] text-slate-400">
+                      <span>
+                        Prints on every 58 mm and 80 mm receipt and cannot be removed by local administrators. Long lines wrap automatically; each sale keeps the footer it was printed with.
+                      </span>
+                      <span className={`font-mono whitespace-nowrap ${settings.developer_invoice_footer.length >= FOOTER_MAX_LENGTH ? 'text-amber-500 font-bold' : ''}`}>
+                        {settings.developer_invoice_footer.length} / {FOOTER_MAX_LENGTH}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Live 58mm wrap preview */}
+                  <div className="bg-slate-100 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col items-center max-h-[360px] overflow-y-auto">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 self-start">58 mm wrap preview</span>
+                    <UnifiedInvoice
+                      invoice={FOOTER_PREVIEW_INVOICE}
+                      settings={{
+                        store_name: settings.store_name,
+                        store_address: settings.store_address,
+                        developer_invoice_footer: settings.developer_invoice_footer
+                      }}
+                      templateOverride="compact"
+                      paperSizeOverride="58mm"
+                      showControls={false}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

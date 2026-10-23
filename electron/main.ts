@@ -76,7 +76,7 @@ ipcMain.handle('print:thermal', async (_event, options = {}) => {
         printBackground: true,
         deviceName: options.printerName || '',
         pageSize: {
-          width: 80000, // 80mm in microns
+          width: (options.paperWidthMm === 58 ? 58 : 80) * 1000, // roll width in microns
           height: 297000
         },
         margins: {

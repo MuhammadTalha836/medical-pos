@@ -66,15 +66,15 @@ Copy and paste the structured prompts below into Antigravity using the Ralph Loo
 **Objective:** Restrict invoice formatting exclusively to thermal receipt printers, integrate the store identity, and apply the dynamic invoice footer.
 
 ### Task 3.1: Thermal-Only Invoice Templates (58 mm & 80 mm)
-- [ ] Remove all A3, A4, and A5 paper-size options and templates from the codebase and settings interface.
-- [ ] Implement built-in invoice designs targetting strictly **58 mm** and **80 mm** thermal receipt widths.
-- [ ] Build an administrator preview and selection interface for thermal templates that persists the choice across application restarts.
+- [x] Remove all A3, A4, and A5 paper-size options and templates from the codebase and settings interface.
+- [x] Implement built-in invoice designs targetting strictly **58 mm** and **80 mm** thermal receipt widths.
+- [x] Build an administrator preview and selection interface for thermal templates that persists the choice across application restarts.
 
 ### Task 3.2: Protected Store Identity & Footer Integration
-- [ ] Bind the medical store name and address to the protected identity fields configured by the Developer during setup.
-- [ ] Prevent Admins from hiding or removing the store name/address via Invoice Settings unless explicitly enabled by the Developer.
-- [ ] Implement a single, unified Developer-controlled invoice footer configuration that dynamically renders across all 58 mm and 80 mm thermal templates.
-- [ ] Handle long footer text safely via text wrapping and ensure compatibility with future prints and historical records.
+- [x] Bind the medical store name and address to the protected identity fields configured by the Developer during setup.
+- [x] Prevent Admins from hiding or removing the store name/address via Invoice Settings unless explicitly enabled by the Developer.
+- [x] Implement a single, unified Developer-controlled invoice footer configuration that dynamically renders across all 58 mm and 80 mm thermal templates.
+- [x] Handle long footer text safely via text wrapping and ensure compatibility with future prints and historical records.
 
 ---
 
@@ -98,8 +98,8 @@ Copy and paste the structured prompts below into Antigravity using the Ralph Loo
 **Objective:** Thoroughly test all security boundaries, offline capabilities, and acceptance criteria.
 
 ### Acceptance Criteria Checklist
-- [ ] **TC-01:** Only 58 mm and 80 mm thermal invoice templates are offered; A3/A4/A5 are removed.
-- [ ] **TC-02:** Admin can preview/select thermal templates, persisting across restarts.
+- [x] **TC-01:** Only 58 mm and 80 mm thermal invoice templates are offered; A3/A4/A5 are removed.
+- [x] **TC-02:** Admin can preview/select thermal templates, persisting across restarts.
 - [x] **TC-03:** Developer has a dedicated protected settings page with valid input validations.
 - [x] **TC-04:** Backup retention limits and Admin account-creation permissions are strictly controlled by the Developer.
 - [x] **TC-05:** Developer manages Admin/Cashier passwords; unauthorized roles cannot modify Developer credentials.

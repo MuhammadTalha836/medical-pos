@@ -24,6 +24,14 @@ import {
   decryptTotpSecret
 } from './security/totp';
 import { logSecurityAudit } from './security/audit';
+import {
+  DEFAULT_DEVELOPER_FOOTER,
+  FOOTER_MAX_LENGTH,
+  isValidPaperSize,
+  isValidTemplate,
+  normalizePaperSize,
+  normalizeTemplate
+} from './invoice/invoiceSettings';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -113,6 +121,9 @@ interface SaleEntity {
   paymentType: string;
   status: string;
   notes: string | null;
+  storeNameSnapshot?: string | null;
+  storeAddressSnapshot?: string | null;
+  invoiceFooterSnapshot?: string | null;
   createdAt: Date;
   items?: SaleItemEntity[];
 }
@@ -159,6 +170,9 @@ function formatSale(sale: SaleEntity) {
     payment_type: sale.paymentType,
     status: sale.status,
     notes: sale.notes,
+    store_name_snapshot: sale.storeNameSnapshot ?? null,
+    store_address_snapshot: sale.storeAddressSnapshot ?? null,
+    invoice_footer_snapshot: sale.invoiceFooterSnapshot ?? null,
     created_at: sale.createdAt,
     items: sale.items ? sale.items.map(formatSaleItem) : undefined
   };
@@ -1115,6 +1129,7 @@ app.get('/api/developer/settings', async (req: Request, res: Response) => {
             'allow_admin_create_cashier',
             'allow_admin_create_admin',
             'allow_admin_edit_store_identity',
+            'allow_admin_hide_store_identity',
             'store_name',
             'store_address',
             'developer_invoice_footer',
@@ -1131,9 +1146,10 @@ app.get('/api/developer/settings', async (req: Request, res: Response) => {
       allow_admin_create_cashier: 'true',
       allow_admin_create_admin: 'false',
       allow_admin_edit_store_identity: 'false',
+      allow_admin_hide_store_identity: 'false',
       store_name: 'PharmaCare Pharmacy',
       store_address: 'Main Boulevard, Healthcare City',
-      developer_invoice_footer: 'Software maintained by System Developer',
+      developer_invoice_footer: DEFAULT_DEVELOPER_FOOTER,
       developer_email: ''
     };
 
@@ -1169,6 +1185,7 @@ app.put('/api/developer/settings', async (req: Request, res: Response) => {
       'allow_admin_create_cashier',
       'allow_admin_create_admin',
       'allow_admin_edit_store_identity',
+      'allow_admin_hide_store_identity',
       'store_name',
       'store_address',
       'developer_invoice_footer',
@@ -1179,6 +1196,30 @@ app.put('/api/developer/settings', async (req: Request, res: Response) => {
     for (const key of allowedKeys) {
       if (req.body[key] !== undefined) {
         updates[key] = String(req.body[key]);
+      }
+    }
+
+    // Protected store identity & footer validation
+    for (const key of ['store_name', 'store_address']) {
+      if (updates[key] !== undefined) {
+        updates[key] = updates[key].trim();
+        if (!updates[key]) {
+          return res.status(400).json({ error: `${key === 'store_name' ? 'Store name' : 'Store address'} cannot be empty` });
+        }
+      }
+    }
+    if (updates.developer_invoice_footer !== undefined) {
+      updates.developer_invoice_footer = updates.developer_invoice_footer.trim();
+      if (!updates.developer_invoice_footer) {
+        return res.status(400).json({ error: 'Invoice footer cannot be empty' });
+      }
+      if (updates.developer_invoice_footer.length > FOOTER_MAX_LENGTH) {
+        return res.status(400).json({ error: `Invoice footer cannot exceed ${FOOTER_MAX_LENGTH} characters` });
+      }
+    }
+    for (const key of ['allow_admin_create_cashier', 'allow_admin_create_admin', 'allow_admin_edit_store_identity', 'allow_admin_hide_store_identity']) {
+      if (updates[key] !== undefined && updates[key] !== 'true' && updates[key] !== 'false') {
+        return res.status(400).json({ error: `${key} must be 'true' or 'false'` });
       }
     }
 
@@ -1998,6 +2039,16 @@ app.post('/api/sales', async (req: Request, res: Response) => {
         }
         const invoiceNo = `INV-${today}-${String(nextSeq).padStart(4, '0')}`;
 
+        // Snapshot the protected store identity & developer footer so reprints match the original receipt
+        const identityRows = await tx.systemSetting.findMany({
+          where: { key: { in: ['store_name', 'store_address', 'developer_invoice_footer'] } }
+        });
+        const identity: Record<string, string> = {};
+        for (const row of identityRows) identity[row.key] = row.value;
+        const storeNameSnapshot = identity.store_name ?? null;
+        const storeAddressSnapshot = identity.store_address ?? null;
+        const invoiceFooterSnapshot = identity.developer_invoice_footer || DEFAULT_DEVELOPER_FOOTER;
+
         // 1. Insert Sale Master
         const sale = await tx.sale.create({
           data: {
@@ -2016,7 +2067,10 @@ app.post('/api/sales', async (req: Request, res: Response) => {
             cashTendered: tendered,
             changeDue: finalChangeDue,
             paymentType: payment_type || 'Cash',
-            notes: notes || null
+            notes: notes || null,
+            storeNameSnapshot,
+            storeAddressSnapshot,
+            invoiceFooterSnapshot
           }
         });
 
@@ -2094,7 +2148,10 @@ app.post('/api/sales', async (req: Request, res: Response) => {
           saleId: sale.id,
           invoiceNo,
           netTotal: sale.netTotal,
-          changeDue: sale.changeDue
+          changeDue: sale.changeDue,
+          store_name_snapshot: storeNameSnapshot,
+          store_address_snapshot: storeAddressSnapshot,
+          invoice_footer_snapshot: invoiceFooterSnapshot
         };
       });
     };
@@ -3680,7 +3737,7 @@ app.get('/api/settings', async (_req: Request, res: Response) => {
     const rows = await prisma.systemSetting.findMany();
     const settings: Record<string, string> = {
       max_bill_discount_pct: '14',
-      default_invoice_template: 'thermal',
+      default_invoice_template: 'classic',
       invoice_paper_size: '80mm',
       return_policy_text: 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.',
       show_store_name: 'true',
@@ -3716,35 +3773,112 @@ app.get('/api/settings', async (_req: Request, res: Response) => {
     }
     // Developer information is mandatory and cannot be disabled
     settings.show_developer_info = 'true';
+
+    // Thermal-only invoices: never hand out legacy A4/A5 sizes or sheet templates
+    settings.default_invoice_template = normalizeTemplate(settings.default_invoice_template);
+    settings.invoice_paper_size = normalizePaperSize(settings.invoice_paper_size ?? settings.paper_width);
+    settings.paper_width = settings.invoice_paper_size;
+    if (!settings.developer_invoice_footer) {
+      settings.developer_invoice_footer = DEFAULT_DEVELOPER_FOOTER;
+    }
+
+    // Store identity stays visible on receipts unless the Developer allows hiding it
+    if (settings.allow_admin_hide_store_identity !== 'true') {
+      settings.show_store_name = 'true';
+      settings.show_store_address = 'true';
+    }
+
+    // Developer identity is only served through the protected developer endpoint
+    delete settings.developer_email;
     res.json(settings);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
+// Developer and Admin always manage settings; other roles need the 'settings' permission
+async function canManageSettings(roleName: string): Promise<boolean> {
+  if (roleName === 'developer' || roleName === 'admin') return true;
+  const role = await prisma.role.findUnique({ where: { name: roleName } });
+  if (!role) return false;
+  try {
+    return JSON.parse(role.permissions || '{}').settings === true;
+  } catch {
+    return false;
+  }
+}
+
+// Keys only the Developer may change through any settings endpoint
+const DEVELOPER_ONLY_SETTING_KEYS = [
+  'developer_invoice_footer',
+  'show_developer_info',
+  'allow_admin_create_cashier',
+  'allow_admin_create_admin',
+  'allow_admin_edit_store_identity',
+  'allow_admin_hide_store_identity',
+  'backup_retention_limit',
+  'backup_frequency',
+  'backup_scheduled_time'
+];
+
 app.post('/api/settings', async (req: Request, res: Response) => {
   try {
     const actingUser = await getActingUser(req);
-    const settings = { ...req.body };
+    if (!actingUser || !(await canManageSettings(actingUser.role))) {
+      await logSecurityAudit({
+        action: 'SETTINGS_UPDATE',
+        module: 'SETTINGS',
+        status: 'FAILED',
+        details: 'Unauthorized attempt to modify system settings without settings permission',
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
+      return res.status(403).json({ error: 'Access denied: settings permission required' });
+    }
+
+    const settings: Record<string, unknown> = { ...req.body };
     // Developer info is strictly mandatory
     settings.show_developer_info = 'true';
+    // Setup lock and developer identity are only managed by the setup wizard / developer endpoint
+    delete settings.setup_completed;
+    delete settings.developer_email;
+
+    // Thermal-only invoices: reject A3/A4/A5 sizes and retired sheet templates
+    if (settings.default_invoice_template !== undefined && !isValidTemplate(settings.default_invoice_template)) {
+      return res.status(400).json({ error: 'Invalid invoice template. Allowed: classic, compact, detailed' });
+    }
+    if (settings.invoice_paper_size !== undefined && !isValidPaperSize(settings.invoice_paper_size)) {
+      return res.status(400).json({ error: 'Invalid paper size. Only 58mm and 80mm thermal rolls are supported' });
+    }
+    if (settings.paper_width !== undefined && !isValidPaperSize(settings.paper_width)) {
+      return res.status(400).json({ error: 'Invalid paper width. Only 58mm and 80mm thermal rolls are supported' });
+    }
+    // invoice_paper_size is canonical; keep the legacy paper_width key in step with it
+    if (settings.invoice_paper_size !== undefined) {
+      settings.paper_width = settings.invoice_paper_size;
+    } else if (settings.paper_width !== undefined) {
+      settings.invoice_paper_size = settings.paper_width;
+    }
 
     // If acting user is NOT developer, protect developer-managed keys & store identity
-    if (actingUser?.role !== 'developer') {
-      delete settings.developer_invoice_footer;
-      delete settings.allow_admin_create_cashier;
-      delete settings.allow_admin_create_admin;
-      delete settings.allow_admin_edit_store_identity;
-      delete settings.backup_retention_limit;
-      delete settings.backup_frequency;
-      delete settings.backup_scheduled_time;
+    if (actingUser.role !== 'developer') {
+      for (const key of DEVELOPER_ONLY_SETTING_KEYS) {
+        delete settings[key];
+      }
 
-      const allowEditIdentity = await prisma.systemSetting.findUnique({
-        where: { key: 'allow_admin_edit_store_identity' }
+      const identityToggles = await prisma.systemSetting.findMany({
+        where: { key: { in: ['allow_admin_edit_store_identity', 'allow_admin_hide_store_identity'] } }
       });
-      if (allowEditIdentity?.value !== 'true') {
+      const toggles: Record<string, string> = {};
+      for (const row of identityToggles) toggles[row.key] = row.value;
+
+      if (toggles.allow_admin_edit_store_identity !== 'true') {
         delete settings.store_name;
         delete settings.store_address;
+      }
+      if (toggles.allow_admin_hide_store_identity !== 'true') {
+        delete settings.show_store_name;
+        delete settings.show_store_address;
       }
     }
 

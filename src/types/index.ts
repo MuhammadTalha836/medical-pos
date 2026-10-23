@@ -186,6 +186,11 @@ export interface SaleInvoice {
   notes?: string | null;
   shift_id?: number | null;
   items?: SaleItem[];
+
+  // Phase 3: store identity & developer footer captured when the sale was made (null on older sales)
+  store_name_snapshot?: string | null;
+  store_address_snapshot?: string | null;
+  invoice_footer_snapshot?: string | null;
 }
 
 export interface SaleItem {
@@ -242,8 +247,8 @@ export interface PurchaseInvoice {
   items?: PurchaseItem[];
 }
 
-export type InvoiceTemplateType = 'thermal' | 'standard' | 'detailed';
-export type InvoicePaperSize = '80mm' | '58mm' | 'A4' | 'A5';
+export type InvoiceTemplateType = 'classic' | 'compact' | 'detailed';
+export type InvoicePaperSize = '58mm' | '80mm';
 
 export interface SystemSettings {
   store_name: string;
@@ -382,6 +387,7 @@ export interface DeveloperSettingsPayload {
   allow_admin_create_cashier: string;
   allow_admin_create_admin: string;
   allow_admin_edit_store_identity: string;
+  allow_admin_hide_store_identity: string;
   store_name: string;
   store_address: string;
   developer_invoice_footer: string;
@@ -389,7 +395,7 @@ export interface DeveloperSettingsPayload {
 }
 
 export interface ElectronAPI {
-  printThermal: (options?: { silent?: boolean; printerName?: string }) => Promise<{ success: boolean; error?: string }>;
+  printThermal: (options?: { silent?: boolean; printerName?: string; paperWidthMm?: 58 | 80 }) => Promise<{ success: boolean; error?: string }>;
   selectBackupDir: () => Promise<string | null>;
   selectRestoreFile: () => Promise<string | null>;
 }

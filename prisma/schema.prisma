@@ -167,6 +167,9 @@ model Sale {
   status            String       @default("completed")
   notes             String?
   shiftId           Int?         @map("shift_id")
+  storeNameSnapshot     String?  @map("store_name_snapshot")
+  storeAddressSnapshot  String?  @map("store_address_snapshot")
+  invoiceFooterSnapshot String?  @map("invoice_footer_snapshot")
   createdAt         DateTime     @default(now()) @map("created_at")
 
   customer          Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)

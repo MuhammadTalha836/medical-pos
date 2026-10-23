@@ -127,6 +127,9 @@ CREATE TABLE IF NOT EXISTS sales (
   status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'returned', 'cancelled'
   notes TEXT,
   shift_id INTEGER REFERENCES cashier_shifts(id),
+  store_name_snapshot TEXT,
+  store_address_snapshot TEXT,
+  invoice_footer_snapshot TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -202,7 +202,14 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; saleId: number; invoiceNo: string }>(r)),
+    }).then(r => handleResponse<{
+      success: boolean;
+      saleId: number;
+      invoiceNo: string;
+      store_name_snapshot?: string | null;
+      store_address_snapshot?: string | null;
+      invoice_footer_snapshot?: string | null;
+    }>(r)),
   getSales: (params?: { date_from?: string; date_to?: string; invoice_no?: string }) => {
     const url = new URL(`${API_BASE}/sales`, window.location.origin);
     if (params?.date_from) url.searchParams.append('date_from', params.date_from);

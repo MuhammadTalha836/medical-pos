@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
-import { SystemSettings, User, Role, RolePermissions, InvoiceTemplateType, SaleInvoice } from '../types';
+import { SystemSettings, User, Role, RolePermissions, InvoiceTemplateType, InvoicePaperSize, SaleInvoice } from '../types';
+import { DEFAULT_DEVELOPER_FOOTER, INVOICE_PAPER_SIZES, TEMPLATE_LABELS, normalizePaperSize, normalizeTemplate } from '../utils/invoice';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { Modal } from '../components/common/Modal';
@@ -37,6 +38,30 @@ import {
   Sparkles,
   Check
 } from 'lucide-react';
+
+const TEMPLATE_CARDS: { id: InvoiceTemplateType; title: string; description: string; icon: React.ElementType }[] = [
+  {
+    id: 'classic',
+    title: 'Classic Receipt',
+    description: 'Full column table on 80 mm (two-line rows on 58 mm) with barcode, terms and footer note.',
+    icon: Receipt
+  },
+  {
+    id: 'compact',
+    title: 'Compact Receipt',
+    description: 'Paper-saving two-line item rows with only net, tendered and change totals.',
+    icon: FileText
+  },
+  {
+    id: 'detailed',
+    title: 'Detailed Receipt',
+    description: 'Numbered lines with code & rack, split line/bill discounts, terms and return policy.',
+    icon: LayoutDashboard
+  }
+];
+
+// Store name & address visibility toggles are protected by the Developer
+const PROTECTED_IDENTITY_FIELDS = ['show_store_name', 'show_store_address'];
 
 interface SettingsPageProps {
   settings?: SystemSettings | null;
@@ -230,7 +255,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   const { user, user: currentUser, updateCurrentUser, hasPermission } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles'>('store');
-  const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateType>('thermal');
+  const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateType>('classic');
+  const [previewPaperSize, setPreviewPaperSize] = useState<InvoicePaperSize>('80mm');
+  const canHideStoreIdentity = user?.role === 'developer' || settings?.allow_admin_hide_store_identity === 'true';
 
   const [formData, setFormData] = useState<SystemSettings>({
     store_name: '',
@@ -247,7 +274,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
     low_stock_threshold: '10',
     paper_width: '80mm',
     max_bill_discount_pct: '14',
-    default_invoice_template: 'thermal',
+    default_invoice_template: 'classic',
     invoice_paper_size: '80mm',
     return_policy_text: 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.',
     show_store_name: 'true',
@@ -314,15 +341,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   useEffect(() => {
     if (settings) {
       setFormData(prev => ({ ...prev, ...settings }));
-      if (settings.default_invoice_template) {
-        setPreviewTemplate(settings.default_invoice_template as InvoiceTemplateType);
-      }
+      setPreviewTemplate(normalizeTemplate(settings.default_invoice_template));
+      setPreviewPaperSize(normalizePaperSize(settings.invoice_paper_size));
     }
     api.getSettings().then(s => {
       setFormData(prev => ({ ...prev, ...s }));
-      if (s.default_invoice_template) {
-        setPreviewTemplate(s.default_invoice_template as InvoiceTemplateType);
-      }
+      setPreviewTemplate(normalizeTemplate(s.default_invoice_template));
+      setPreviewPaperSize(normalizePaperSize(s.invoice_paper_size));
     });
     fetchUsers();
     fetchRoles();
@@ -330,6 +355,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
   const handleToggleField = (fieldKey: string) => {
     if (fieldKey === 'show_developer_info') return; // Strictly mandatory
+    if (PROTECTED_IDENTITY_FIELDS.includes(fieldKey) && !canHideStoreIdentity) return; // Developer-protected
     setFormData(prev => ({
       ...prev,
       [fieldKey]: prev[fieldKey] === 'false' ? 'true' : 'false'
@@ -372,8 +398,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   const handleResetInvoiceDefaults = () => {
     setFormData(prev => ({
       ...prev,
-      default_invoice_template: 'thermal',
+      default_invoice_template: 'classic',
       invoice_paper_size: '80mm',
+      paper_width: '80mm',
       return_policy_text: 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.',
       show_store_name: 'true',
       show_store_phone: 'true',
@@ -403,7 +430,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       show_return_policy: 'true',
       show_developer_info: 'true'
     }));
-    setPreviewTemplate('thermal');
+    setPreviewTemplate('classic');
+    setPreviewPaperSize('80mm');
   };
 
   const fetchUsers = async () => {
@@ -927,14 +955,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Receipt Paper Width</label>
-                  <select
-                    value={formData.paper_width}
-                    onChange={(e) => setFormData(prev => ({ ...prev, paper_width: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                  >
-                    <option value="80mm">80mm Thermal Paper (Standard POS)</option>
-                    <option value="58mm">58mm Thermal Paper (Compact)</option>
-                  </select>
+                  <div className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
+                    {normalizePaperSize(formData.invoice_paper_size).replace('mm', ' mm')} thermal roll · change it under Invoice Settings & Templates
+                  </div>
                 </div>
 
                 <div className="sm:col-span-2">
@@ -1069,140 +1092,89 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             {/* Left Column: Controls & Configuration */}
             <form onSubmit={handleSaveSettings} className="xl:col-span-7 space-y-6">
-              {/* Card 1: Template Selection */}
+              {/* Card 1: Thermal Template & Roll Width Selection */}
               <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Receipt className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Default Invoice Design Template</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Default Thermal Receipt Design</h3>
                   </div>
                   <span className="text-[10px] uppercase font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800/60">
-                    Active: {formData.default_invoice_template?.toUpperCase() || 'THERMAL'}
+                    Active: {TEMPLATE_LABELS[normalizeTemplate(formData.default_invoice_template)]} · {normalizePaperSize(formData.invoice_paper_size)}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  {/* Template 1: Thermal Receipt */}
-                  <div
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, default_invoice_template: 'thermal' }));
-                      setPreviewTemplate('thermal');
-                    }}
-                    className={`cursor-pointer rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
-                      (formData.default_invoice_template || 'thermal') === 'thermal'
-                        ? 'bg-teal-50/70 dark:bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
-                        : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300">
-                          <Receipt className="w-4 h-4" />
+                  {TEMPLATE_CARDS.map(card => {
+                    const Icon = card.icon;
+                    const isSelected = normalizeTemplate(formData.default_invoice_template) === card.id;
+                    return (
+                      <div
+                        key={card.id}
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, default_invoice_template: card.id }));
+                          setPreviewTemplate(card.id);
+                        }}
+                        className={`cursor-pointer rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-teal-50/70 dark:bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
+                            : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <div className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300">
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            {isSelected && (
+                              <span className="p-1 bg-teal-600 text-white rounded-full">
+                                <Check className="w-3 h-3" />
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2.5">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white block">{card.title}</span>
+                            <span className="text-[10px] text-teal-600 dark:text-teal-400 font-mono">58 mm / 80 mm Roll</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                            {card.description}
+                          </p>
                         </div>
-                        {(formData.default_invoice_template || 'thermal') === 'thermal' && (
-                          <span className="p-1 bg-teal-600 text-white rounded-full">
-                            <Check className="w-3 h-3" />
-                          </span>
-                        )}
                       </div>
-                      <div className="mt-2.5">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white block">Thermal Receipt</span>
-                        <span className="text-[10px] text-teal-600 dark:text-teal-400 font-mono">80mm / 58mm Roll</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                        Continuous roll layout optimized for thermal printers with compact typography and simulated barcodes.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Template 2: Standard Invoice */}
-                  <div
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, default_invoice_template: 'standard' }));
-                      setPreviewTemplate('standard');
-                    }}
-                    className={`cursor-pointer rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
-                      formData.default_invoice_template === 'standard'
-                        ? 'bg-teal-50/70 dark:bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
-                        : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
-                          <FileText className="w-4 h-4" />
-                        </div>
-                        {formData.default_invoice_template === 'standard' && (
-                          <span className="p-1 bg-teal-600 text-white rounded-full">
-                            <Check className="w-3 h-3" />
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-2.5">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white block">Standard Invoice</span>
-                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono">Sheet A4 / A5</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                        Clean document format with structured header, customer profile box, striped table, and signature line.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Template 3: Detailed Invoice */}
-                  <div
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, default_invoice_template: 'detailed' }));
-                      setPreviewTemplate('detailed');
-                    }}
-                    className={`cursor-pointer rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
-                      formData.default_invoice_template === 'detailed'
-                        ? 'bg-teal-50/70 dark:bg-teal-950/20 border-teal-500 shadow-sm ring-1 ring-teal-500'
-                        : 'bg-slate-50/60 dark:bg-[#0d131f] border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300">
-                          <LayoutDashboard className="w-4 h-4" />
-                        </div>
-                        {formData.default_invoice_template === 'detailed' && (
-                          <span className="p-1 bg-teal-600 text-white rounded-full">
-                            <Check className="w-3 h-3" />
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-2.5">
-                        <span className="text-xs font-bold text-slate-900 dark:text-white block">Detailed Invoice</span>
-                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">Enterprise A4</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                        Comprehensive pharmaceutical enterprise layout with rack locations, SKU codes, and full audit breakdown.
-                      </p>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
 
-                {/* Paper Size Configuration */}
+                {/* Thermal Roll Width (58mm / 80mm only) */}
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Print Paper Size & Layout Format
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Thermal Roll Width
                   </label>
-                  <select
-                    value={formData.invoice_paper_size || formData.paper_width || '80mm'}
-                    onChange={(e) => {
-                      setFormData(prev => ({
-                        ...prev,
-                        invoice_paper_size: e.target.value as any,
-                        paper_width: e.target.value
-                      }));
-                    }}
-                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  >
-                    <option value="80mm">80mm Thermal Paper (Standard POS Continuous Roll)</option>
-                    <option value="58mm">58mm Thermal Paper (Compact POS Continuous Roll)</option>
-                    <option value="A4">A4 Full Sheet Paper (210 × 297 mm Standard Sheet)</option>
-                    <option value="A5">A5 Half Sheet Paper (148 × 210 mm Half Sheet)</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    {INVOICE_PAPER_SIZES.map(size => {
+                      const isSelected = normalizePaperSize(formData.invoice_paper_size) === size;
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, invoice_paper_size: size, paper_width: size }));
+                            setPreviewPaperSize(size);
+                          }}
+                          className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-teal-600 border-teal-600 text-white shadow-sm'
+                              : 'bg-slate-50 dark:bg-[#0d131f] border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-500'
+                          }`}
+                        >
+                          {size === '80mm' ? '80 mm · Standard POS roll' : '58 mm · Compact POS roll'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                    Receipts are thermal-only. Your selection is saved on this computer and used for every sale and reprint.
+                  </p>
                 </div>
               </div>
 
@@ -1230,21 +1202,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       { key: 'show_invoice_no', label: 'Invoice Number & Barcode' },
                       { key: 'show_invoice_date', label: 'Invoice Date & Time' }
                     ].map(field => {
-                      const isChecked = formData[field.key] !== 'false';
+                      const isLocked = PROTECTED_IDENTITY_FIELDS.includes(field.key) && !canHideStoreIdentity;
+                      const isChecked = isLocked || formData[field.key] !== 'false';
                       return (
                         <div
                           key={field.key}
                           onClick={() => handleToggleField(field.key)}
-                          className="flex items-center space-x-2.5 p-2 rounded-lg bg-slate-50 dark:bg-[#0d131f] hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer transition-colors border border-slate-200 dark:border-slate-800/70"
+                          title={isLocked ? 'Protected by Developer: store identity must appear on every receipt' : undefined}
+                          className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                            isLocked
+                              ? 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                              : 'bg-slate-50 dark:bg-[#0d131f] hover:bg-slate-100 dark:hover:bg-slate-800/80 cursor-pointer border-slate-200 dark:border-slate-800/70'
+                          }`}
                         >
-                          {isChecked ? (
-                            <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
-                          ) : (
-                            <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          <div className="flex items-center space-x-2.5">
+                            {isChecked ? (
+                              <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                            )}
+                            <span className={`text-xs ${isChecked ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-500'}`}>
+                              {field.label}
+                            </span>
+                          </div>
+                          {isLocked && (
+                            <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>Protected</span>
+                            </span>
                           )}
-                          <span className={`text-xs ${isChecked ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-500'}`}>
-                            {field.label}
-                          </span>
                         </div>
                       );
                     })}
@@ -1385,16 +1371,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       );
                     })}
 
-                    {/* Developer Information (MANDATORY & LOCKED) */}
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs opacity-90 cursor-not-allowed">
-                      <div className="flex items-center space-x-2.5">
-                        <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
-                        <span className="font-semibold text-slate-900 dark:text-white">Developer Information</span>
+                    {/* Developer Footer (MANDATORY & MANAGED BY DEVELOPER) */}
+                    <div className="sm:col-span-2 p-2 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs cursor-not-allowed space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2.5">
+                          <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                          <span className="font-semibold text-slate-900 dark:text-white">Developer Footer (managed by Developer)</span>
+                        </div>
+                        <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                          <Lock className="w-2.5 h-2.5" />
+                          <span>Mandatory</span>
+                        </span>
                       </div>
-                      <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                        <Lock className="w-2.5 h-2.5" />
-                        <span>Mandatory</span>
-                      </span>
+                      <p className="pl-6 text-[11px] text-slate-500 dark:text-slate-400 font-mono whitespace-pre-wrap [overflow-wrap:anywhere]">
+                        {formData.developer_invoice_footer || DEFAULT_DEVELOPER_FOOTER}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1438,53 +1429,63 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-1">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewTemplate('thermal')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        previewTemplate === 'thermal'
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      Thermal
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewTemplate('standard')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        previewTemplate === 'standard'
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      Standard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewTemplate('detailed')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                        previewTemplate === 'detailed'
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}
-                    >
-                      Detailed
-                    </button>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {TEMPLATE_CARDS.map(card => (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => setPreviewTemplate(card.id)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                          previewTemplate === card.id
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {TEMPLATE_LABELS[card.id]}
+                      </button>
+                    ))}
+                    <span className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+                    {INVOICE_PAPER_SIZES.map(size => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setPreviewPaperSize(size)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                          previewPaperSize === size
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Preview updating dynamically with selected fields, paper format, and template styling.
+                  {previewTemplate !== normalizeTemplate(formData.default_invoice_template) ||
+                  previewPaperSize !== normalizePaperSize(formData.invoice_paper_size) ? (
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                      Preview only. Selected design: {TEMPLATE_LABELS[normalizeTemplate(formData.default_invoice_template)]} · {normalizePaperSize(formData.invoice_paper_size)}
+                    </span>
+                  ) : normalizeTemplate(formData.default_invoice_template) !== normalizeTemplate(settings?.default_invoice_template) ||
+                    normalizePaperSize(formData.invoice_paper_size) !== normalizePaperSize(settings?.invoice_paper_size) ? (
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold">Unsaved changes. Save to apply to all receipts.</span>
+                  ) : (
+                    'Preview updates live with the selected fields, design and roll width.'
+                  )}
                 </div>
 
                 {/* Preview Paper Mount Area */}
                 <div className="bg-slate-100 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-center max-h-[750px] overflow-y-auto">
                   <UnifiedInvoice
                     invoice={MOCK_PREVIEW_INVOICE}
-                    settings={formData}
+                    settings={{
+                      ...formData,
+                      ...(canHideStoreIdentity ? {} : { show_store_name: 'true', show_store_address: 'true' })
+                    }}
                     templateOverride={previewTemplate}
+                    paperSizeOverride={previewPaperSize}
                     showControls={false}
                   />
                 </div>

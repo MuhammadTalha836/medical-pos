@@ -36,6 +36,9 @@ export function initDatabase(customPath?: string): Database.Database {
   try { db.exec(`ALTER TABLE users ADD COLUMN locked_until DATETIME;`); } catch {}
   try { db.exec(`ALTER TABLE audit_logs ADD COLUMN affected_user TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE audit_logs ADD COLUMN status TEXT DEFAULT 'SUCCESS';`); } catch {}
+  try { db.exec(`ALTER TABLE sales ADD COLUMN store_name_snapshot TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE sales ADD COLUMN store_address_snapshot TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE sales ADD COLUMN invoice_footer_snapshot TEXT;`); } catch {}
 
   // Seed default data if database is fresh
   seedInitialData(db);

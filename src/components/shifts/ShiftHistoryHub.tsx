@@ -421,7 +421,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                           <button
                             onClick={() => setSelectedShiftForPrint(shift)}
                             className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
-                            title="Print 80mm Thermal Shift Slip"
+                            title="Print Thermal Shift Slip"
                           >
                             <Printer className="w-3.5 h-3.5" />
                           </button>
