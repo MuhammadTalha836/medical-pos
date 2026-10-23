@@ -363,6 +363,10 @@ model BackupHistory {
   backupType     String   @map("backup_type")
   fileSizeBytes  Int      @map("file_size_bytes")
   status         String   @default("success")
+  checksumSha256 String?  @map("checksum_sha256")
+  verified       Int      @default(1)
+  errorMessage   String?  @map("error_message")
+  secondaryPath  String?  @map("secondary_path")
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("backup_history")

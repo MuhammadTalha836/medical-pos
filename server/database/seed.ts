@@ -52,6 +52,7 @@ export function seedInitialData(db: Database.Database) {
     backup_retention_limit: '10',
     backup_frequency: 'daily',
     backup_scheduled_time: '23:00',
+    backup_weekly_day: '0',
     developer_invoice_footer: 'Software maintained by System Developer',
     allow_admin_create_cashier: 'true',
     allow_admin_create_admin: 'false',

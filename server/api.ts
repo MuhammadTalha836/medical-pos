@@ -5,13 +5,23 @@ import cors from 'cors';
 import { Prisma } from '@prisma/client';
 import { prisma, initPrisma } from './database/prisma';
 import {
-  createBackup,
   getBackupList,
   restoreDatabase,
   resetStockZero,
   optimizeDatabase,
-  pruneBackupsByRetentionLimit
+  pruneBackupsByRetentionLimit,
+  countRetainedBackups,
+  getRetentionLimit,
+  getConfiguredBackupDir,
+  PRE_RESTORE_KEEP
 } from './database/backup';
+import {
+  getScheduleState,
+  isValidBackupTime,
+  isValidFrequency,
+  runRecordedBackup,
+  startBackupScheduler
+} from './backup/scheduler';
 import crypto from 'crypto';
 import QRCode from 'qrcode';
 import { hashPassword, verifyPassword } from './security/passwords';
@@ -73,6 +83,18 @@ async function getActingUser(req: Request): Promise<{ id: number; username: stri
     };
   } catch {
     return null;
+  }
+}
+
+// Developer always passes; Admin and custom roles are checked against their role's JSON permissions
+async function hasRolePermission(roleName: string, permissionKey: string): Promise<boolean> {
+  if (roleName === 'developer') return true;
+  const role = await prisma.role.findUnique({ where: { name: roleName } });
+  if (!role) return false;
+  try {
+    return JSON.parse(role.permissions || '{}')[permissionKey] === true;
+  } catch {
+    return false;
   }
 }
 
@@ -1126,6 +1148,7 @@ app.get('/api/developer/settings', async (req: Request, res: Response) => {
             'backup_retention_limit',
             'backup_frequency',
             'backup_scheduled_time',
+            'backup_weekly_day',
             'allow_admin_create_cashier',
             'allow_admin_create_admin',
             'allow_admin_edit_store_identity',
@@ -1143,6 +1166,7 @@ app.get('/api/developer/settings', async (req: Request, res: Response) => {
       backup_retention_limit: '30',
       backup_frequency: 'daily',
       backup_scheduled_time: '23:00',
+      backup_weekly_day: '0',
       allow_admin_create_cashier: 'true',
       allow_admin_create_admin: 'false',
       allow_admin_edit_store_identity: 'false',
@@ -1155,6 +1179,9 @@ app.get('/api/developer/settings', async (req: Request, res: Response) => {
 
     for (const row of settingsRows) {
       devSettings[row.key] = row.value;
+    }
+    if (devSettings.backup_frequency === 'on_shift_close') {
+      devSettings.backup_frequency = 'daily';
     }
 
     res.json(devSettings);
@@ -1182,6 +1209,7 @@ app.put('/api/developer/settings', async (req: Request, res: Response) => {
       'backup_retention_limit',
       'backup_frequency',
       'backup_scheduled_time',
+      'backup_weekly_day',
       'allow_admin_create_cashier',
       'allow_admin_create_admin',
       'allow_admin_edit_store_identity',
@@ -1197,6 +1225,24 @@ app.put('/api/developer/settings', async (req: Request, res: Response) => {
       if (req.body[key] !== undefined) {
         updates[key] = String(req.body[key]);
       }
+    }
+
+    // Backup policy validation
+    if (updates.backup_frequency !== undefined && !isValidFrequency(updates.backup_frequency)) {
+      return res.status(400).json({ error: 'Invalid backup frequency. Allowed: off, twice_daily, daily, weekly' });
+    }
+    if (updates.backup_scheduled_time !== undefined && !isValidBackupTime(updates.backup_scheduled_time)) {
+      return res.status(400).json({ error: 'Backup time must use 24-hour HH:MM format' });
+    }
+    if (updates.backup_weekly_day !== undefined && !/^[0-6]$/.test(updates.backup_weekly_day)) {
+      return res.status(400).json({ error: 'Weekly backup day must be 0 (Sunday) to 6 (Saturday)' });
+    }
+    if (updates.backup_retention_limit !== undefined) {
+      const limit = Number(updates.backup_retention_limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 365) {
+        return res.status(400).json({ error: 'Backup retention limit must be a whole number between 1 and 365' });
+      }
+      updates.backup_retention_limit = String(limit);
     }
 
     // Protected store identity & footer validation
@@ -1235,12 +1281,9 @@ app.put('/api/developer/settings', async (req: Request, res: Response) => {
       );
     }
 
-    // Trigger backup pruning if retention limit was changed
+    // Apply a lowered retention limit right away (only verified routine backups in the backup folder)
     if (updates.backup_retention_limit) {
-      const limit = parseInt(updates.backup_retention_limit, 10);
-      if (!isNaN(limit)) {
-        pruneBackupsByRetentionLimit(limit);
-      }
+      pruneBackupsByRetentionLimit(Number(updates.backup_retention_limit), getConfiguredBackupDir());
     }
 
     await logSecurityAudit({
@@ -2642,8 +2685,26 @@ app.get('/api/reports/sales/company-wise', async (_req: Request, res: Response) 
 // 8. Utilities: Local Backup & Restore, Stock Zero, Optimization
 // -------------------------------------------------------------
 
-app.get('/api/utilities/backups', (_req: Request, res: Response) => {
+async function requireBackupPermission(req: Request, res: Response, permissionKey: 'can_backup' | 'can_restore', action: string) {
+  const actingUser = await getActingUser(req);
+  if (!actingUser || !(await hasRolePermission(actingUser.role, permissionKey))) {
+    await logSecurityAudit({
+      action,
+      module: 'BACKUP',
+      status: 'FAILED',
+      details: `Unauthorized ${action} attempt without ${permissionKey} permission`,
+      userId: actingUser?.id,
+      userName: actingUser?.username
+    });
+    res.status(403).json({ error: `Access denied: ${permissionKey} permission required` });
+    return null;
+  }
+  return actingUser;
+}
+
+app.get('/api/utilities/backups', async (req: Request, res: Response) => {
   try {
+    if (!(await requireBackupPermission(req, res, 'can_backup', 'BACKUP_LIST'))) return;
     const list = getBackupList();
     res.json(list);
   } catch (error: unknown) {
@@ -2652,78 +2713,105 @@ app.get('/api/utilities/backups', (_req: Request, res: Response) => {
 });
 
 app.post('/api/utilities/backup', async (req: Request, res: Response) => {
-  const { customDir, secondaryDir } = req.body;
   try {
-    let finalSecondary = secondaryDir;
-    if (!finalSecondary) {
-      const secRow = await prisma.systemSetting.findUnique({ where: { key: 'secondary_backup_dir' } });
-      if (secRow && secRow.value) finalSecondary = secRow.value;
+    const actingUser = await requireBackupPermission(req, res, 'can_backup', 'MANUAL_BACKUP');
+    if (!actingUser) return;
+
+    const { result, error } = await runRecordedBackup('manual', { id: actingUser.id, username: actingUser.username });
+    if (!result) {
+      return res.status(500).json({ error });
     }
-
-    const result = await createBackup('manual', customDir, finalSecondary);
-
-    // Save timestamp & path in settings
-    await prisma.systemSetting.upsert({
-      where: { key: 'last_backup_time' },
-      update: { value: result.timestamp },
-      create: { key: 'last_backup_time', value: result.timestamp }
-    });
-    await prisma.systemSetting.upsert({
-      where: { key: 'last_backup_file' },
-      update: { value: result.filepath },
-      create: { key: 'last_backup_file', value: result.filepath }
-    });
-
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-// Auto-Backup Background Scheduler (runs every 30 minutes)
-setInterval(async () => {
+// Backup health for the dashboard (any signed-in user; file paths only for backup operators)
+app.get('/api/backups/status', async (req: Request, res: Response) => {
   try {
-    const enabledRow = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_enabled' } });
-    if (enabledRow?.value !== 'true') return;
-
-    const intervalRow = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_interval_hours' } });
-    const intervalHours = Number(intervalRow?.value || '24');
-    const intervalMs = intervalHours * 60 * 60 * 1000;
-
-    const lastTimeRow = await prisma.systemSetting.findUnique({ where: { key: 'last_backup_time' } });
-    const lastBackupMs = lastTimeRow?.value ? new Date(lastTimeRow.value).getTime() : 0;
-    const now = Date.now();
-
-    if (now - lastBackupMs >= intervalMs) {
-      console.log('[Auto-Backup] Triggering scheduled database backup...');
-      const targetDirRow = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_dir' } });
-      const secondaryDirRow = await prisma.systemSetting.findUnique({ where: { key: 'secondary_backup_dir' } });
-
-      const result = await createBackup(
-        'auto_daily',
-        targetDirRow?.value || undefined,
-        secondaryDirRow?.value || undefined
-      );
-
-      await prisma.systemSetting.upsert({
-        where: { key: 'last_backup_time' },
-        update: { value: result.timestamp },
-        create: { key: 'last_backup_time', value: result.timestamp }
-      });
-      await prisma.systemSetting.upsert({
-        where: { key: 'last_backup_file' },
-        update: { value: result.filepath },
-        create: { key: 'last_backup_file', value: result.filepath }
-      });
-
-      console.log(`[Auto-Backup] Scheduled backup completed: ${result.filename} (${(result.sizeBytes / 1024).toFixed(1)} KB)`);
+    const actingUser = await getActingUser(req);
+    if (!actingUser) {
+      return res.status(401).json({ error: 'Sign in required' });
     }
-  } catch (err: any) {
-    console.error('[Auto-Backup Daemon] Error:', err.message);
+    const canSeePaths = await hasRolePermission(actingUser.role, 'can_backup');
+    const { settings, frequency, time, weekday, schedule } = await getScheduleState();
+
+    res.json({
+      frequency,
+      scheduled_time: time,
+      weekly_day: weekday,
+      enabled: schedule.enabled,
+      next_run_at: schedule.nextRunAt ? schedule.nextRunAt.toISOString() : null,
+      is_overdue: schedule.isDue,
+      last_success_at: settings.last_backup_time || null,
+      last_attempt_at: settings.last_backup_attempt_at || null,
+      last_status: settings.last_backup_status || (settings.last_backup_time ? 'success' : null),
+      last_error: settings.last_backup_status === 'failed' ? settings.last_backup_error || null : null,
+      last_type: settings.last_backup_type || null,
+      last_backup_file: canSeePaths ? settings.last_backup_file || null : null,
+      retention_limit: getRetentionLimit(),
+      retained_count: countRetainedBackups(),
+      pre_restore_keep: PRE_RESTORE_KEEP
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
   }
-}, 30 * 60 * 1000);
+});
+
+// Admin may change only the time of day; frequency stays under Developer control
+app.put('/api/backups/schedule', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await requireBackupPermission(req, res, 'can_backup', 'BACKUP_SCHEDULE_UPDATE');
+    if (!actingUser) return;
+
+    const keys = Object.keys(req.body || {});
+    if (keys.length !== 1 || keys[0] !== 'backup_scheduled_time') {
+      return res.status(400).json({ error: 'Only backup_scheduled_time can be changed here. Backup frequency is managed by the Developer.' });
+    }
+    const time = req.body.backup_scheduled_time;
+    if (!isValidBackupTime(time)) {
+      return res.status(400).json({ error: 'Backup time must use 24-hour HH:MM format' });
+    }
+
+    await prisma.systemSetting.upsert({
+      where: { key: 'backup_scheduled_time' },
+      update: { value: time },
+      create: { key: 'backup_scheduled_time', value: time }
+    });
+    await logSecurityAudit({
+      action: 'BACKUP_SCHEDULE_UPDATE',
+      module: 'BACKUP',
+      status: 'SUCCESS',
+      details: `Backup time of day set to ${time}`,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+
+    const { schedule } = await getScheduleState();
+    res.json({ success: true, backup_scheduled_time: time, next_run_at: schedule.nextRunAt ? schedule.nextRunAt.toISOString() : null });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+async function runShiftCloseBackup(actor: { id?: number | null; username?: string | null }) {
+  const { frequency } = await getScheduleState();
+  if (frequency === 'off') return null;
+  const { result, error } = await runRecordedBackup('shift_close', actor);
+  if (error) console.error('Shift-close backup error:', error);
+  return result ?? null;
+}
+
+// Offline backup scheduler (disabled under test runs so suites exit cleanly)
+if (process.env.NODE_ENV !== 'test' && !process.env.TEST_MODE) {
+  startBackupScheduler();
+}
 
 app.post('/api/utilities/restore', async (req: Request, res: Response) => {
+  const actingUser = await requireBackupPermission(req, res, 'can_restore', 'DATABASE_RESTORE');
+  if (!actingUser) return;
+
   const { backupFilePath } = req.body;
   if (!backupFilePath) {
     return res.status(400).json({ error: 'backupFilePath is required' });
@@ -2731,9 +2819,25 @@ app.post('/api/utilities/restore', async (req: Request, res: Response) => {
 
   try {
     const result = await restoreDatabase(backupFilePath);
+    await logSecurityAudit({
+      action: 'DATABASE_RESTORE',
+      module: 'BACKUP',
+      status: 'SUCCESS',
+      details: `Database restored from ${String(backupFilePath).split(/[\\/]/).pop()}`,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: getErrorMessage(error) });
+    await logSecurityAudit({
+      action: 'DATABASE_RESTORE',
+      module: 'BACKUP',
+      status: 'FAILED',
+      details: getErrorMessage(error),
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+    res.status(400).json({ error: getErrorMessage(error) });
   }
 });
 
@@ -3124,16 +3228,8 @@ app.post('/api/shifts/:id/close', async (req: Request, res: Response) => {
       }
     });
 
-    // Auto-backup on shift close if configured
-    let backupResult = null;
-    const autoBackupSetting = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_enabled' } });
-    if (autoBackupSetting?.value === 'true') {
-      try {
-        backupResult = await createBackup('auto_daily');
-      } catch (bkErr) {
-        console.error('Auto backup during shift closing error:', bkErr);
-      }
-    }
+    // Shift-close backup runs alongside the schedule unless the Developer switched automatic backups off
+    const backupResult = await runShiftCloseBackup({ id: shift.userId, username: shift.userName });
 
     // Write audit log
     await prisma.auditLog.create({
@@ -3712,16 +3808,8 @@ app.post('/api/utilities/closing', async (req: Request, res: Response) => {
       }
     });
 
-    // Auto-backup on closing if enabled
-    const autoBackupSetting = await prisma.systemSetting.findUnique({ where: { key: 'auto_backup_enabled' } });
-    let backupResult = null;
-    if (autoBackupSetting?.value === 'true') {
-      try {
-        backupResult = await createBackup('auto_daily');
-      } catch (bkErr) {
-        console.error('Auto backup during closing error:', bkErr);
-      }
-    }
+    // Closing backup runs alongside the schedule unless the Developer switched automatic backups off
+    const backupResult = await runShiftCloseBackup({ id: user_id ? Number(user_id) : null, username: user_name || 'Admin' });
 
     res.json({ success: true, message: 'Daily closing recorded successfully.', backup: backupResult });
   } catch (error: unknown) {
@@ -3798,14 +3886,7 @@ app.get('/api/settings', async (_req: Request, res: Response) => {
 
 // Developer and Admin always manage settings; other roles need the 'settings' permission
 async function canManageSettings(roleName: string): Promise<boolean> {
-  if (roleName === 'developer' || roleName === 'admin') return true;
-  const role = await prisma.role.findUnique({ where: { name: roleName } });
-  if (!role) return false;
-  try {
-    return JSON.parse(role.permissions || '{}').settings === true;
-  } catch {
-    return false;
-  }
+  return roleName === 'admin' || hasRolePermission(roleName, 'settings');
 }
 
 // Keys only the Developer may change through any settings endpoint
@@ -3818,7 +3899,18 @@ const DEVELOPER_ONLY_SETTING_KEYS = [
   'allow_admin_hide_store_identity',
   'backup_retention_limit',
   'backup_frequency',
-  'backup_scheduled_time'
+  'backup_scheduled_time',
+  'backup_weekly_day',
+  // Retired by Phase 4: automatic backups are switched off only through the Developer frequency
+  'auto_backup_enabled',
+  'auto_backup_interval_hours',
+  // Backup run state is written only by the backup engine
+  'last_backup_time',
+  'last_backup_file',
+  'last_backup_status',
+  'last_backup_error',
+  'last_backup_attempt_at',
+  'last_backup_type'
 ];
 
 app.post('/api/settings', async (req: Request, res: Response) => {

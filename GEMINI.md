@@ -32,7 +32,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Multi-Payment Reconciliation**: Tracks Cash, Card, Credit (Khata), and Online payment totals in real-time.
    - **Shift Balancing & Discrepancies**: Calculates expected closing cash versus counted cash, recording exact cash shortage or excess.
    - **Admin Shift Hub**: Dedicated admin section with cashier, date range, and status filters, and line-item invoice inspector.
-   - **Automated Backup on Shift Closure**: Shift closing automatically triggers an atomic SQLite snapshot backup to the local filesystem.
+   - **Automated Backup on Shift Closure**: Shift closing triggers a verified `shift_close` backup alongside the timed schedule, unless the Developer has set the backup frequency to Off.
 
 3. **Thermal-Only Invoice Templates & Protected Store Identity (`UnifiedInvoice.tsx`, `SettingsPage.tsx`, `server/invoice/invoiceSettings.ts`)**:
    - **Thermal-only**: Receipts print exclusively on **58 mm** or **80 mm** rolls (`invoice_paper_size`, mirrored into legacy `paper_width`). A3/A4/A5 sheet formats were removed; `POST /api/settings` rejects them with HTTP 400 and startup migration (`migrateLegacyInvoiceSettings`) rewrites old values (`A4` → `80mm`, `thermal`/`standard` → `classic`).
@@ -82,10 +82,13 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - CSV export for all reports.
 
 10. **Multi-Destination Backup, Vault & Disaster Recovery (`UtilitiesPage.tsx`, `backup.ts`, `docs/DISASTER_RECOVERY_GUIDE.md`)**:
-    - **Multi-Destination Vault**: Simultaneous atomic SQLite snapshots to primary local disk (`./backups`) and secondary external USB flash drives.
-    - **Cryptographic SHA-256 Sidecars**: Companion `.sha256` files generated for every backup to verify cryptographic integrity offline.
-    - **Pre-Restore Rollback Snapshot**: Automatic safety snapshot (`pre_restore`) created prior to database restore.
-    - **Background Auto-Backup Daemon**: Scheduler triggering automated local backups at configured hourly intervals.
+    - **Multi-Destination Vault**: Snapshots go to the saved primary folder (`auto_backup_dir`, default `./backups`) and an optional secondary folder (USB drive / network share), copied only when its SHA-256 matches.
+    - **Verify-then-commit backups**: Each backup is written to `*.db.partial`, switched to a self-contained journal mode, checked with `PRAGMA integrity_check` and for the core tables, checksummed, and only then renamed into place and recorded in `backup_history` (`verified = 1`). Failed attempts are recorded with `status = 'failed'` and an error message. A per-process queue makes sure two backups never run at the same time.
+    - **Retention limit (Developer)**: `backup_retention_limit` (1–365) keeps the newest N verified routine backups (`manual`, `scheduled`, `shift_close`, legacy `auto_daily`) per folder. Pruning runs only right after a verified success, never deletes the newest good backup, and only touches files recorded in `backup_history`.
+    - **Pre-Restore Rollback Snapshot**: A safety snapshot (`pre_restore`) is taken before a restore. These are kept separately from the retention limit (newest 3). A restore is refused if the chosen file fails verification.
+    - **Offline Backup Scheduler (`server/backup/scheduler.ts`)**: The Developer sets the frequency (`off` / `twice_daily` / `daily` / `weekly` + weekday); the Admin sets only the time of day (`PUT /api/backups/schedule`). The scheduler checks every minute and 15 s after startup. Runs missed while the PC was off are caught up with a single backup, failures are retried after a 15-minute backoff, and a clock moved backwards cannot stop backups. It is disabled under `TEST_MODE`.
+    - **Backup Health dashboard card**: `GET /api/backups/status` reports the last success, next run, retained count / limit, and the last failure message.
+    - **Backup permissions**: Listing and creating backups need `can_backup` and restoring needs `can_restore` (the Developer always passes). Denied attempts and every backup or restore outcome are audited.
     - **In-App Disaster Recovery Guide**: Detailed documentation and recovery procedures.
     - **Stock Zero Audit Utility**: Protected by confirmation code `RESET-ZERO-CONFIRM`.
     - **Database Optimization**: `VACUUM`, `PRAGMA optimize`, `ANALYZE`.
@@ -262,6 +265,7 @@ Phase-specific security suites:
 npm run test:phase1   # Developer setup wizard & TOTP login
 npm run test:phase2   # RBAC, developer settings, audit log
 npm run test:phase3   # Thermal-only templates, protected identity, footer, sale snapshots
+npm run test:phase4   # Backup retention, verification, offline scheduler, backup RBAC
 ```
 
 ### Type Checking & Linting

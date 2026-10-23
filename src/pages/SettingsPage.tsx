@@ -991,15 +991,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Enable Auto-Backup on Shift Closing</label>
-                  <select
-                    value={formData.auto_backup_enabled}
-                    onChange={(e) => setFormData(prev => ({ ...prev, auto_backup_enabled: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                  >
-                    <option value="true">Enabled (Recommended)</option>
-                    <option value="false">Disabled</option>
-                  </select>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Automatic Backups</label>
+                  <div className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-600 dark:text-slate-400 flex items-center">
+                    <Lock className="w-3 h-3 mr-1 text-amber-500" />
+                    Frequency is set by the Developer; choose the time of day under Backup & Recovery
+                  </div>
                 </div>
 
                 <div>

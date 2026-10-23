@@ -15,6 +15,7 @@
     "test:phase1": "tsx server/tests/phase1_test.ts",
     "test:phase2": "tsx server/tests/phase2_test.ts",
     "test:phase3": "tsx server/tests/phase3_test.ts",
+    "test:phase4": "tsx server/tests/phase4_test.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",

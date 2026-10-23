@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
-import { DeveloperSettingsPayload, AuditLogEntry, User, SaleInvoice } from '../types';
+import { DeveloperSettingsPayload, AuditLogEntry, User, SaleInvoice, BackupFrequency } from '../types';
 import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../utils/invoice';
+import { WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -72,6 +73,7 @@ export const DeveloperSettingsPage: React.FC = () => {
     backup_retention_limit: '30',
     backup_frequency: 'daily',
     backup_scheduled_time: '23:00',
+    backup_weekly_day: '0',
     allow_admin_create_cashier: 'true',
     allow_admin_create_admin: 'false',
     allow_admin_edit_store_identity: 'false',
@@ -603,25 +605,26 @@ export const DeveloperSettingsPage: React.FC = () => {
                 <span>Database Backup Retention & Automation Rules</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Configure local disk snapshot retention. Older SQLite snapshots beyond the retention threshold are automatically pruned to preserve disk capacity.
+                Every backup is integrity-checked before it counts. Older verified backups beyond the retention limit are removed only after a new backup succeeds, so the last good backup is never lost.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Backup Retention Limit (Files to Keep)
                 </label>
                 <input
                   type="number"
-                  min="5"
+                  min="1"
                   max="365"
+                  step="1"
                   required
                   value={settings.backup_retention_limit}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_retention_limit: e.target.value }))}
                   className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">Default: 30 snapshots</span>
+                <span className="text-[10px] text-slate-400 mt-1 block">1–365 scheduled, manual &amp; shift-close backups. Pre-restore safety snapshots are kept separately (newest 3).</span>
               </div>
 
               <div>
@@ -633,15 +636,34 @@ export const DeveloperSettingsPage: React.FC = () => {
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_frequency: e.target.value }))}
                   className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
                 >
-                  <option value="daily">Daily Snapshot</option>
-                  <option value="twice_daily">Twice Daily (Every 12h)</option>
-                  <option value="on_shift_close">On Cashier Shift Close</option>
+                  <option value="off">Off (no automatic backups)</option>
+                  <option value="twice_daily">Every 12 hours</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
                 </select>
+                <span className="text-[10px] text-slate-400 mt-1 block">Shift-close backups also run unless this is Off.</span>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Daily Scheduled Time
+                  Weekly Backup Day
+                </label>
+                <select
+                  value={settings.backup_weekly_day || '0'}
+                  disabled={settings.backup_frequency !== 'weekly'}
+                  onChange={(e) => setSettings(prev => ({ ...prev, backup_weekly_day: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+                >
+                  {WEEKDAY_LABELS.map((label, idx) => (
+                    <option key={label} value={String(idx)}>{label}</option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-slate-400 mt-1 block">Used only for Weekly backups.</span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Backup Time of Day
                 </label>
                 <input
                   type="time"
@@ -649,9 +671,17 @@ export const DeveloperSettingsPage: React.FC = () => {
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_scheduled_time: e.target.value }))}
                   className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">24-hour format (e.g. 23:00)</span>
+                <span className="text-[10px] text-slate-400 mt-1 block">24-hour format. Administrators may adjust only this time.</span>
               </div>
             </div>
+
+            <p className="text-[11px] text-purple-500 dark:text-purple-300 font-medium">
+              {describeBackupSchedule(
+                (['off', 'twice_daily', 'daily', 'weekly'].includes(settings.backup_frequency) ? settings.backup_frequency : 'daily') as BackupFrequency,
+                settings.backup_scheduled_time || '23:00',
+                Number(settings.backup_weekly_day || 0)
+              )}. Missed runs (e.g. while the PC was off) are caught up once at the next start.
+            </p>
 
             <div className="pt-4 flex justify-end">
               <button

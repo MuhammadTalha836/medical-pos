@@ -4,6 +4,7 @@ import { SystemSettings, SaleInvoice } from '../types';
 import { Modal } from '../components/common/Modal';
 import { ThermalReceipt } from '../components/pos/ThermalReceipt';
 import { useAuthStore } from '../store/useAuthStore';
+import { BackupHealthCard } from '../components/backup/BackupHealthCard';
 import {
   DollarSign,
   ShoppingCart,
@@ -185,6 +186,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
       </div>
 
       {/* Main Content: Low Stock Priority Table & Recent Invoices */}
+      {/* Backup Health (Phase 4) */}
+      <BackupHealthCard />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Low Stock Priority Table */}
         <div className="card-premium p-5 space-y-4 flex flex-col">

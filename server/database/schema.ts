@@ -273,9 +273,13 @@ CREATE TABLE IF NOT EXISTS backup_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   backup_filename TEXT NOT NULL,
   backup_path TEXT NOT NULL,
-  backup_type TEXT NOT NULL, -- 'manual', 'auto_daily', 'pre_restore'
+  backup_type TEXT NOT NULL, -- 'manual', 'scheduled', 'shift_close', 'pre_restore' (legacy: 'auto_daily')
   file_size_bytes INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'success',
+  status TEXT NOT NULL DEFAULT 'success', -- 'success', 'failed'
+  checksum_sha256 TEXT,
+  verified INTEGER NOT NULL DEFAULT 1,
+  error_message TEXT,
+  secondary_path TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

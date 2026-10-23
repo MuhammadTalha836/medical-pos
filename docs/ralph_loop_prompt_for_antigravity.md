@@ -82,15 +82,15 @@ Copy and paste the structured prompts below into Antigravity using the Ralph Loo
 **Objective:** Implement local offline backup scheduling, retention limits, and verification safeguards.
 
 ### Task 4.1: Backup Retention Limits
-- [ ] Implement backend logic to enforce the Developer-configured backup retention limit (e.g., keeping only the latest $N$ successful backups).
-- [ ] Ensure automated cleanup deletes oldest backups *only after* a new backup has completed successfully and passed integrity verification checks.
-- [ ] Prevent deletion of the last known-good backup if a new backup fails.
+- [x] Implement backend logic to enforce the Developer-configured backup retention limit (e.g., keeping only the latest $N$ successful backups).
+- [x] Ensure automated cleanup deletes oldest backups *only after* a new backup has completed successfully and passed integrity verification checks.
+- [x] Prevent deletion of the last known-good backup if a new backup fails.
 
 ### Task 4.2: Backup Frequency & Execution Time Scheduling
-- [ ] Allow the Developer to define the automatic backup frequency (e.g., daily).
-- [ ] Allow the Admin to configure only the time of day for the backup execution, bounded by the Developer's frequency rule.
-- [ ] Implement a local offline scheduler to handle execution, power-off states, and missed scheduled runs gracefully.
-- [ ] Expose backup statuses, last backup time, next scheduled time, and failure messages in the dashboard.
+- [x] Allow the Developer to define the automatic backup frequency (e.g., daily).
+- [x] Allow the Admin to configure only the time of day for the backup execution, bounded by the Developer's frequency rule.
+- [x] Implement a local offline scheduler to handle execution, power-off states, and missed scheduled runs gracefully.
+- [x] Expose backup statuses, last backup time, next scheduled time, and failure messages in the dashboard.
 
 ---
 
@@ -108,7 +108,7 @@ Copy and paste the structured prompts below into Antigravity using the Ralph Loo
 - [x] **TC-08:** Initial setup captures Developer email and successfully validates TOTP authenticator setup.
 - [x] **TC-09:** Developer login requires a valid current TOTP code and operates fully offline.
 - [x] **TC-10:** Setup wizard cannot be re-run by unauthorized users to overwrite credentials.
-- [ ] **TC-11:** Backup retention (e.g., keeping exactly 4 backups) and scheduling execute reliably offline without compromising safe recovery states.
+- [x] **TC-11:** Backup retention (e.g., keeping exactly 4 backups) and scheduling execute reliably offline without compromising safe recovery states.
 
 ---
 

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import Database from 'better-sqlite3';
 import { db, DB_PATH } from './db';
 
 export const DEFAULT_BACKUP_DIR = path.resolve(process.cwd(), 'backups');
@@ -8,6 +9,17 @@ export const DEFAULT_BACKUP_DIR = path.resolve(process.cwd(), 'backups');
 if (!fs.existsSync(DEFAULT_BACKUP_DIR)) {
   fs.mkdirSync(DEFAULT_BACKUP_DIR, { recursive: true });
 }
+
+export type BackupType = 'manual' | 'scheduled' | 'shift_close' | 'pre_restore';
+
+// Routine backups share the Developer retention limit; pre-restore safety snapshots are kept separately.
+// 'auto_daily' is the pre-Phase 4 name for automatic backups and is still pruned as routine.
+const ROUTINE_BACKUP_TYPES = ['manual', 'scheduled', 'shift_close', 'auto_daily'];
+export const PRE_RESTORE_KEEP = 3;
+export const DEFAULT_RETENTION_LIMIT = 30;
+
+// Tables every valid PharmaCare database must contain
+const REQUIRED_TABLES = ['system_settings', 'products', 'sales', 'users'];
 
 export interface BackupResult {
   success: boolean;
@@ -18,6 +30,7 @@ export interface BackupResult {
   timestamp: string;
   checksumSha256?: string;
   secondaryPath?: string;
+  prunedCount?: number;
   message?: string;
 }
 
@@ -33,37 +46,131 @@ export function calculateFileChecksum(filePath: string): string {
 }
 
 /**
- * Creates an atomic backup of the SQLite database using SQLite's backup API.
- * Supports multi-destination sync to a secondary drive/folder (e.g. external USB).
+ * Verifies that a file is a complete, uncorrupted PharmaCare SQLite database:
+ * valid header, PRAGMA integrity_check = ok, and the core tables present.
+ * Opens the file read-only so verification never modifies it.
  */
-export async function createBackup(
-  backupType: 'manual' | 'auto_daily' | 'pre_restore' = 'manual',
+export function verifyBackupFile(filePath: string): { ok: boolean; error?: string } {
+  if (!fs.existsSync(filePath)) {
+    return { ok: false, error: 'Backup file does not exist.' };
+  }
+
+  const header = Buffer.alloc(16);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    fs.readSync(fd, header, 0, 16, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  if (header.toString('utf8', 0, 15) !== 'SQLite format 3') {
+    return { ok: false, error: 'File is not a valid SQLite database.' };
+  }
+
+  let check: Database.Database | null = null;
+  try {
+    check = new Database(filePath, { readonly: true, fileMustExist: true });
+    const integrity = check.pragma('integrity_check') as Array<{ integrity_check: string }>;
+    if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok') {
+      return { ok: false, error: `Integrity check failed: ${integrity.map(r => r.integrity_check).join('; ')}` };
+    }
+    const tables = new Set(
+      (check.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map(t => t.name)
+    );
+    const missing = REQUIRED_TABLES.filter(t => !tables.has(t));
+    if (missing.length > 0) {
+      return { ok: false, error: `Backup is missing required tables: ${missing.join(', ')}` };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: `Backup could not be opened: ${err.message}` };
+  } finally {
+    check?.close();
+  }
+}
+
+function removeIfExists(filePath: string) {
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch {
+    // Best effort cleanup
+  }
+}
+
+function getSettingValue(key: string): string | undefined {
+  const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get(key) as { value?: string } | undefined;
+  return row?.value;
+}
+
+/**
+ * Resolves the configured primary backup folder (admin-set auto_backup_dir, else ./backups).
+ */
+export function getConfiguredBackupDir(): string {
+  const configured = getSettingValue('auto_backup_dir');
+  return configured && configured.trim() ? path.resolve(configured.trim()) : DEFAULT_BACKUP_DIR;
+}
+
+export function getRetentionLimit(): number {
+  const parsed = parseInt(getSettingValue('backup_retention_limit') || '', 10);
+  return isNaN(parsed) || parsed < 1 ? DEFAULT_RETENTION_LIMIT : parsed;
+}
+
+// Serializes all backups (manual, scheduled, shift-close, pre-restore) so they never overlap
+let backupQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Creates a verified backup of the SQLite database.
+ * The snapshot is written to a .partial file, verified (integrity_check + core tables), checksummed,
+ * and only then renamed into place and recorded. Old backups are pruned only after that succeeds;
+ * a failed backup is recorded as 'failed' and never triggers pruning.
+ */
+export function createBackup(
+  backupType: BackupType = 'manual',
   customDir?: string,
   secondaryDir?: string
 ): Promise<BackupResult> {
-  const targetDir = customDir ? path.resolve(customDir) : DEFAULT_BACKUP_DIR;
-  if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
-  }
+  const run = backupQueue.then(() => runBackup(backupType, customDir, secondaryDir));
+  backupQueue = run.catch(() => undefined);
+  return run;
+}
 
+async function runBackup(backupType: BackupType, customDir?: string, secondaryDir?: string): Promise<BackupResult> {
+  const targetDir = customDir ? path.resolve(customDir) : DEFAULT_BACKUP_DIR;
   const now = new Date();
   const dateStr = now.toISOString().replace(/[:.]/g, '-');
   const filename = `pharmacy_backup_${backupType}_${dateStr}.db`;
   const filepath = path.join(targetDir, filename);
+  const partialPath = `${filepath}.partial`;
 
   try {
-    // Utilize better-sqlite3 native async atomic backup API
-    await db.backup(filepath);
-
-    const stats = fs.statSync(filepath);
-    const checksum = calculateFileChecksum(filepath);
-
-    // Save SHA-256 sidecar file for offline verification
-    try {
-      fs.writeFileSync(`${filepath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
-    } catch {
-      // Non-fatal
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
+
+    // 1. Snapshot via better-sqlite3's online backup API into a temporary file
+    await db.backup(partialPath);
+
+    // Make the snapshot self-contained (no -wal/-shm side files) before verification
+    const snapshot = new Database(partialPath, { fileMustExist: true });
+    try {
+      snapshot.pragma('journal_mode = DELETE');
+    } finally {
+      snapshot.close();
+    }
+
+    // 2. Verify integrity before the backup is allowed to count
+    const verification = verifyBackupFile(partialPath);
+    if (!verification.ok) {
+      throw new Error(verification.error);
+    }
+
+    // 3. Commit atomically and confirm the checksum survived the rename
+    const checksum = calculateFileChecksum(partialPath);
+    fs.renameSync(partialPath, filepath);
+    if (calculateFileChecksum(filepath) !== checksum) {
+      throw new Error('Checksum mismatch after writing backup file.');
+    }
+    fs.writeFileSync(`${filepath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
+    const stats = fs.statSync(filepath);
 
     // Multi-Destination: Copy to secondary destination (e.g. External USB drive) if configured
     let secondaryPath: string | undefined = undefined;
@@ -73,27 +180,30 @@ export async function createBackup(
         if (!fs.existsSync(secDirResolved)) {
           fs.mkdirSync(secDirResolved, { recursive: true });
         }
-        secondaryPath = path.join(secDirResolved, filename);
-        fs.copyFileSync(filepath, secondaryPath);
-        fs.writeFileSync(`${secondaryPath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
+        const copyPath = path.join(secDirResolved, filename);
+        fs.copyFileSync(filepath, copyPath);
+        if (calculateFileChecksum(copyPath) === checksum) {
+          fs.writeFileSync(`${copyPath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
+          secondaryPath = copyPath;
+        } else {
+          removeIfExists(copyPath);
+          console.warn('[Backup] Secondary copy checksum mismatch; copy discarded.');
+        }
       } catch (secErr: any) {
         console.warn('[Backup] Secondary destination copy warning:', secErr.message);
       }
     }
 
-    // Record in backup history table
-    const insertHistory = db.prepare(`
-      INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status)
-      VALUES (?, ?, ?, ?, 'success')
-    `);
-    insertHistory.run(filename, filepath, backupType, stats.size);
+    // 4. Record the verified backup
+    db.prepare(`
+      INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status, checksum_sha256, verified, secondary_path)
+      VALUES (?, ?, ?, ?, 'success', ?, 1, ?)
+    `).run(filename, filepath, backupType, stats.size, checksum, secondaryPath ?? null);
 
-    // Prune old backups according to retention limit
-    try {
-      pruneBackupsByRetentionLimit();
-    } catch {
-      // Non-fatal pruning error
-    }
+    // 5. Only now is it safe to prune older backups in this folder
+    const prunedCount = backupType === 'pre_restore'
+      ? prunePreRestoreSnapshots(targetDir)
+      : pruneBackupsByRetentionLimit(undefined, targetDir);
 
     return {
       success: true,
@@ -104,50 +214,85 @@ export async function createBackup(
       sizeBytes: stats.size,
       type: backupType,
       timestamp: now.toISOString(),
+      prunedCount,
       message: secondaryPath
-        ? `Backup created successfully and synced to secondary external drive.`
-        : 'Backup created successfully.'
+        ? 'Backup created, verified, and synced to secondary external drive.'
+        : 'Backup created and verified successfully.'
     };
   } catch (error: any) {
-    console.error('Backup failed:', error);
-    throw new Error(`Backup failed: ${error.message}`);
+    removeIfExists(partialPath);
+    removeIfExists(`${partialPath}-wal`);
+    removeIfExists(`${partialPath}-shm`);
+    const message = error?.message || String(error);
+    try {
+      db.prepare(`
+        INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status, verified, error_message)
+        VALUES (?, ?, ?, 0, 'failed', 0, ?)
+      `).run(filename, filepath, backupType, message);
+    } catch {
+      // History is best effort when the database itself is the problem
+    }
+    console.error('Backup failed:', message);
+    throw new Error(`Backup failed: ${message}`);
   }
 }
 
+interface RetainedBackupRow {
+  id: number;
+  backup_filename: string;
+  backup_path: string;
+  secondary_path: string | null;
+}
+
+function deleteBackupRow(row: RetainedBackupRow) {
+  removeIfExists(row.backup_path);
+  removeIfExists(`${row.backup_path}.sha256`);
+  if (row.secondary_path) {
+    removeIfExists(row.secondary_path);
+    removeIfExists(`${row.secondary_path}.sha256`);
+  }
+  db.prepare('DELETE FROM backup_history WHERE id = ?').run(row.id);
+}
+
 /**
- * Prunes backups exceeding retention limit.
+ * Verified successful backups of the given types stored in a folder, newest first.
+ * Only files recorded in backup_history are ever considered, so unrelated files are never touched.
  */
-export function pruneBackupsByRetentionLimit(customLimit?: number): number {
+function listVerifiedBackups(dir: string, types: string[]): RetainedBackupRow[] {
+  const placeholders = types.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT id, backup_filename, backup_path, secondary_path
+    FROM backup_history
+    WHERE status = 'success' AND verified = 1 AND backup_type IN (${placeholders})
+    ORDER BY id DESC
+  `).all(...types) as RetainedBackupRow[];
+
+  const resolvedDir = path.resolve(dir);
+  return rows.filter(r => path.dirname(path.resolve(r.backup_path)) === resolvedDir && fs.existsSync(r.backup_path));
+}
+
+export function countRetainedBackups(dir: string = getConfiguredBackupDir()): number {
+  return listVerifiedBackups(dir, ROUTINE_BACKUP_TYPES).length;
+}
+
+/**
+ * Enforces the Developer retention limit on routine backups in a folder: keeps the newest N verified
+ * backups and deletes older ones (with their checksum sidecars and secondary copies).
+ * The newest verified backup is never deleted because N is at least 1.
+ */
+export function pruneBackupsByRetentionLimit(customLimit?: number, dir: string = getConfiguredBackupDir()): number {
   try {
-    let maxKeep = customLimit;
-    if (maxKeep === undefined || maxKeep === null) {
-      const row = db.prepare("SELECT value FROM system_settings WHERE key = 'backup_retention_limit'").get() as { value?: string } | undefined;
-      maxKeep = row?.value ? parseInt(row.value, 10) : 30;
-    }
-    if (isNaN(maxKeep) || maxKeep <= 0) maxKeep = 30;
+    let maxKeep = customLimit ?? getRetentionLimit();
+    if (isNaN(maxKeep) || maxKeep < 1) maxKeep = 1;
 
-    if (!fs.existsSync(DEFAULT_BACKUP_DIR)) return 0;
-    const dbFiles = fs.readdirSync(DEFAULT_BACKUP_DIR)
-      .filter(f => f.endsWith('.db'))
-      .map(f => {
-        const fp = path.join(DEFAULT_BACKUP_DIR, f);
-        return { filename: f, filepath: fp, mtime: fs.statSync(fp).mtime.getTime() };
-      })
-      .sort((a, b) => b.mtime - a.mtime); // newest first
-
+    const retained = listVerifiedBackups(dir, ROUTINE_BACKUP_TYPES);
     let deletedCount = 0;
-    if (dbFiles.length > maxKeep) {
-      const toDelete = dbFiles.slice(maxKeep);
-      for (const item of toDelete) {
-        try {
-          if (fs.existsSync(item.filepath)) fs.unlinkSync(item.filepath);
-          const sha = `${item.filepath}.sha256`;
-          if (fs.existsSync(sha)) fs.unlinkSync(sha);
-          db.prepare('DELETE FROM backup_history WHERE backup_filename = ?').run(item.filename);
-          deletedCount++;
-        } catch (e) {
-          console.warn('[Backup Prune] Error removing file:', item.filename, e);
-        }
+    for (const row of retained.slice(maxKeep)) {
+      try {
+        deleteBackupRow(row);
+        deletedCount++;
+      } catch (e) {
+        console.warn('[Backup Prune] Error removing file:', row.backup_filename, e);
       }
     }
     return deletedCount;
@@ -158,17 +303,35 @@ export function pruneBackupsByRetentionLimit(customLimit?: number): number {
 }
 
 /**
+ * Keeps only the newest pre-restore safety snapshots in a folder.
+ */
+export function prunePreRestoreSnapshots(dir: string = getConfiguredBackupDir()): number {
+  try {
+    let deletedCount = 0;
+    for (const row of listVerifiedBackups(dir, ['pre_restore']).slice(PRE_RESTORE_KEEP)) {
+      deleteBackupRow(row);
+      deletedCount++;
+    }
+    return deletedCount;
+  } catch (err) {
+    console.warn('[Backup Prune] Pre-restore warning:', err);
+    return 0;
+  }
+}
+
+/**
  * Lists all existing backups from directory and database history.
  */
 export function getBackupList() {
   const records = db.prepare('SELECT * FROM backup_history ORDER BY id DESC LIMIT 50').all();
+  const backupDir = getConfiguredBackupDir();
 
-  // Also check disk files in default directory
-  const diskFiles = fs.existsSync(DEFAULT_BACKUP_DIR)
-    ? fs.readdirSync(DEFAULT_BACKUP_DIR)
+  // Also check disk files in the configured backup directory
+  const diskFiles = fs.existsSync(backupDir) && fs.statSync(backupDir).isDirectory()
+    ? fs.readdirSync(backupDir)
         .filter(f => f.endsWith('.db'))
         .map(f => {
-          const fp = path.join(DEFAULT_BACKUP_DIR, f);
+          const fp = path.join(backupDir, f);
           const stat = fs.statSync(fp);
           const shaFile = `${fp}.sha256`;
           let checksum = '';
@@ -194,24 +357,20 @@ export function getBackupList() {
 
 /**
  * Restores a SQLite database from a chosen backup file with automatic safety snapshot.
+ * The chosen file is fully verified before anything is touched.
  */
 export async function restoreDatabase(backupFilePath: string): Promise<{ success: boolean; message: string }> {
   if (!fs.existsSync(backupFilePath)) {
     throw new Error('Selected backup file does not exist.');
   }
 
-  // Verify header is a valid SQLite 3 file
-  const buffer = Buffer.alloc(16);
-  const fd = fs.openSync(backupFilePath, 'r');
-  fs.readSync(fd, buffer, 0, 16, 0);
-  fs.closeSync(fd);
-
-  if (buffer.toString('utf8', 0, 15) !== 'SQLite format 3') {
-    throw new Error('The selected file is not a valid SQLite database.');
+  const verification = verifyBackupFile(backupFilePath);
+  if (!verification.ok) {
+    throw new Error(`Restore aborted, the selected backup failed verification: ${verification.error}`);
   }
 
   // 1. Create a safety snapshot of current DB before replacing
-  await createBackup('pre_restore');
+  await createBackup('pre_restore', getConfiguredBackupDir());
 
   // 2. Perform restore by copying backup file over active DB
   // Checkpoint WAL first

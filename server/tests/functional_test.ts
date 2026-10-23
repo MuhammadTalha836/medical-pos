@@ -525,15 +525,28 @@ async function runTestSuite() {
         fs.mkdirSync(secondaryVault, { recursive: true });
       }
 
-      const backupRes = await request('/utilities/backup', {
+      // Backups go to the saved folders; point the secondary destination at the test vault for this step
+      const adminHeaders = { 'x-user-id': String(adminUser.id) };
+      const originalSecondary = (await request('/settings')).secondary_backup_dir ?? '';
+      await request('/settings', {
         method: 'POST',
-        body: JSON.stringify({
-          customDir: './backups',
-          secondaryDir: secondaryVault,
-        }),
+        headers: adminHeaders,
+        body: JSON.stringify({ secondary_backup_dir: secondaryVault }),
       });
 
+      let backupRes: any;
+      try {
+        backupRes = await request('/utilities/backup', { method: 'POST', headers: adminHeaders });
+      } finally {
+        await request('/settings', {
+          method: 'POST',
+          headers: adminHeaders,
+          body: JSON.stringify({ secondary_backup_dir: originalSecondary }),
+        });
+      }
+
       assert(backupRes.success, 'Backup created successfully');
+      assert(!!backupRes.secondaryPath, 'Backup synced to the secondary destination');
       assert(fs.existsSync(backupRes.filepath), 'Primary backup file exists on disk');
       assert(backupRes.checksumSha256 && backupRes.checksumSha256.length === 64, 'Valid 64-char SHA-256 returned');
 

@@ -1,4 +1,5 @@
 import {
+  BackupStatus,
   Company,
   Product,
   SaleInvoice,
@@ -254,19 +255,27 @@ export const api = {
   getCompanyWiseSalesReport: () => fetch(`${API_BASE}/reports/sales/company-wise`).then(r => handleResponse<any[]>(r)),
 
   // Utilities & Local Backup
-  getBackupList: () => fetch(`${API_BASE}/utilities/backups`).then(r => handleResponse<any>(r)),
-  createBackup: (customDir?: string, secondaryDir?: string) =>
+  getBackupList: () => fetch(`${API_BASE}/utilities/backups`, { headers: getAuthHeaders() }).then(r => handleResponse<any>(r)),
+  // Backups always go to the saved primary/secondary folders (Utilities -> Backup & Vault)
+  createBackup: () =>
     fetch(`${API_BASE}/utilities/backup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customDir, secondaryDir })
+      headers: getAuthHeaders()
     }).then(r => handleResponse<any>(r)),
   restoreBackup: (backupFilePath: string) =>
     fetch(`${API_BASE}/utilities/restore`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ backupFilePath })
     }).then(r => handleResponse<any>(r)),
+  getBackupStatus: () =>
+    fetch(`${API_BASE}/backups/status`, { headers: getAuthHeaders() }).then(r => handleResponse<BackupStatus>(r)),
+  updateBackupTime: (backupScheduledTime: string) =>
+    fetch(`${API_BASE}/backups/schedule`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ backup_scheduled_time: backupScheduledTime })
+    }).then(r => handleResponse<{ success: boolean; backup_scheduled_time: string; next_run_at: string | null }>(r)),
   resetStockZero: (data: { company_id?: number; confirmation_code: string; user_id?: number; user_name?: string }) =>
     fetch(`${API_BASE}/utilities/stock-zero`, {
       method: 'POST',

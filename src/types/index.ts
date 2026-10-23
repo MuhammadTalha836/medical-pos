@@ -380,10 +380,32 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
+// Phase 4: Developer-controlled automatic backup frequency
+export type BackupFrequency = 'off' | 'twice_daily' | 'daily' | 'weekly';
+
+export interface BackupStatus {
+  frequency: BackupFrequency;
+  scheduled_time: string;
+  weekly_day: number;
+  enabled: boolean;
+  next_run_at: string | null;
+  is_overdue: boolean;
+  last_success_at: string | null;
+  last_attempt_at: string | null;
+  last_status: 'success' | 'failed' | null;
+  last_error: string | null;
+  last_type: string | null;
+  last_backup_file: string | null;
+  retention_limit: number;
+  retained_count: number;
+  pre_restore_keep: number;
+}
+
 export interface DeveloperSettingsPayload {
   backup_retention_limit: string;
   backup_frequency: string;
   backup_scheduled_time?: string;
+  backup_weekly_day?: string;
   allow_admin_create_cashier: string;
   allow_admin_create_admin: string;
   allow_admin_edit_store_identity: string;

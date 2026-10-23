@@ -39,6 +39,10 @@ export function initDatabase(customPath?: string): Database.Database {
   try { db.exec(`ALTER TABLE sales ADD COLUMN store_name_snapshot TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE sales ADD COLUMN store_address_snapshot TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE sales ADD COLUMN invoice_footer_snapshot TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE backup_history ADD COLUMN checksum_sha256 TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE backup_history ADD COLUMN verified INTEGER NOT NULL DEFAULT 1;`); } catch {}
+  try { db.exec(`ALTER TABLE backup_history ADD COLUMN error_message TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE backup_history ADD COLUMN secondary_path TEXT;`); } catch {}
 
   // Seed default data if database is fresh
   seedInitialData(db);

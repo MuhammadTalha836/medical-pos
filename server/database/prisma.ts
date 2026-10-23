@@ -26,6 +26,15 @@ export async function initPrisma(): Promise<void> {
     try { await prisma.$executeRawUnsafe(`ALTER TABLE sales ADD COLUMN store_name_snapshot TEXT;`); } catch {}
     try { await prisma.$executeRawUnsafe(`ALTER TABLE sales ADD COLUMN store_address_snapshot TEXT;`); } catch {}
     try { await prisma.$executeRawUnsafe(`ALTER TABLE sales ADD COLUMN invoice_footer_snapshot TEXT;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE backup_history ADD COLUMN checksum_sha256 TEXT;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE backup_history ADD COLUMN verified INTEGER NOT NULL DEFAULT 1;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE backup_history ADD COLUMN error_message TEXT;`); } catch {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE backup_history ADD COLUMN secondary_path TEXT;`); } catch {}
+
+    // Phase 4: shift-close backups always accompany the schedule, so the old 'on_shift_close' rule becomes daily
+    try {
+      await prisma.systemSetting.updateMany({ where: { key: 'backup_frequency', value: 'on_shift_close' }, data: { value: 'daily' } });
+    } catch {}
 
     // Phase 3: move legacy A4/A5 paper sizes and sheet templates onto thermal equivalents
     try { await migrateLegacyInvoiceSettings(prisma); } catch (err) {

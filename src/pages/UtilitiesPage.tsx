@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
-import { SystemSettings } from '../types';
+import { BackupStatus, SystemSettings } from '../types';
+import { BACKUP_FREQUENCY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { ShiftHistoryHub } from '../components/shifts/ShiftHistoryHub';
 import {
   Database,
@@ -39,8 +40,9 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
   const [loading, setLoading] = useState(false);
   const [customBackupDir, setCustomBackupDir] = useState('./backups');
   const [secondaryBackupDir, setSecondaryBackupDir] = useState('');
-  const [autoBackupEnabled, setAutoBackupEnabled] = useState(true);
-  const [autoBackupInterval, setAutoBackupInterval] = useState('24');
+  const [savedBackupDirs, setSavedBackupDirs] = useState({ primary: './backups', secondary: '' });
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [backupTime, setBackupTime] = useState('23:00');
   const [savingSettings, setSavingSettings] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
@@ -53,27 +55,23 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
   const loadData = async () => {
     try {
       setLoading(true);
-      const [bkList, compList, allSettings] = await Promise.all([
-        api.getBackupList(),
+      const [bkList, compList, allSettings, status] = await Promise.all([
+        api.getBackupList().catch(() => ({ records: [], diskFiles: [] })),
         api.getCompanies(),
-        api.getSettings()
+        api.getSettings(),
+        api.getBackupStatus().catch(() => null)
       ]);
       setBackups(bkList);
       setCompanies(compList);
+      setBackupStatus(status);
+      if (status) setBackupTime(status.scheduled_time);
 
       if (allSettings) {
-        if (allSettings.secondary_backup_dir !== undefined) {
-          setSecondaryBackupDir(allSettings.secondary_backup_dir);
-        }
-        if (allSettings.auto_backup_enabled !== undefined) {
-          setAutoBackupEnabled(allSettings.auto_backup_enabled === 'true');
-        }
-        if (allSettings.auto_backup_interval_hours !== undefined) {
-          setAutoBackupInterval(allSettings.auto_backup_interval_hours);
-        }
-        if (allSettings.auto_backup_dir) {
-          setCustomBackupDir(allSettings.auto_backup_dir);
-        }
+        const primary = allSettings.auto_backup_dir || './backups';
+        const secondary = allSettings.secondary_backup_dir || '';
+        setCustomBackupDir(primary);
+        setSecondaryBackupDir(secondary);
+        setSavedBackupDirs({ primary, secondary });
       }
     } catch (err) {
       console.error('Failed to load utilities data:', err);
@@ -108,18 +106,25 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
     }
   };
 
+  const saveBackupFolders = async () => {
+    const primary = customBackupDir.trim() || './backups';
+    const secondary = secondaryBackupDir.trim();
+    if (primary === savedBackupDirs.primary && secondary === savedBackupDirs.secondary) return;
+    await api.saveSettings({ auto_backup_dir: primary, secondary_backup_dir: secondary });
+    setSavedBackupDirs({ primary, secondary });
+  };
+
   const handleSaveBackupSettings = async () => {
     try {
       setSavingSettings(true);
       setMessage(null);
-      await api.saveSettings({
-        secondary_backup_dir: secondaryBackupDir.trim(),
-        auto_backup_enabled: String(autoBackupEnabled),
-        auto_backup_interval_hours: autoBackupInterval,
-        auto_backup_dir: customBackupDir.trim() || './backups'
-      });
-      setMessage({ type: 'success', text: 'Backup preferences and multi-destination paths saved successfully.' });
+      await saveBackupFolders();
+      if (backupStatus && backupTime !== backupStatus.scheduled_time) {
+        await api.updateBackupTime(backupTime);
+      }
+      setMessage({ type: 'success', text: 'Backup folders and time of day saved successfully.' });
       if (onRefreshSettings) onRefreshSettings();
+      loadData();
     } catch (err: any) {
       setMessage({ type: 'error', text: 'Failed to save settings: ' + err.message });
     } finally {
@@ -131,14 +136,13 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
     try {
       setLoading(true);
       setMessage(null);
-      const res = await api.createBackup(
-        customBackupDir.trim() || undefined,
-        secondaryBackupDir.trim() || undefined
-      );
+      // Backups always use the saved folders, so persist any edited paths first
+      await saveBackupFolders();
+      const res = await api.createBackup();
       if (res.success) {
         setMessage({
           type: 'success',
-          text: `Backup created: ${res.filename} (${(res.sizeBytes / 1024).toFixed(1)} KB). SHA-256 verified.${res.secondaryPath ? ' Synced to secondary drive.' : ''}`
+          text: `Backup created: ${res.filename} (${(res.sizeBytes / 1024).toFixed(1)} KB). Integrity check and SHA-256 verified.${res.secondaryPath ? ' Synced to secondary drive.' : ''}${res.prunedCount ? ` ${res.prunedCount} old backup(s) removed by the retention limit.` : ''}`
         });
         loadData();
       }
@@ -408,35 +412,26 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                     </p>
                   </div>
 
-                  {/* Automated Background Schedule Settings */}
+                  {/* Automatic Backup Schedule: frequency is Developer-controlled, Admin sets the time of day */}
                   <div className="pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="autoBackupEnabled"
-                        checked={autoBackupEnabled}
-                        onChange={(e) => setAutoBackupEnabled(e.target.checked)}
-                        className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 h-4 w-4"
-                      />
-                      <label htmlFor="autoBackupEnabled" className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                        Automated Background Backup
-                      </label>
+                    <div className="text-xs text-slate-700 dark:text-slate-300">
+                      <span className="text-slate-500 dark:text-slate-400">Frequency: </span>
+                      <strong>{backupStatus ? BACKUP_FREQUENCY_LABELS[backupStatus.frequency] : '...'}</strong>
+                      <span className="flex items-center text-[10px] text-slate-400 mt-0.5">
+                        <Lock className="w-3 h-3 mr-0.5" /> Set by Developer
+                      </span>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs text-slate-500 dark:text-slate-400">Interval:</span>
-                      <select
-                        value={autoBackupInterval}
-                        onChange={(e) => setAutoBackupInterval(e.target.value)}
-                        disabled={!autoBackupEnabled}
-                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                      >
-                        <option value="2">Every 2 Hours</option>
-                        <option value="4">Every 4 Hours</option>
-                        <option value="8">Every 8 Hours</option>
-                        <option value="12">Every 12 Hours</option>
-                        <option value="24">Daily (Every 24 Hours)</option>
-                      </select>
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Time of day:</span>
+                      <input
+                        type="time"
+                        value={backupTime}
+                        onChange={(e) => setBackupTime(e.target.value)}
+                        disabled={!backupStatus || backupStatus.frequency === 'off'}
+                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+                      />
                     </div>
 
                     <div className="flex justify-end">
@@ -450,6 +445,16 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         <span>{savingSettings ? 'Saving...' : 'Save Settings'}</span>
                       </button>
                     </div>
+
+                    {backupStatus && (
+                      <div className="sm:col-span-3 text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                        <span>{describeBackupSchedule(backupStatus.frequency, backupStatus.scheduled_time, backupStatus.weekly_day)}</span>
+                        {backupStatus.next_run_at && (
+                          <span>Next run: <strong className="text-slate-700 dark:text-slate-300">{new Date(backupStatus.next_run_at).toLocaleString()}</strong></span>
+                        )}
+                        <span>Keeping newest <strong className="text-slate-700 dark:text-slate-300">{backupStatus.retention_limit}</strong> verified backups ({backupStatus.retained_count} stored)</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -501,23 +506,31 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                           </td>
                         </tr>
                       ) : (
-                        backups.diskFiles?.map((file: any, idx: number) => (
+                        backups.diskFiles?.map((file: any, idx: number) => {
+                          const record = backups.records?.find((r: any) => r.backup_filename === file.filename);
+                          const kind = file.filename.includes('_pre_restore_')
+                            ? { label: 'Pre-Restore', cls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' }
+                            : file.filename.includes('_shift_close_')
+                            ? { label: 'Shift Close', cls: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' }
+                            : file.filename.includes('_scheduled_') || file.filename.includes('_auto_')
+                            ? { label: 'Scheduled', cls: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' }
+                            : { label: 'Manual', cls: 'bg-teal-500/10 text-teal-600 dark:text-teal-400' };
+                          return (
                           <tr key={idx} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
                             <td className="py-2.5 px-3 font-mono text-slate-900 dark:text-white text-[11px] truncate max-w-[190px]" title={file.path}>
                               {file.filename}
                             </td>
                             <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 text-[10px]">
-                              <span className={`px-2 py-0.5 rounded-full font-semibold ${
-                                file.filename.includes('auto_shift')
-                                  ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
-                                  : file.filename.includes('pre_restore')
-                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                  : file.filename.includes('auto')
-                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                                  : 'bg-teal-500/10 text-teal-600 dark:text-teal-400'
-                              }`}>
-                                {file.filename.includes('auto_shift') ? 'Shift Close' : file.filename.includes('pre_restore') ? 'Pre-Restore' : file.filename.includes('auto') ? 'Auto-Schedule' : 'Manual'}
-                              </span>
+                              <div className="flex flex-col items-start gap-1">
+                                <span className={`px-2 py-0.5 rounded-full font-semibold ${kind.cls}`}>{kind.label}</span>
+                                {record?.verified === 1 && record?.status === 'success' ? (
+                                  <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 font-semibold">
+                                    <ShieldCheck className="w-3 h-3 mr-0.5" /> Verified
+                                  </span>
+                                ) : !record ? (
+                                  <span className="text-slate-400">Untracked</span>
+                                ) : null}
+                              </div>
                             </td>
                             <td className="py-2.5 px-3 text-right font-mono text-slate-600 dark:text-slate-300 text-[11px]">
                               {(file.sizeBytes / 1024).toFixed(1)} KB
@@ -555,7 +568,8 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                               </button>
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
