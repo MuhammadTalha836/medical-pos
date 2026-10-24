@@ -6,6 +6,8 @@ import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../utils/invoice';
 import { WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
+import { LicensePanel } from '../components/developer/LicensePanel';
+import { AdminPermissionsPanel } from '../components/developer/AdminPermissionsPanel';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -26,7 +28,9 @@ import {
   Filter,
   Check,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CalendarClock,
+  ListChecks
 } from 'lucide-react';
 
 // Minimal sale used to preview how the developer footer wraps on the narrowest (58mm) roll
@@ -66,7 +70,7 @@ const FOOTER_PREVIEW_INVOICE: SaleInvoice = {
 
 export const DeveloperSettingsPage: React.FC = () => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'policies' | 'store' | 'backups' | 'passwords' | 'audit'>('policies');
+  const [activeTab, setActiveTab] = useState<'license' | 'policies' | 'permissions' | 'store' | 'backups' | 'passwords' | 'audit'>('license');
 
   // Developer settings state
   const [settings, setSettings] = useState<DeveloperSettingsPayload>({
@@ -270,10 +274,22 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="flex overflow-x-auto space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2">
         <button
+          onClick={() => setActiveTab('license')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'license'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <CalendarClock className="w-4 h-4" />
+          <span>License</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('policies')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeTab === 'policies'
-              ? 'bg-purple-600 text-white shadow-sm'
+              ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -282,10 +298,22 @@ export const DeveloperSettingsPage: React.FC = () => {
         </button>
 
         <button
+          onClick={() => setActiveTab('permissions')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'permissions'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <ListChecks className="w-4 h-4" />
+          <span>Admin Permissions</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('store')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeTab === 'store'
-              ? 'bg-purple-600 text-white shadow-sm'
+              ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -297,7 +325,7 @@ export const DeveloperSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('backups')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeTab === 'backups'
-              ? 'bg-purple-600 text-white shadow-sm'
+              ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -309,7 +337,7 @@ export const DeveloperSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('passwords')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeTab === 'passwords'
-              ? 'bg-purple-600 text-white shadow-sm'
+              ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -321,7 +349,7 @@ export const DeveloperSettingsPage: React.FC = () => {
           onClick={() => setActiveTab('audit')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeTab === 'audit'
-              ? 'bg-purple-600 text-white shadow-sm'
+              ? 'bg-purple-600 text-white shadow-xs'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
@@ -338,21 +366,25 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* Global Alerts */}
       {saveSuccessMsg && (
         <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{saveSuccessMsg}</span>
         </div>
       )}
       {saveErrorMsg && (
         <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-rose-600 dark:text-rose-400 animate-fadeIn">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{saveErrorMsg}</span>
         </div>
       )}
 
+      {activeTab === 'license' && <LicensePanel onChanged={() => fetchAuditLogs(1)} />}
+
+      {activeTab === 'permissions' && <AdminPermissionsPanel />}
+
       {/* TAB 1: RBAC POLICIES */}
       {activeTab === 'policies' && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-xs">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <ShieldCheck className="w-5 h-5 text-purple-500" />
@@ -365,14 +397,14 @@ export const DeveloperSettingsPage: React.FC = () => {
 
             <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
               {/* Toggle 1: Allow Admin create cashier */}
-              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800/80">
                 <div className="space-y-1 pr-4">
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Create Cashier Accounts</span>
                     {settings.allow_admin_create_cashier === 'true' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500">Restricted</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-rose-500/10 text-rose-500">Restricted</span>
                     )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -386,19 +418,19 @@ export const DeveloperSettingsPage: React.FC = () => {
                     onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_create_cashier: e.target.checked ? 'true' : 'false' }))}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
 
               {/* Toggle 2: Allow Admin create admin */}
-              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800/80">
                 <div className="space-y-1 pr-4">
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Create Administrator Accounts</span>
                     {settings.allow_admin_create_admin === 'true' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500">Disabled (Recommended)</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-amber-500/10 text-amber-500">Disabled (Recommended)</span>
                     )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -412,19 +444,19 @@ export const DeveloperSettingsPage: React.FC = () => {
                     onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_create_admin: e.target.checked ? 'true' : 'false' }))}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
 
               {/* Toggle 3: Allow Admin edit store identity */}
-              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800/80">
                 <div className="space-y-1 pr-4">
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Edit Store Name & Address</span>
                     {settings.allow_admin_edit_store_identity === 'true' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
                     )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -438,19 +470,19 @@ export const DeveloperSettingsPage: React.FC = () => {
                     onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_edit_store_identity: e.target.checked ? 'true' : 'false' }))}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
 
               {/* Toggle 4: Allow Admin to hide store identity on receipts */}
-              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800/80">
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800/80">
                 <div className="space-y-1 pr-4">
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Hide Store Name & Address on Receipts</span>
                     {settings.allow_admin_hide_store_identity === 'true' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
+                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
                     )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -464,7 +496,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                     onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_hide_store_identity: e.target.checked ? 'true' : 'false' }))}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                 </label>
               </div>
             </div>
@@ -486,7 +518,7 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* TAB 2: PROTECTED STORE IDENTITY & DEVELOPER FOOTER */}
       {activeTab === 'store' && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-xs">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <Building className="w-5 h-5 text-purple-500" />
@@ -507,20 +539,19 @@ export const DeveloperSettingsPage: React.FC = () => {
                   required
                   value={settings.store_name}
                   onChange={(e) => setSettings(prev => ({ ...prev, store_name: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Developer Contact / Recovery Email
+                  Developer Sign-in Email (fixed in this build)
                 </label>
                 <input
                   type="email"
+                  readOnly
                   value={settings.developer_email || ''}
-                  onChange={(e) => setSettings(prev => ({ ...prev, developer_email: e.target.value }))}
-                  placeholder="developer@localdomain.com"
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed focus:outline-hidden"
                 />
               </div>
 
@@ -533,7 +564,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   required
                   value={settings.store_address}
                   onChange={(e) => setSettings(prev => ({ ...prev, store_address: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                 />
               </div>
 
@@ -550,7 +581,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                       maxLength={FOOTER_MAX_LENGTH}
                       value={settings.developer_invoice_footer}
                       onChange={(e) => setSettings(prev => ({ ...prev, developer_invoice_footer: e.target.value }))}
-                      className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                     />
                     <div className="flex justify-between gap-2 mt-1 text-[10px] text-slate-400">
                       <span>
@@ -598,7 +629,7 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* TAB 3: BACKUP RETENTION & SCHEDULING */}
       {activeTab === 'backups' && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-xs">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <Database className="w-5 h-5 text-purple-500" />
@@ -622,7 +653,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   required
                   value={settings.backup_retention_limit}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_retention_limit: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">1–365 scheduled, manual &amp; shift-close backups. Pre-restore safety snapshots are kept separately (newest 3).</span>
               </div>
@@ -634,7 +665,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                 <select
                   value={settings.backup_frequency}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_frequency: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                 >
                   <option value="off">Off (no automatic backups)</option>
                   <option value="twice_daily">Every 12 hours</option>
@@ -652,7 +683,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   value={settings.backup_weekly_day || '0'}
                   disabled={settings.backup_frequency !== 'weekly'}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_weekly_day: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
                 >
                   {WEEKDAY_LABELS.map((label, idx) => (
                     <option key={label} value={String(idx)}>{label}</option>
@@ -669,7 +700,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   type="time"
                   value={settings.backup_scheduled_time || '23:00'}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_scheduled_time: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">24-hour format. Administrators may adjust only this time.</span>
               </div>
@@ -700,7 +731,7 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* TAB 4: STAFF PASSWORD RESET */}
       {activeTab === 'passwords' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-sm">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
@@ -719,7 +750,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Filter staff accounts..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                 />
               </div>
             </div>
@@ -804,7 +835,7 @@ export const DeveloperSettingsPage: React.FC = () => {
       {activeTab === 'audit' && (
         <div className="space-y-4">
           {/* Audit Filters Bar */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <div className="flex items-center space-x-1 text-xs text-slate-500">
                 <Filter className="w-3.5 h-3.5 text-purple-500" />
@@ -814,7 +845,7 @@ export const DeveloperSettingsPage: React.FC = () => {
               <select
                 value={filterModule}
                 onChange={(e) => setFilterModule(e.target.value)}
-                className="bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none"
+                className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden"
               >
                 <option value="">All Modules</option>
                 <option value="AUTH">AUTH</option>
@@ -828,7 +859,7 @@ export const DeveloperSettingsPage: React.FC = () => {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none"
+                className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden"
               >
                 <option value="">All Statuses</option>
                 <option value="SUCCESS">SUCCESS</option>
@@ -842,7 +873,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   onChange={(e) => setFilterUser(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && fetchAuditLogs(1)}
                   placeholder="Filter by user..."
-                  className="bg-slate-50 dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none w-36"
+                  className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden w-36"
                 />
               </div>
 
@@ -861,11 +892,11 @@ export const DeveloperSettingsPage: React.FC = () => {
           </div>
 
           {/* Audit Logs Table */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-[#0d131f]/50 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-surface-inset-dark/50 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
                     <th className="py-3 px-3">Timestamp</th>
                     <th className="py-3 px-3">Status</th>
                     <th className="py-3 px-3">Action</th>
@@ -983,7 +1014,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new strong password..."
-                className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-purple-500"
               />
               <button
                 type="button"
@@ -1021,7 +1052,7 @@ export const DeveloperSettingsPage: React.FC = () => {
             <button
               type="submit"
               disabled={resettingPassword}
-              className="flex items-center space-x-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition shadow disabled:opacity-50"
+              className="flex items-center space-x-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition shadow-sm disabled:opacity-50"
             >
               <KeyRound className="w-3.5 h-3.5" />
               <span>{resettingPassword ? 'Updating...' : 'Confirm Reset'}</span>

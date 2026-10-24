@@ -15,8 +15,10 @@
 process.env.NODE_ENV = 'test';
 process.env.TEST_MODE = 'true';
 
+import './testEnv';
 import http from 'http';
 import { app } from '../api';
+import { authHeaders, adminAuthHeaders, useFullTestLicense } from './testAuth';
 import { prisma } from '../database/prisma';
 import { hashPassword } from '../security/passwords';
 import { migrateLegacyInvoiceSettings, FOOTER_MAX_LENGTH } from '../invoice/invoiceSettings';
@@ -38,10 +40,12 @@ let server: http.Server | undefined;
 let baseUrl: string;
 
 async function request(path: string, options?: RequestInit) {
+  const auth = options?.headers && 'Authorization' in (options.headers as Record<string, string>) ? {} : await adminAuthHeaders();
   const res = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...auth,
       ...options?.headers,
     },
   });
@@ -96,6 +100,7 @@ async function runPhase3Tests() {
       resolve();
     });
   });
+  await useFullTestLicense();
   console.log(`[Phase3 Test] Target API: ${baseUrl}\n`);
 
   let passed = 0;
@@ -147,9 +152,9 @@ async function runPhase3Tests() {
   });
   createdUserIds.push(cashierUser.id);
 
-  const devHeaders = { 'x-user-id': String(devUser.id) };
-  const adminHeaders = { 'x-user-id': String(adminUser.id) };
-  const cashierHeaders = { 'x-user-id': String(cashierUser.id) };
+  const devHeaders = authHeaders(devUser);
+  const adminHeaders = authHeaders(adminUser);
+  const cashierHeaders = authHeaders(cashierUser);
 
   const postSettings = (headers: Record<string, string>, body: Record<string, unknown>) =>
     request('/settings', { method: 'POST', headers, body: JSON.stringify(body) });
@@ -235,9 +240,9 @@ async function runPhase3Tests() {
     // -------------------------------------------------------------
     // Authorization
     // -------------------------------------------------------------
-    await test('Auth: unauthenticated POST /settings is rejected with 403', async () => {
-      const res = await request('/settings', { method: 'POST', body: JSON.stringify({ receipt_footer: 'hacked' }) });
-      assert(res.status === 403, `Expected 403, got ${res.status}`);
+    await test('Auth: unauthenticated POST /settings is rejected with 401', async () => {
+      const res = await request('/settings', { method: 'POST', headers: { Authorization: '' }, body: JSON.stringify({ receipt_footer: 'hacked' }) });
+      assert(res.status === 401, `Expected 401, got ${res.status}`);
     });
 
     await test('Auth: Cashier POST /settings is rejected with 403 and audited as FAILED', async () => {

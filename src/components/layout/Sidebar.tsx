@@ -71,13 +71,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} rounded-xl text-xs font-semibold transition-all cursor-pointer ${
           isActive
             ? isDev
-              ? 'bg-purple-50 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 shadow-xs'
-              : 'bg-teal-50 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/80 shadow-xs'
+              ? 'bg-purple-50 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 shadow-2xs'
+              : 'bg-teal-50 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/80 shadow-2xs'
             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#111827]'
         }`}
       >
         <div className="flex items-center space-x-2.5 truncate">
-          <Icon className={`w-4 h-4 flex-shrink-0 ${
+          <Icon className={`w-4 h-4 shrink-0 ${
             isActive
               ? isDev
                 ? 'text-purple-600 dark:text-purple-400'

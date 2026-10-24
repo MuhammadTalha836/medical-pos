@@ -259,12 +259,12 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
     if (diff === null || diff === undefined) return <span className="text-[10px] text-slate-400">\u2014</span>;
     if (Math.abs(diff) < 0.01) return <span className="badge-success font-mono text-[10px] font-bold">BALANCED</span>;
     if (diff > 0) return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+      <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
         +{diff.toFixed(2)} EXCESS
       </span>
     );
     return (
-      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+      <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
         {diff.toFixed(2)} SHORT
       </span>
     );
@@ -325,8 +325,8 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             : 'bg-rose-50 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800/80 text-rose-800 dark:text-rose-300'
         }`}>
           {notification.type === 'success'
-            ? <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
-            : <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400" />}
+            ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            : <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />}
           <span>{notification.text}</span>
         </div>
       )}
@@ -348,8 +348,8 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             slate: 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'
           };
           return (
-            <div key={i} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center space-x-3">
-              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0 ${colorMap[kpi.color]}`}>
+            <div key={i} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex items-center space-x-3">
+              <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${colorMap[kpi.color]}`}>
                 <Icon className="w-5 h-5" />
               </div>
               <div>
@@ -364,7 +364,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
             <Filter className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
@@ -378,7 +378,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Shift # or cashier..."
-              className="pl-8 pr-3 py-1.5 w-48 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="pl-8 pr-3 py-1.5 w-48 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-teal-500"
             />
           </div>
           <div className="relative">
@@ -386,7 +386,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               id="shift-cashier-filter"
               value={cashierFilter}
               onChange={e => setCashierFilter(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
             >
               <option value="all">All Cashiers</option>
               {cashiersList.map(c => (
@@ -400,7 +400,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               id="shift-status-filter"
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
             >
               <option value="all">All Statuses</option>
               <option value="open">Active Only</option>
@@ -412,10 +412,10 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             <Calendar className="w-3.5 h-3.5" />
             <span>From:</span>
             <input id="shift-date-from" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500" />
+              className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500" />
             <span>To:</span>
             <input id="shift-date-to" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500" />
+              className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500" />
           </div>
           {hasFilters && (
             <button onClick={clearFilters}
@@ -430,10 +430,10 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
       </div>
 
       {/* Shifts Table */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[1100px]">
-            <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-3">Shift #</th>
                 <th className="py-3 px-3">Cashier</th>
@@ -471,7 +471,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               ) : (
                 filteredShifts.map((shift, idx) => (
                   <tr key={shift.id}
-                    className={`hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-[#0d131f]/40'}`}
+                    className={`hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50/50 dark:bg-surface-inset-dark/40'}`}
                   >
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">{shift.shift_no}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
@@ -571,7 +571,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
           </table>
         </div>
         {filteredShifts.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-[#0d131f]/40 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-surface-inset-dark/40 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
             <span>Showing <span className="font-bold text-slate-700 dark:text-slate-300">{filteredShifts.length}</span> shifts{hasFilters && <> (filtered)</>}</span>
             <span className="font-mono">Total Sales: <span className="font-bold text-teal-700 dark:text-teal-300">
               {currency} {filteredShifts.reduce((sum, s) => sum + (s.total_sales_amount || 0), 0).toFixed(2)}
@@ -590,7 +590,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
           </div>
         ) : inspectData ? (
           <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0d131f] p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-xl border border-slate-200 dark:border-slate-800">
               {[
                 { label: 'Cashier', value: inspectData.shift?.user_name, mono: false },
                 { label: 'Opening Float', value: `${currency} ${(inspectData.shift?.opening_cash || 0).toFixed(2)}`, mono: true },
@@ -615,7 +615,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center space-x-1 p-1 bg-slate-100 dark:bg-[#0d131f] rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold w-fit">
+            <div className="flex items-center space-x-1 p-1 bg-slate-100 dark:bg-surface-inset-dark rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold w-fit">
               {([
                 { id: 'sales' as const, label: 'Sales', Icon: Receipt, count: inspectData.sales?.length },
                 { id: 'returns' as const, label: 'Returns', Icon: RotateCcw, count: inspectData.returns?.length },
@@ -623,11 +623,11 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               ]).map(tab => (
                 <button key={tab.id} onClick={() => setInspectTab(tab.id)}
                   className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all ${inspectTab === tab.id
-                    ? 'bg-white dark:bg-[#1a2436] text-teal-700 dark:text-teal-400 shadow-sm'
+                    ? 'bg-white dark:bg-[#1a2436] text-teal-700 dark:text-teal-400 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
                   <tab.Icon className="w-3.5 h-3.5" />
                   <span>{tab.label}</span>
-                  <span className="px-1 py-0.5 rounded text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono">{tab.count || 0}</span>
+                  <span className="px-1 py-0.5 rounded-sm text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono">{tab.count || 0}</span>
                 </button>
               ))}
             </div>
@@ -635,7 +635,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
               {inspectTab === 'sales' && (
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
                     <tr>
                       <th className="py-2 px-3">Invoice #</th><th className="py-2 px-3">Customer</th>
                       <th className="py-2 px-3">Time</th><th className="py-2 px-3">Payment</th>
@@ -650,7 +650,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                         <td className="py-1.5 px-3 font-mono font-bold text-slate-900 dark:text-white">{sale.invoice_no}</td>
                         <td className="py-1.5 px-3 text-slate-700 dark:text-slate-300">{sale.customer_name}</td>
                         <td className="py-1.5 px-3 text-slate-500 font-mono text-[11px]">{new Date(sale.sale_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono uppercase">{sale.payment_type}</span></td>
+                        <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono uppercase">{sale.payment_type}</span></td>
                         <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{currency} {Number(sale.net_total).toFixed(2)}</td>
                         <td className="py-1.5 px-3 text-center"><span className={sale.status === 'completed' ? 'badge-success' : sale.status === 'returned' ? 'badge-danger' : 'badge-warning'}>{sale.status?.toUpperCase()}</span></td>
                       </tr>
@@ -660,7 +660,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               )}
               {inspectTab === 'returns' && (
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
                     <tr>
                       <th className="py-2 px-3">Return #</th><th className="py-2 px-3">Orig. Invoice</th>
                       <th className="py-2 px-3">Customer</th><th className="py-2 px-3">Reason</th>
@@ -684,7 +684,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               )}
               {inspectTab === 'payments' && (
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
                     <tr>
                       <th className="py-2 px-3">Method</th><th className="py-2 px-3">Notes</th>
                       <th className="py-2 px-3">Time</th><th className="py-2 px-3 text-right">Amount</th>
@@ -722,7 +722,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
       <Modal isOpen={!!correctShift} onClose={() => setCorrectShift(null)}
         title={`Correct Cash Count: ${correctShift?.shift_no || ''}`} maxWidth="max-w-md">
         <form onSubmit={handleAdminCorrect} className="space-y-4 text-xs">
-          <div className="bg-slate-50 dark:bg-[#0d131f] p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
             <div className="flex justify-between">
               <span className="text-slate-500">System Expected Cash:</span>
               <span className="font-mono font-bold text-slate-900 dark:text-white">{currency} {(correctShift?.expected_cash || 0).toFixed(2)}</span>
@@ -761,7 +761,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
         title={`Admin Reopen: ${reopenShift?.shift_no || ''}`} maxWidth="max-w-md">
         <form onSubmit={handleAdminReopen} className="space-y-4 text-xs">
           <div className="p-3 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900/60 rounded-xl text-indigo-800 dark:text-indigo-300 space-y-1">
-            <div className="flex items-center space-x-1.5 font-bold"><Unlock className="w-4 h-4 flex-shrink-0" /><span>Administrative Reopen Override</span></div>
+            <div className="flex items-center space-x-1.5 font-bold"><Unlock className="w-4 h-4 shrink-0" /><span>Administrative Reopen Override</span></div>
             <p className="text-[11px] leading-relaxed">Reopening unlocks the cash register for that cashier. Permanently logged to audit trail.</p>
           </div>
           <div>
@@ -783,12 +783,12 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
         title={`Force-Close Shift: ${forceCloseShift?.shift_no || ''}`} maxWidth="max-w-md">
         <form onSubmit={handleAdminForceClose} className="space-y-4 text-xs">
           <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 rounded-xl text-rose-800 dark:text-rose-300 space-y-1">
-            <div className="flex items-center space-x-1.5 font-bold"><ShieldAlert className="w-4 h-4 flex-shrink-0" /><span>Admin Force-Close Override</span></div>
+            <div className="flex items-center space-x-1.5 font-bold"><ShieldAlert className="w-4 h-4 shrink-0" /><span>Admin Force-Close Override</span></div>
             <p className="text-[11px] leading-relaxed">
               Immediately closes and locks the active shift for <strong>{forceCloseShift?.user_name}</strong>. Use only when cashier is unavailable. Permanently audited.
             </p>
           </div>
-          <div className="bg-slate-50 dark:bg-[#0d131f] p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1">
             <div className="flex justify-between"><span className="text-slate-500">Cashier:</span><span className="font-bold text-slate-900 dark:text-white">{forceCloseShift?.user_name}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Shift Started:</span><span className="font-mono text-slate-700 dark:text-slate-300">{forceCloseShift?.start_time ? new Date(forceCloseShift.start_time).toLocaleString() : '\u2014'}</span></div>
             <div className="flex justify-between"><span className="text-slate-500">Sales Count:</span><span className="font-mono text-slate-700 dark:text-slate-300">{forceCloseShift?.total_sales_count || 0} invoices</span></div>

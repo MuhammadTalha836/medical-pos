@@ -3,6 +3,8 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useShiftStore } from '../../store/useShiftStore';
 import { ProfileModal } from '../auth/ProfileModal';
+import { api } from '../../services/apiService';
+import { LicenseStatus } from '../../types';
 import {
   Activity,
   Clock,
@@ -30,6 +32,20 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
   const [time, setTime] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [elapsedMinutes, setElapsedMinutes] = useState<number>(0);
+  const [license, setLicense] = useState<LicenseStatus | null>(null);
+
+  // Demo countdown for the Admin and Developer (rechecked hourly)
+  useEffect(() => {
+    if (!user || (user.role !== 'admin' && user.role !== 'developer')) {
+      setLicense(null);
+      return;
+    }
+    const check = () => api.getLicenseStatus().then(setLicense).catch(() => {});
+    check();
+    const interval = setInterval(check, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user?.id, user?.role]);
+  const showDemoBadge = license?.mode === 'demo' && license.daysLeft !== null && (license.daysLeft <= 7 || user?.role === 'developer');
 
   useEffect(() => {
     const updateTime = () => {
@@ -66,7 +82,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
       {/* Brand & Status */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-md shadow-teal-500/20">
+          <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-md shadow-teal-500/20">
             <Activity className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -77,6 +93,14 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
               <span className="badge-info">
                 POS v1.0
               </span>
+              {showDemoBadge && (
+                <span
+                  className={license?.expired || (license?.daysLeft ?? 99) <= 3 ? 'badge-danger' : 'badge-warning'}
+                  title={license?.expiresAt ? `Demo ends ${new Date(license.expiresAt).toLocaleString()}` : undefined}
+                >
+                  {license!.expired ? 'Demo ended' : `Demo: ${license!.daysLeft} day${license!.daysLeft === 1 ? '' : 's'} left`}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Offline Desktop Pharmacy System</p>
           </div>
@@ -94,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
       {/* Clock, Theme Toggle & Action Controls */}
       <div className="flex items-center space-x-3 sm:space-x-4">
         {/* Date & Time */}
-        <div className="hidden lg:flex items-center space-x-3 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-xs">
+        <div className="hidden lg:flex items-center space-x-3 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-xs">
           <div className="flex items-center space-x-1.5">
             <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
             <span>{date}</span>
@@ -146,12 +170,12 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
                 else setClosingModalOpen(true);
               }}
               title={`Active Shift: ${activeShift.shift_no} (Started by ${activeShift.user_name}). Click to reconcile and close shift.`}
-              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-800/80 rounded-xl transition-colors shadow-sm"
+              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-800/80 rounded-xl transition-colors shadow-xs"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="font-mono">{activeShift.shift_no}</span>
               <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">({elapsedFormatted})</span>
-              <span className="text-[10px] uppercase tracking-wider bg-emerald-200/60 dark:bg-emerald-800/60 px-1.5 py-0.5 rounded font-bold ml-1">
+              <span className="text-[10px] uppercase tracking-wider bg-emerald-200/60 dark:bg-emerald-800/60 px-1.5 py-0.5 rounded-sm font-bold ml-1">
                 Close Shift
               </span>
             </button>
@@ -159,11 +183,11 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
             <button
               onClick={() => setStartModalOpen(true)}
               title="No shift currently active. Click to start a new cashier shift."
-              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 border border-amber-300 dark:border-amber-800/80 rounded-xl transition-colors shadow-sm animate-pulse"
+              className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:hover:bg-amber-900/50 border border-amber-300 dark:border-amber-800/80 rounded-xl transition-colors shadow-xs animate-pulse"
             >
               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
               <span>Shift Inactive</span>
-              <span className="text-[10px] uppercase tracking-wider bg-amber-200/60 dark:bg-amber-800/60 px-1.5 py-0.5 rounded font-bold ml-1">
+              <span className="text-[10px] uppercase tracking-wider bg-amber-200/60 dark:bg-amber-800/60 px-1.5 py-0.5 rounded-sm font-bold ml-1">
                 Start Shift
               </span>
             </button>
@@ -177,7 +201,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
             title="Edit My Profile & Change Password"
             className="flex items-center space-x-2.5 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-[#162032] transition-colors text-left group"
           >
-            <div className="w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-500/40 flex items-center justify-center text-teal-600 dark:text-teal-300 text-xs font-bold shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-500/40 flex items-center justify-center text-teal-600 dark:text-teal-300 text-xs font-bold shadow-xs">
               <UserCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
             </div>
             <div className="hidden sm:block">

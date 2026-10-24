@@ -1,15 +1,9 @@
 import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
 import { SCHEMA_SQL } from './schema';
 import { seedInitialData } from './seed';
+import { DB_PATH } from './paths';
 
-const DB_DIR = path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
-}
-
-export const DB_PATH = path.join(DB_DIR, 'pharmacy.db');
+export { DB_PATH };
 
 export function initDatabase(customPath?: string): Database.Database {
   const targetPath = customPath || DB_PATH;

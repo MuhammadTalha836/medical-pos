@@ -192,17 +192,8 @@ export function seedInitialData(db: Database.Database) {
     insertOrIgnoreRole.run('developer', 'System Developer', 'Master system configuration, security rules, and TOTP authentication', 1, devPerms);
   }
 
-  // 2b. Seed Default Users
-  const userCount = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
-  if (userCount === 0) {
-    const insertUser = db.prepare(`
-      INSERT INTO users (username, password, full_name, role)
-      VALUES (?, ?, ?, ?)
-    `);
-    insertUser.run('admin', 'admin123', 'Administrator', 'admin');
-    insertUser.run('pharmacist', 'pharma123', 'Dr. Ahmed Khan (Pharm-D)', 'pharmacist');
-    insertUser.run('cashier', 'cash123', 'Muhammad Bilal', 'cashier');
-  }
+  // 2b. No default staff accounts: the Developer creates the Admin (with its password) in the setup wizard,
+  // and the Admin creates cashiers. Shipping fixed passwords such as admin123 would leave a backdoor.
 
   // 3. Seed Companies
   const companyCount = (db.prepare('SELECT COUNT(*) as count FROM companies').get() as { count: number }).count;

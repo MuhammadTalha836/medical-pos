@@ -1,0 +1,11 @@
+multi invoice or order taking system
+developer can manage the demo period for pharmacy
+developer set the admin password 
+totp only for developer 
+when developer install the exe in medical store system , to installation se pehlye wo 2fa maangye ga jo sirf developer ke  phone mobile authenticator me ho ga per developer wo code enter krye ga or install krnye ke baad , developer admin baannye ga or baki cheezye setup kr ke de ga jeyse ke backup path, automatic backup time , admin permissions, demo or free agar demo par hai to ketnye din baad baand ho jaye ga, 
+
+
+
+now update my all code , remove unsed code and weak code, remove all the extra code, deleet backup folder db beacuse now we are in development phase also refresh the database, remove all the extra or no need code from my folder instead of docs/* 
+remove antigravaty words or jo software me libaray use hoi hai unka naam na lihka aye kahi b ,local ko b remove krna hai just 100% offline pos lihka aye 
+optimize and reused the code , use me project base skill and make my project code optimize and scalable and perfect

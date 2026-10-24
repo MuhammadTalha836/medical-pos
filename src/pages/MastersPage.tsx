@@ -262,12 +262,12 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center space-x-2 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm">
+        <div className="flex items-center space-x-2 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-xs">
           <button
             onClick={() => setActiveTab('products')}
             className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === 'products'
-                ? 'bg-teal-600 text-white shadow-sm'
+                ? 'bg-teal-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -278,7 +278,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             onClick={() => setActiveTab('companies')}
             className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               activeTab === 'companies'
-                ? 'bg-teal-600 text-white shadow-sm'
+                ? 'bg-teal-600 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -290,7 +290,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
 
       {feedbackMessage && (
         <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{feedbackMessage}</span>
         </div>
       )}
@@ -299,7 +299,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       {activeTab === 'products' && (
         <div className="space-y-4">
           {/* Controls Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-xs">
             <form onSubmit={handleSearchSubmit} className="flex-1 min-w-[260px] flex items-center space-x-2">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -343,10 +343,10 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
           </div>
 
           {/* Products Table */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs flex flex-col">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="py-3 px-3">C-Code</th>
                     <th className="py-3 px-3">P-Code</th>
@@ -386,7 +386,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                           className={`transition-colors ${
                             idx % 2 === 0
                               ? 'bg-transparent'
-                              : 'bg-slate-50/70 dark:bg-[#0d131f]/40'
+                              : 'bg-slate-50/70 dark:bg-surface-inset-dark/40'
                           } hover:bg-teal-50/50 dark:hover:bg-teal-950/20`}
                         >
                           <td className="py-3 px-3 font-mono font-bold text-teal-600 dark:text-teal-300">
@@ -403,15 +403,15 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                           </td>
                           <td className="py-3 px-3">
                             <div className="flex flex-col gap-1 items-start">
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
+                              <span className="px-2 py-0.5 rounded-sm text-[10px] bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-medium">
                                 {prod.unit_type}
                               </span>
                               {prod.allow_open_sale === 0 || prod.allow_open_sale === false ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap" title="Must be sold in complete original packaging only">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 whitespace-nowrap" title="Must be sold in complete original packaging only">
                                   Full Pack Only
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap" title={`Loose sales allowed (Min: ${prod.min_sale_qty || 1})`}>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[9px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 whitespace-nowrap" title={`Loose sales allowed (Min: ${prod.min_sale_qty || 1})`}>
                                   Open Sale: Yes{prod.min_sale_qty && prod.min_sale_qty > 1 ? ` (Min ${prod.min_sale_qty})` : ''}
                                 </span>
                               )}
@@ -482,7 +482,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       {/* COMPANIES TAB */}
       {activeTab === 'companies' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-center bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-xs">
             <div>
               <h2 className="text-sm font-bold text-slate-900 dark:text-white">Registered Pharmaceutical Companies / Distributors</h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">Companies map to short C-Codes used across sales and inventory</p>
@@ -500,10 +500,10 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {companies.map(c => (
-              <div key={c.id} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-teal-500/40 transition-all space-y-3 shadow-sm">
+              <div key={c.id} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between hover:border-teal-500/40 transition-all space-y-3 shadow-xs">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="px-2 py-0.5 text-xs font-mono font-bold bg-teal-50 dark:bg-teal-950/70 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded">
+                    <span className="px-2 py-0.5 text-xs font-mono font-bold bg-teal-50 dark:bg-teal-950/70 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-sm">
                       C-Code: {c.code}
                     </span>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-1.5">{c.name}</h3>
@@ -634,7 +634,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
           </div>
 
           {/* Requirement 6: Packaging & Open-Sale Policy */}
-          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
                 <Package className="w-3.5 h-3.5" />
@@ -762,7 +762,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
           </div>
 
           {/* Pricing Grid */}
-          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
             <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider block">Pricing & Margin Details</span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
@@ -773,7 +773,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   required
                   value={productForm.box_trade_price}
                   onChange={(e) => handleProductBoxPricingChange(parseFloat(e.target.value) || 0, productForm.box_retail_price, productForm.packing)}
-                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
 
@@ -785,7 +785,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   required
                   value={productForm.box_retail_price}
                   onChange={(e) => handleProductBoxPricingChange(productForm.box_trade_price, parseFloat(e.target.value) || 0, productForm.packing)}
-                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
 
@@ -796,7 +796,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   step="0.01"
                   value={productForm.unit_retail_price}
                   onChange={(e) => setProductForm(prev => ({ ...prev, unit_retail_price: parseFloat(e.target.value) || 0 }))}
-                  className="w-full bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-800 rounded-lg px-2.5 py-1.5 text-xs text-teal-800 dark:text-teal-200 font-mono font-bold focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-800 rounded-lg px-2.5 py-1.5 text-xs text-teal-800 dark:text-teal-200 font-mono font-bold focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
 
@@ -809,7 +809,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   max="100"
                   value={productForm.default_discount_pct}
                   onChange={(e) => setProductForm(prev => ({ ...prev, default_discount_pct: parseFloat(e.target.value) || 0 }))}
-                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                  className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                 />
               </div>
             </div>

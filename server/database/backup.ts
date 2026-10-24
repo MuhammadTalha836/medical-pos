@@ -4,7 +4,8 @@ import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import { db, DB_PATH } from './db';
 
-export const DEFAULT_BACKUP_DIR = path.resolve(process.cwd(), 'backups');
+// The Electron app points PHARMACARE_BACKUP_DIR at its per-user folder; dev and tests use ./backups
+export const DEFAULT_BACKUP_DIR = path.resolve(process.env.PHARMACARE_BACKUP_DIR || path.join(process.cwd(), 'backups'));
 
 if (!fs.existsSync(DEFAULT_BACKUP_DIR)) {
   fs.mkdirSync(DEFAULT_BACKUP_DIR, { recursive: true });
@@ -106,7 +107,8 @@ function getSettingValue(key: string): string | undefined {
  */
 export function getConfiguredBackupDir(): string {
   const configured = getSettingValue('auto_backup_dir');
-  return configured && configured.trim() ? path.resolve(configured.trim()) : DEFAULT_BACKUP_DIR;
+  // Relative folders (e.g. the default './backups') resolve against the app's base folder, not the process cwd
+  return configured && configured.trim() ? path.resolve(path.dirname(DEFAULT_BACKUP_DIR), configured.trim()) : DEFAULT_BACKUP_DIR;
 }
 
 export function getRetentionLimit(): number {

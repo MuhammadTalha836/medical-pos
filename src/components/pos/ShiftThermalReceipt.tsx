@@ -77,7 +77,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
       {/* Printable Receipt DOM */}
       <div
         id="thermal-receipt-printable"
-        className={`bg-white text-black font-mono leading-tight border border-slate-300 shadow-sm select-text ${is58 ? 'print-paper-58mm w-[58mm] p-2 text-[10px]' : 'print-paper-80mm w-[80mm] p-4 text-[11px]'}`}
+        className={`bg-white text-black font-mono leading-tight border border-slate-300 shadow-xs select-text ${is58 ? 'print-paper-58mm w-[58mm] p-2 text-[10px]' : 'print-paper-80mm w-[80mm] p-4 text-[11px]'}`}
         style={{ fontFamily: "'JetBrains Mono', 'Courier New', Courier, monospace" }}
       >
         {/* Pharmacy Header */}

@@ -1,13 +1,12 @@
 /**
  * PharmaCare Pro - Phase 1 End-to-End Test Suite
- * Covers: Password Hashing (Bcrypt), Offline RFC 6238 TOTP Engine,
- * Setup Wizard Flow, Offline Developer Login, Rate Limiting & Account Lockout,
- * and Data Isolation.
+ * Covers: Password Hashing (Bcrypt), RFC 6238 TOTP Engine, developer-gated Setup Wizard
+ * (master key unlock, admin creation, license), Developer Login with replay protection,
+ * Rate Limiting & Account Lockout, sessions and Data Isolation.
+ * Runs on a temporary copy of the database (see testEnv.ts).
  */
 
-process.env.NODE_ENV = 'test';
-process.env.TEST_MODE = 'true';
-
+import { TEST_DEVELOPER_EMAIL, TEST_DEVELOPER_SECRET } from './testEnv';
 import http from 'http';
 import { app } from '../api';
 import { prisma } from '../database/prisma';
@@ -66,29 +65,14 @@ async function runPhase1Tests() {
   console.log(colors.bold(colors.cyan('  (Core Setup, Bcrypt, Offline TOTP, Setup Wizard)   ')));
   console.log(colors.bold(colors.cyan('======================================================\n')));
 
-  // Check if port 3001 is already running, else start ephemeral server
-  try {
-    const probe = await fetch('http://localhost:3001/api/status').catch(() => null);
-    if (probe && probe.ok) {
-      baseUrl = 'http://localhost:3001/api';
-    } else {
-      await new Promise<void>((resolve) => {
-        server = app.listen(0, () => {
-          const addr = server.address() as any;
-          baseUrl = `http://localhost:${addr.port}/api`;
-          resolve();
-        });
-      });
-    }
-  } catch {
-    await new Promise<void>((resolve) => {
-      server = app.listen(0, () => {
-        const addr = server.address() as any;
-        baseUrl = `http://localhost:${addr.port}/api`;
-        resolve();
-      });
+  // Always an in-process server: sessions live in this process
+  await new Promise<void>((resolve) => {
+    server = app.listen(0, () => {
+      const addr = server.address() as any;
+      baseUrl = `http://localhost:${addr.port}/api`;
+      resolve();
     });
-  }
+  });
 
   let testsPassed = 0;
   let testsTotal = 0;
@@ -195,14 +179,34 @@ async function runPhase1Tests() {
     });
 
     // ------------------------------------------------------------------------
-    // 4. Setup Wizard Flow & Lockout
+    // 4. Developer-gated Setup Wizard
     // ------------------------------------------------------------------------
-    let setupSecret = '';
-    let setupTempToken = '';
-    const testDevEmail = 'lead.developer@pharmacare.local';
+    const nowSec = () => Math.floor(Date.now() / 1000);
+    const adminUsername = `owner_${Date.now().toString(36)}`;
+    const adminPassword = 'StoreOwner#2026';
+    let setupToken = '';
+    let unlockCode = '';
+    let developerToken = '';
 
-    await step('Test Setup Wizard Initialization (Secret & QR Code)', async () => {
-      // Temporarily clear setup_completed for testing setup wizard flow
+    const setupBody = (overrides: Record<string, unknown> = {}) => JSON.stringify({
+      setupToken,
+      storeName: 'Test Medical Pharmacy',
+      storeAddress: 'Test Commercial Ave',
+      admin: { fullName: 'Store Owner', username: adminUsername, password: adminPassword },
+      backup: { frequency: 'daily', time: '22:30' },
+      adminPermissions: { can_delete_invoice: false },
+      policies: {
+        allow_admin_create_cashier: true,
+        allow_admin_create_admin: false,
+        allow_admin_edit_store_identity: false,
+        allow_admin_hide_store_identity: false
+      },
+      license: { mode: 'demo', demoDays: 30 },
+      ...overrides
+    });
+
+    await step('Setup wizard is locked behind the developer master code', async () => {
+      // Reset setup on this temporary database copy
       await prisma.systemSetting.upsert({
         where: { key: 'setup_completed' },
         update: { value: 'false' },
@@ -213,202 +217,189 @@ async function runPhase1Tests() {
       const statusRes = await request('/setup/status');
       assert(statusRes.ok, 'Setup status endpoint responds');
       assert(statusRes.body.isSetupCompleted === false, 'Setup status is not completed');
+      assert(statusRes.body.developerEmail === TEST_DEVELOPER_EMAIL, 'Fixed developer email is reported');
+      assert(statusRes.body.developerKeyConfigured === true, 'Developer key is configured');
 
-      // Initialize setup
-      const initRes = await request('/setup/initialize', {
-        method: 'POST',
-        body: JSON.stringify({
-          developerEmail: testDevEmail,
-          storeName: 'Test Medical Pharmacy',
-          storeAddress: 'Test Commercial Ave'
-        })
-      });
+      // The old self-registration endpoints are gone
+      const legacyInit = await request('/setup/initialize', { method: 'POST', body: JSON.stringify({ developerEmail: 'hacker@malicious.local' }) });
+      assert(legacyInit.status === 401 || legacyInit.status === 404, 'Old QR self-registration endpoint no longer works');
 
-      assert(initRes.ok, 'Initialize setup succeeds');
-      assert(initRes.body.secret && initRes.body.qrCodeDataUrl, 'Returns secret and QR Code Data URL');
-      assert(initRes.body.tempToken, 'Returns temporary encrypted setup token');
+      const noTokenComplete = await request('/setup/complete', { method: 'POST', body: setupBody({ setupToken: 'forged-token' }) });
+      assert(noTokenComplete.status === 401, 'Setup cannot be completed without unlocking first');
 
-      setupSecret = initRes.body.secret;
-      setupTempToken = initRes.body.tempToken;
+      const badUnlock = await request('/setup/unlock', { method: 'POST', body: JSON.stringify({ code: '000000' }) });
+      assert(badUnlock.status === 401, 'Wrong developer code rejected');
+
+      // A code from a different authenticator (any other secret) is useless
+      const otherSecretCode = generateTotpCode(generateTotpSecret());
+      const otherUnlock = await request('/setup/unlock', { method: 'POST', body: JSON.stringify({ code: otherSecretCode }) });
+      assert(otherUnlock.status === 401 || otherSecretCode === generateTotpCode(TEST_DEVELOPER_SECRET), 'Code from another authenticator rejected');
+
+      unlockCode = generateTotpCode(TEST_DEVELOPER_SECRET, nowSec());
+      const goodUnlock = await request('/setup/unlock', { method: 'POST', body: JSON.stringify({ code: unlockCode }) });
+      assert(goodUnlock.ok, `Developer code unlocks the wizard (${JSON.stringify(goodUnlock.body)})`);
+      assert(typeof goodUnlock.body.setupToken === 'string' && goodUnlock.body.setupToken.length > 20, 'Setup token returned');
+      setupToken = goodUnlock.body.setupToken;
+
+      const replay = await request('/setup/unlock', { method: 'POST', body: JSON.stringify({ code: unlockCode }) });
+      assert(replay.status === 401 && /already used/.test(replay.body.error), 'The same code cannot be used twice');
     });
 
-    await step('Test Setup Wizard Verification and Permanent Lockout', async () => {
-      // 1. Submit invalid code -> must be rejected
-      const badVerifyRes = await request('/setup/verify', {
+    await step('Setup completion validates input and creates the Admin, settings and license', async () => {
+      const weakPassword = await request('/setup/complete', {
         method: 'POST',
-        body: JSON.stringify({
-          developerEmail: testDevEmail,
-          code: '999999', // Incorrect code
-          tempToken: setupTempToken
-        })
+        body: setupBody({ admin: { fullName: 'Store Owner', username: adminUsername, password: 'short' } })
       });
-      assert(badVerifyRes.status === 400, 'Invalid TOTP code rejected with HTTP 400');
+      assert(weakPassword.status === 400, 'Admin password under 8 characters rejected');
 
-      // 2. Submit valid code -> must succeed
-      const validCode = generateTotpCode(setupSecret);
-      const goodVerifyRes = await request('/setup/verify', {
-        method: 'POST',
-        body: JSON.stringify({
-          developerEmail: testDevEmail,
-          code: validCode,
-          tempToken: setupTempToken,
-          storeName: 'Test Medical Pharmacy',
-          storeAddress: 'Test Commercial Ave',
-          adminPassword: 'newAdminPassword123'
-        })
-      });
+      const badLicense = await request('/setup/complete', { method: 'POST', body: setupBody({ license: { mode: 'demo', demoDays: 0 } }) });
+      assert(badLicense.status === 400, 'Demo of 0 days rejected');
 
-      assert(goodVerifyRes.ok, 'Valid TOTP code completes setup');
-      assert(goodVerifyRes.body.user && goodVerifyRes.body.user.role === 'developer', 'Returns Developer user');
+      const done = await request('/setup/complete', { method: 'POST', body: setupBody() });
+      assert(done.ok, `Setup completes (${JSON.stringify(done.body)})`);
+      assert(done.body.user.role === 'developer', 'Returns the Developer user');
+      assert(done.body.user.email === TEST_DEVELOPER_EMAIL, 'Developer uses the fixed email');
+      assert(typeof done.body.token === 'string', 'Returns a developer session token');
+      developerToken = done.body.token;
 
-      // 3. Verify setup is now completed and locked
+      const admin = await prisma.user.findUnique({ where: { username: adminUsername } });
+      assert(admin?.role === 'admin' && admin.status === 'active', 'Admin account created');
+      assert(!!admin && /^\$2[aby]\$/.test(admin.password), 'Admin password stored as bcrypt hash');
+
+      const adminRole = await prisma.role.findUnique({ where: { name: 'admin' } });
+      const perms = JSON.parse(adminRole?.permissions || '{}');
+      assert(perms.can_delete_invoice === false && perms.pos === true, 'Admin permissions chosen by the Developer are saved');
+
+      const settings = await prisma.systemSetting.findMany({ where: { key: { in: ['backup_scheduled_time', 'store_name', 'license_mode', 'license_signature'] } } });
+      const map = Object.fromEntries(settings.map(r => [r.key, r.value]));
+      assert(map.backup_scheduled_time === '22:30', 'Backup time saved');
+      assert(map.store_name === 'Test Medical Pharmacy', 'Store name saved');
+      assert(map.license_mode === 'demo' && /^[0-9a-f]{64}$/.test(map.license_signature), 'Signed demo license saved');
+
+      const license = await request('/license/status');
+      assert(license.body.mode === 'demo' && license.body.daysLeft === 30 && license.body.expired === false, '30-day demo active');
+    });
+
+    await step('Setup is permanently locked afterwards', async () => {
       const statusRes = await request('/setup/status');
       assert(statusRes.body.isSetupCompleted === true, 'System is now marked setup_completed = true');
 
-      // 4. Attempting to re-run setup initialize must be strictly forbidden (HTTP 403)
-      const rerunInitRes = await request('/setup/initialize', {
-        method: 'POST',
-        body: JSON.stringify({ developerEmail: 'hacker@malicious.local' })
-      });
-      assert(rerunInitRes.status === 403, 'Re-running setup initialization is forbidden (HTTP 403)');
+      const rerunUnlock = await request('/setup/unlock', { method: 'POST', body: JSON.stringify({ code: generateTotpCode(TEST_DEVELOPER_SECRET, nowSec() + 30) }) });
+      assert(rerunUnlock.status === 403, 'Re-running setup unlock is forbidden (HTTP 403)');
 
-      // 5. Attempting to re-run setup verify must also be forbidden (HTTP 403)
-      const rerunVerifyRes = await request('/setup/verify', {
-        method: 'POST',
-        body: JSON.stringify({
-          developerEmail: 'hacker@malicious.local',
-          code: '123456',
-          tempToken: setupTempToken
-        })
-      });
-      assert(rerunVerifyRes.status === 403, 'Re-running setup verification is forbidden (HTTP 403)');
+      const rerunComplete = await request('/setup/complete', { method: 'POST', body: setupBody() });
+      assert(rerunComplete.status === 403, 'Re-running setup completion is forbidden (HTTP 403)');
     });
 
     // ------------------------------------------------------------------------
-    // 5. Offline Developer Login & Rate Limiting Lockout
+    // 5. Developer Login & Rate Limiting Lockout
     // ------------------------------------------------------------------------
-    await step('Test Offline Developer Login with Valid TOTP', async () => {
-      const code = generateTotpCode(setupSecret);
-      const loginRes = await request('/auth/developer-login', {
+    await step('Developer login uses the master authenticator code once', async () => {
+      const wrongEmail = await request('/auth/developer-login', {
         method: 'POST',
-        body: JSON.stringify({
-          email: testDevEmail,
-          code
-        })
+        body: JSON.stringify({ email: 'someone@else.local', code: generateTotpCode(TEST_DEVELOPER_SECRET, nowSec() + 30) })
       });
+      assert(wrongEmail.status === 401, 'Only the fixed developer email can sign in');
 
-      assert(loginRes.ok, 'Developer login succeeds with valid TOTP');
+      const code = generateTotpCode(TEST_DEVELOPER_SECRET, nowSec() + 30);
+      const loginRes = await request('/auth/developer-login', { method: 'POST', body: JSON.stringify({ email: TEST_DEVELOPER_EMAIL, code }) });
+      assert(loginRes.ok, `Developer login succeeds (${JSON.stringify(loginRes.body)})`);
       assert(loginRes.body.user.role === 'developer', 'User role is developer');
-      assert(loginRes.body.user.email === testDevEmail, 'User email matches');
+      assert(typeof loginRes.body.token === 'string', 'Session token returned');
+      developerToken = loginRes.body.token;
+
+      const replay = await request('/auth/developer-login', { method: 'POST', body: JSON.stringify({ email: TEST_DEVELOPER_EMAIL, code }) });
+      assert(replay.status === 401, 'Replayed developer code rejected');
+      await prisma.user.updateMany({ where: { role: 'developer' }, data: { failedLoginAttempts: 0, lockedUntil: null } });
     });
 
     await step('Test Developer Rate Limiting and 15-Minute Account Lockout', async () => {
-      // Perform 5 consecutive failed login attempts
       for (let attempt = 1; attempt <= 4; attempt++) {
         const failRes = await request('/auth/developer-login', {
           method: 'POST',
-          body: JSON.stringify({
-            email: testDevEmail,
-            code: '000000'
-          })
+          body: JSON.stringify({ email: TEST_DEVELOPER_EMAIL, code: '000000' })
         });
         assert(failRes.status === 401, `Attempt ${attempt} rejected with 401`);
       }
 
-      // 5th failed attempt should trigger lockout (HTTP 429)
       const lockRes = await request('/auth/developer-login', {
         method: 'POST',
-        body: JSON.stringify({
-          email: testDevEmail,
-          code: '000000'
-        })
+        body: JSON.stringify({ email: TEST_DEVELOPER_EMAIL, code: '000000' })
       });
       assert(lockRes.status === 429, '5th failed attempt triggers HTTP 429 Lockout');
       assert(lockRes.body.error.includes('locked'), 'Lockout message returned');
 
-      // Subsequent attempt even with correct code should still be locked
-      const validCode = generateTotpCode(setupSecret);
       const lockedAttemptRes = await request('/auth/developer-login', {
         method: 'POST',
-        body: JSON.stringify({
-          email: testDevEmail,
-          code: validCode
-        })
+        body: JSON.stringify({ email: TEST_DEVELOPER_EMAIL, code: generateTotpCode(TEST_DEVELOPER_SECRET, nowSec() + 30) })
       });
       assert(lockedAttemptRes.status === 429, 'Locked account blocks even valid code while locked');
 
-      // Clear lockout for further tests
-      await prisma.user.updateMany({
-        where: { email: testDevEmail },
-        data: { failedLoginAttempts: 0, lockedUntil: null }
-      });
+      await prisma.user.updateMany({ where: { role: 'developer' }, data: { failedLoginAttempts: 0, lockedUntil: null } });
     });
 
     // ------------------------------------------------------------------------
-    // 6. Data Isolation & Security Boundaries
+    // 6. Sessions, Data Isolation & Security Boundaries
     // ------------------------------------------------------------------------
-    await step('Verify Credentials Isolation and Developer Account Protection', async () => {
-      // 1. GET /api/users must NEVER expose password or totp_secret
-      const usersRes = await request('/users');
-      assert(usersRes.ok, 'Users endpoint returns 200');
+    await step('Verify sessions, credentials isolation and developer account protection', async () => {
+      const devHeaders = { Authorization: `Bearer ${developerToken}` };
+      const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
+      assert(devUser !== null, 'Developer user exists');
+
+      const noToken = await request('/users');
+      assert(noToken.status === 401 && noToken.body.code === 'SESSION_REQUIRED', 'No session -> 401');
+
+      const spoofed = await request('/users', { headers: { 'x-user-id': String(devUser!.id) } });
+      assert(spoofed.status === 401, 'A spoofed x-user-id header is ignored');
+
+      const usersRes = await request('/users', { headers: devHeaders });
+      assert(usersRes.ok, 'Users endpoint returns 200 with a session');
       for (const u of usersRes.body) {
         assert(!('password' in u), 'Password strictly omitted from user response');
         assert(!('totp_secret' in u), 'totp_secret strictly omitted from user response');
         assert(!('totpSecret' in u), 'totpSecret strictly omitted from user response');
       }
 
-      // 2. Attempting to create a user with role 'developer' via standard API is rejected
       const createDevAttempt = await request('/users', {
         method: 'POST',
-        body: JSON.stringify({
-          username: 'fake_developer',
-          password: 'password123',
-          full_name: 'Imposter',
-          role: 'developer'
-        })
+        headers: devHeaders,
+        body: JSON.stringify({ username: 'fake_developer', password: 'password123', full_name: 'Imposter', role: 'developer' })
       });
       assert(createDevAttempt.status === 400, 'Cannot create developer user via standard /api/users');
 
-      // 3. Attempting to delete developer account via /api/users/:id is rejected
-      const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
-      assert(devUser !== null, 'Developer user exists');
-
-      const deleteAttempt = await request(`/users/${devUser?.id}`, {
-        method: 'DELETE'
-      });
+      const deleteAttempt = await request(`/users/${devUser?.id}`, { method: 'DELETE', headers: devHeaders });
       assert(deleteAttempt.status === 400, 'Developer account cannot be deleted via /api/users/:id');
+
+      const preLoginSettings = await request('/settings');
+      assert(preLoginSettings.ok && preLoginSettings.body.store_name === 'Test Medical Pharmacy', 'Store name is public on the login screen');
+      assert(preLoginSettings.body.backup_scheduled_time === undefined, 'Other settings stay private before login');
+      const fullSettings = await request('/settings', { headers: devHeaders });
+      assert(fullSettings.body.backup_scheduled_time === '22:30' && fullSettings.body.license_signature === undefined, 'Signed license never leaves the server');
     });
 
     // ------------------------------------------------------------------------
     // 7. Staff Login with Bcrypt
     // ------------------------------------------------------------------------
-    await step('Verify Staff Login (Admin / Cashier) with Bcrypt Verification', async () => {
-      // Verify login with updated admin password
-      const adminLogin = await request('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({
-          username: 'admin',
-          password: 'newAdminPassword123'
-        })
-      });
-      assert(adminLogin.ok, 'Admin logs in with bcrypt-hashed password');
+    await step('Verify Staff Login (Admin) with username + password and no TOTP', async () => {
+      const wrong = await request('/auth/login', { method: 'POST', body: JSON.stringify({ username: adminUsername, password: 'wrong-password' }) });
+      assert(wrong.status === 401, 'Wrong password rejected');
+
+      const developerByPassword = await request('/auth/login', { method: 'POST', body: JSON.stringify({ username: 'developer', password: 'anything' }) });
+      assert(developerByPassword.status === 401, 'Developer cannot sign in with a password');
+
+      const adminLogin = await request('/auth/login', { method: 'POST', body: JSON.stringify({ username: adminUsername, password: adminPassword }) });
+      assert(adminLogin.ok, 'Admin logs in with the password the Developer set');
       assert(adminLogin.body.user.role === 'admin', 'Role is admin');
+      assert(adminLogin.body.user.permissions?.can_delete_invoice === false, 'Admin gets the Developer-chosen permissions');
 
-      // Reset admin password to standard 'admin123' with bcrypt for ongoing tests
-      const hashedDefault = await hashPassword('admin123');
-      await prisma.user.updateMany({
-        where: { username: 'admin' },
-        data: { password: hashedDefault }
-      });
+      const adminHeaders = { Authorization: `Bearer ${adminLogin.body.token}` };
+      const me = await request('/users', { headers: adminHeaders });
+      assert(me.ok, 'Admin session works');
 
-      const resetLogin = await request('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({
-          username: 'admin',
-          password: 'admin123'
-        })
-      });
-      assert(resetLogin.ok, 'Admin logs in with admin123');
+      const logout = await request('/auth/logout', { method: 'POST', headers: adminHeaders });
+      assert(logout.ok, 'Logout succeeds');
+      const afterLogout = await request('/users', { headers: adminHeaders });
+      assert(afterLogout.status === 401, 'Token is revoked after logout');
     });
 
     console.log(colors.bold(colors.green('\n======================================================')));

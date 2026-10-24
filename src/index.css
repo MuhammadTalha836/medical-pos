@@ -1,6 +1,134 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-pharmacy-50: #f0fdf9;
+  --color-pharmacy-100: #ccfbf1;
+  --color-pharmacy-200: #99f6e4;
+  --color-pharmacy-300: #5eead4;
+  --color-pharmacy-400: #2dd4bf;
+  --color-pharmacy-500: #14b8a6;
+  --color-pharmacy-600: #0d9488;
+  --color-pharmacy-700: #0f766e;
+  --color-pharmacy-800: #115e59;
+  --color-pharmacy-900: #134e4a;
+  --color-pharmacy-950: #042f2e;
+
+  --color-surface-base-light: #f8fafc;
+  --color-surface-base-dark: #0a0e17;
+
+  --color-surface-card-light: #ffffff;
+  --color-surface-card-dark: #111827;
+
+  --color-surface-elevated-light: #ffffff;
+  --color-surface-elevated-dark: #162032;
+
+  --color-surface-inset-light: #f1f5f9;
+  --color-surface-inset-dark: #0d131f;
+
+  --color-slate-850: #162032;
+  --color-slate-900: #111827;
+  --color-slate-950: #0a0e17;
+
+  --font-sans: Inter, system-ui, -apple-system, sans-serif;
+  --font-mono: JetBrains Mono, Fira Code, monospace;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility page-container {
+  /* Surface & Container Primitives */
+  @apply flex-1 p-4 md:p-6 space-y-5 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-150;
+}
+
+@utility card-premium {
+  @apply bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs transition-all;
+}
+
+@utility card-surface {
+  @apply bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl transition-all;
+}
+
+@utility table-container {
+  @apply bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden;
+}
+
+@utility btn-save {
+  /* Standard Action Buttons */
+  @apply px-4 py-2 bg-linear-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-teal-500/20 active:scale-95 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer;
+}
+
+@utility btn-primary {
+  @apply px-4 py-2 bg-linear-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-teal-500/20 active:scale-95 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer;
+}
+
+@utility btn-edit {
+  @apply px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1 font-semibold text-xs cursor-pointer;
+}
+
+@utility btn-secondary {
+  @apply px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1 font-semibold text-xs cursor-pointer;
+}
+
+@utility btn-delete {
+  @apply px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 transition-colors flex items-center justify-center space-x-1 font-semibold text-xs cursor-pointer disabled:opacity-50;
+}
+
+@utility btn-danger {
+  @apply px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 transition-colors flex items-center justify-center space-x-1 font-semibold text-xs cursor-pointer disabled:opacity-50;
+}
+
+@utility btn-cancel {
+  @apply px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center cursor-pointer;
+}
+
+@utility btn-print {
+  @apply px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer;
+}
+
+@utility kbd-pill {
+  /* Keyboard Shortcut Pill */
+  @apply px-1.5 py-0.5 text-[10px] font-mono rounded-sm font-bold bg-slate-200 dark:bg-[#162032] text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 shadow-2xs;
+}
+
+@utility badge-success {
+  /* Standard Status Badges */
+  @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 inline-flex items-center space-x-1;
+}
+
+@utility badge-warning {
+  @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 inline-flex items-center space-x-1;
+}
+
+@utility badge-danger {
+  @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 inline-flex items-center space-x-1;
+}
+
+@utility badge-info {
+  @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 inline-flex items-center space-x-1;
+}
+
+@utility pos-input {
+  /* High-Speed Clean POS Inputs */
+  @apply bg-white dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all text-xs;
+}
 
 @layer base {
   * {
@@ -42,73 +170,6 @@
   }
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #475569;
-  }
-}
-
-@layer components {
-  /* Surface & Container Primitives */
-  .page-container {
-    @apply flex-1 p-4 md:p-6 space-y-5 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-150;
-  }
-
-  .card-premium {
-    @apply bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all;
-  }
-
-  .card-surface {
-    @apply bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 rounded-xl transition-all;
-  }
-
-  .table-container {
-    @apply bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden;
-  }
-
-  /* Standard Action Buttons */
-  .btn-save, .btn-primary {
-    @apply px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-md shadow-teal-500/20 active:scale-95 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer;
-  }
-  
-  .btn-edit, .btn-secondary {
-    @apply px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1 font-semibold text-xs cursor-pointer;
-  }
-
-  .btn-delete, .btn-danger {
-    @apply px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 transition-colors flex items-center justify-center space-x-1 font-semibold text-xs cursor-pointer disabled:opacity-50;
-  }
-
-  .btn-cancel {
-    @apply px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center cursor-pointer;
-  }
-
-  .btn-print {
-    @apply px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-500/20 active:scale-95 transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50 cursor-pointer;
-  }
-
-  /* Keyboard Shortcut Pill */
-  .kbd-pill {
-    @apply px-1.5 py-0.5 text-[10px] font-mono rounded font-bold bg-slate-200 dark:bg-[#162032] text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 shadow-xs;
-  }
-
-  /* Standard Status Badges */
-  .badge-success {
-    @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 inline-flex items-center space-x-1;
-  }
-
-  .badge-warning {
-    @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 inline-flex items-center space-x-1;
-  }
-
-  .badge-danger {
-    @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 inline-flex items-center space-x-1;
-  }
-
-  .badge-info {
-    @apply px-2 py-0.5 text-[10px] font-bold rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/60 inline-flex items-center space-x-1;
-  }
-
-  /* High-Speed Clean POS Inputs */
-  .pos-input {
-    @apply bg-white dark:bg-[#0d131f] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all text-xs;
   }
 }
 

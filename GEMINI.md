@@ -45,7 +45,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Developer invoice footer**: `developer_invoice_footer` (max 500 chars, multi-line) prints on every design and width, wrapping long text with `overflow-wrap: anywhere`.
    - **Sale snapshots**: Each sale stores `store_name_snapshot`, `store_address_snapshot` and `invoice_footer_snapshot`, so reprints match the original receipt. Older sales without a snapshot fall back to current settings.
    - **Granular Field Visibility Controls**: Admin checkboxes across Store Info, Cashier/Customer Info, Itemized Table Columns, Financial Summary, and Regulatory Policies.
-   - **Settings authorization**: `POST /api/settings` requires Admin, Developer, or a role with the `settings` permission; developer-only keys (footer, RBAC toggles, backup policy) are stripped for non-developers and `setup_completed` / `developer_email` can never be written through it.
+   - **Settings authorization**: `POST /api/settings` requires the Developer or a role with the `settings` permission (the Developer decides whether the Admin has it); developer-only keys (footer, RBAC toggles, backup policy) are stripped for non-developers and `setup_completed` / `developer_email` can never be written through it.
 
 4. **Product-Level Open-Sale & Minimum Quantity Enforcement (`MastersPage.tsx`, `PosPage.tsx`, `server/api.ts`)**:
    - **Product Creation Settings**: Fields for Sale Unit (`unit_type`), Units per Pack (`packing`), Allow Open Sale switch (`allow_open_sale`), and Minimum Sale Quantity (`min_sale_qty`).
@@ -97,6 +97,13 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
     - Pharmacy business profile, drug license number, tax/NTN number, custom receipt headers/footers/terms, currency symbol, maximum bill discount cap.
     - 32 granular staff permissions covering POS operations, sales, returns, discounts, customer khata, product/company masters, purchases, reports, utilities, user accounts, and shift management.
 
+
+12. **Developer-Controlled Installation, License & Sessions (`SetupWizardModal.tsx`, `server/security/*`)**:
+    - **Developer master key**: one TOTP key (one authenticator entry) for every installation, created with `npm run developer:key` (`.env.developer`, never committed) and baked into packaged builds. Developer sign-in uses the fixed developer email + a code from that key; each code works once (replay protection). Staff (Admin, Cashier, custom roles) sign in with username + password only.
+    - **Setup wizard (7 steps)**: unlock with the developer code → store name/address → first Admin (full name, username, password) → backup folder, frequency and time → Admin permissions and policies → Demo (N days) or Full → review and lock. No default staff accounts exist on a fresh install.
+    - **Demo / Full license**: signed `license_*` settings; Developer Settings → License extends the demo, starts a new one or activates Full. When a demo ends, Admin/Cashier cannot sign in (the login screen shows a notice) and signed-in staff are signed out; the Developer still can. Clock rollback and database edits cannot extend it. The header shows a countdown badge.
+    - **Server sessions**: login returns a bearer token held only by the API process; every `/api` route (except status, setup, login, license status and the public store identity) needs it. Identity always comes from the session, never from headers or request bodies.
+    - See `docs/DEVELOPER_RECOVERY.md` for a lost phone, key rotation and expired demos.
 ---
 
 ## 2. Tech Stack & Dependencies
@@ -106,13 +113,16 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 | **Runtime Environment** | Node.js (ES Module: `"type": "module"`) | Unified runtime for local API, desktop scripts, and build tooling. |
 | **Frontend Framework** | React 18 (`react`, `react-dom`) | Declarative, component-driven user interface. |
 | **Build & Bundler** | Vite 6 (`vite`, `@vitejs/plugin-react`) | Ultra-fast dev server and optimized production packaging. |
-| **Styling & CSS** | Tailwind CSS 3, PostCSS, Autoprefixer | Utility-first styling with custom medical dark theme and 58/80mm thermal print CSS. |
+| **Styling & CSS** | Tailwind CSS 4 (`tailwindcss`, `@tailwindcss/vite`) | Utility-first styling; theme tokens in `@theme` (`src/index.css`), custom medical dark theme and 58/80mm thermal print CSS. |
 | **Icons** | Lucide React (`lucide-react`) | Clean, accessible iconography. |
 | **State Management** | Zustand 5 (`zustand`) | Lightweight reactive stores for POS cart, auth, and cache. |
-| **Database & ORM** | SQLite via `better-sqlite3` & Prisma (`@prisma/client`) | Zero-latency, ACID embedded database executing locally on machine with typed queries. |
+| **Database & ORM** | SQLite via `better-sqlite3` 12 & Prisma 7 (`@prisma/adapter-better-sqlite3`, client generated into `server/generated/prisma`) | Zero-latency, ACID embedded database executing locally on machine with typed queries. |
 | **Server Bridge** | Express 4 (`express`, `cors`) | Local REST backend running on `localhost:3001` bridging client and SQLite. |
 | **Server Dev Tooling** | `tsx` (`tsx watch`) | TypeScript execution with hot-reload for the server process. |
-| **Desktop Wrapper** | Electron (`electron`) | Native Windows desktop wrapper with IPC for silent printing and native file dialogs. |
+| **Desktop Wrapper** | Electron 42, `electron-vite`, `electron-builder` (NSIS) | Desktop app: main process runs the API in-process on 127.0.0.1, serves the UI, IPC for printing and file dialogs; hardened in production. |
+| **Validation** | zod 4 (`zod`) | Request-body schemas in `server/validation/schemas.ts`. |
+| **Authentication** | `bcryptjs`, `otplib` v12, `qrcode` | Password hashing, RFC 6238 TOTP for the Developer master key, its QR code (`npm run developer:key`). |
+| **Unit Testing** | vitest 5 (`vitest`) | `npm test` runs `*.spec.ts` unit tests for pure business logic. |
 | **Language** | TypeScript 5 (`typescript`) | Strict type safety across client, server, and desktop layers. |
 
 ---
@@ -174,7 +184,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 │   ├── types/
 │   │   └── index.ts            # Domain TypeScript interfaces and types
 │   ├── App.tsx                 # Root layout, role-aware navigation, global hotkeys
-│   ├── index.css               # Tailwind directives, print stylesheets, custom scrollbars
+│   ├── index.css               # Tailwind 4 import + @theme tokens, print stylesheets, custom scrollbars
 │   └── main.tsx                # React DOM mount point
 ├── index.html                  # HTML entry point with Google Fonts (Inter, JetBrains Mono)
 ├── package.json                # Project dependencies, scripts, and module declaration
@@ -262,11 +272,13 @@ npm run test:functional
 
 Phase-specific security suites:
 ```bash
-npm run test:phase1   # Developer setup wizard & TOTP login
+npm run test:phase1   # Developer-gated setup wizard, master-key TOTP login, replay & lockout
 npm run test:phase2   # RBAC, developer settings, audit log
 npm run test:phase3   # Thermal-only templates, protected identity, footer, sale snapshots
 npm run test:phase4   # Backup retention, verification, offline scheduler, backup RBAC
+npm run test:phase5   # Server sessions, Developer-only admin permissions, Demo/Full license
 ```
+*(All suites run on a temporary copy of `data/pharmacy.db` with a test developer key; see `server/tests/testEnv.ts`.)*
 
 ### Type Checking & Linting
 ```bash
@@ -282,6 +294,20 @@ npm run build
 
 ### Starting Electron Desktop App
 ```bash
-npm start
+npm run rebuild:electron   # compile better-sqlite3 for Electron
+npm run dev:electron       # desktop app with hot reload
+npm run rebuild:node       # switch better-sqlite3 back before npm run dev / tests
 ```
-*(Packages and launches via Electron wrapper)*
+
+### Packaging
+```bash
+npm run developer:key  # once: create the developer master key (required for packaging)
+npm run build:unpack   # unpacked app in release/ (restores the Node build afterwards)
+npm run build:win      # Windows NSIS installer (run on Windows)
+```
+*(Electron is pinned to 42 until better-sqlite3 12.12+ with newer Electron binaries is published on npm. In VS Code terminals, unset `ELECTRON_RUN_AS_NODE` before launching the app.)*
+
+### Unit Tests
+```bash
+npm test
+```

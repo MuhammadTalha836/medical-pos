@@ -97,8 +97,8 @@ export const BackupHealthCard: React.FC = () => {
 
       {status.last_status === 'failed' && status.last_error && (
         <div className="flex items-start space-x-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[11px] text-rose-700 dark:text-rose-300">
-          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-          <span className="[overflow-wrap:anywhere]">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span className="wrap-anywhere">
             Last backup attempt failed{status.last_attempt_at ? ` at ${formatDateTime(status.last_attempt_at)}` : ''}: {status.last_error}. The previous good backup is kept and a retry runs automatically.
           </span>
         </div>

@@ -12,8 +12,13 @@
 process.env.NODE_ENV = 'test';
 process.env.TEST_MODE = 'true';
 
+import './testEnv';
 import http from 'http';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { app } from '../api';
+import { authHeaders, adminAuthHeaders, useFullTestLicense } from './testAuth';
 import { prisma } from '../database/prisma';
 import { hashPassword } from '../security/passwords';
 import { pruneBackupsByRetentionLimit } from '../database/backup';
@@ -36,11 +41,13 @@ let server: http.Server;
 let baseUrl: string;
 
 async function request(path: string, options?: RequestInit) {
+  const auth = options?.headers && 'Authorization' in (options.headers as Record<string, string>) ? {} : await adminAuthHeaders();
   const fullUrl = path.startsWith('http') ? path : `${baseUrl}${path}`;
   const res = await fetch(fullUrl, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...auth,
       ...options?.headers,
     },
   });
@@ -62,29 +69,15 @@ async function runPhase2Tests() {
   console.log(colors.bold(colors.cyan('  (RBAC Policies, Protected Settings, Password Reset, Audit)    ')));
   console.log(colors.bold(colors.cyan('================================================================\n')));
 
-  // Check if port 3001 is already running, else start ephemeral server
-  try {
-    const probe = await fetch('http://localhost:3001/api/status').catch(() => null);
-    if (probe && probe.ok) {
-      baseUrl = 'http://localhost:3001/api';
-    } else {
-      await new Promise<void>((resolve) => {
-        server = app.listen(0, () => {
-          const addr = server.address() as any;
-          baseUrl = `http://localhost:${addr.port}/api`;
-          resolve();
-        });
-      });
-    }
-  } catch {
-    await new Promise<void>((resolve) => {
-      server = app.listen(0, () => {
-        const addr = server.address() as any;
-        baseUrl = `http://localhost:${addr.port}/api`;
-        resolve();
-      });
+  // Always an in-process server: login sessions live in this process
+  await new Promise<void>((resolve) => {
+    server = app.listen(0, () => {
+      const addr = server.address() as any;
+      baseUrl = `http://localhost:${addr.port}/api`;
+      resolve();
     });
-  }
+  });
+  await useFullTestLicense();
 
   console.log(`[Phase2 Test] Target API: ${baseUrl}\n`);
 
@@ -135,15 +128,9 @@ async function runPhase2Tests() {
     });
   }
 
-  const devHeaders = {
-    'x-user-id': String(devUser.id),
-    'x-user-role': 'developer'
-  };
+  const devHeaders = authHeaders(devUser);
 
-  const adminHeaders = {
-    'x-user-id': String(adminUser.id),
-    'x-user-role': 'admin'
-  };
+  const adminHeaders = authHeaders(adminUser);
 
   // -------------------------------------------------------------
   // TC-03: Access Control Enforcement (Task 2.1)
@@ -481,8 +468,14 @@ async function runPhase2Tests() {
   // Backup Retention Pruning Logic
   // -------------------------------------------------------------
   await test('Backup Retention: pruneBackupsByRetentionLimit executes safely without errors', async () => {
-    const pruned = pruneBackupsByRetentionLimit(30);
-    assert(typeof pruned === 'number', 'Expected number returned from pruneBackupsByRetentionLimit');
+    // Prune an empty temp folder: pruning the configured folder would delete the store's real backups
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pharmacare-phase2-'));
+    try {
+      const pruned = pruneBackupsByRetentionLimit(30, tmpDir);
+      assert(pruned === 0, `Expected nothing to prune in an empty folder, pruned ${pruned}`);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   // -------------------------------------------------------------

@@ -130,7 +130,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         <div className="card-premium p-4.5 flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Products</span>
-            <div className="p-2 rounded-xl bg-slate-100 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+            <div className="p-2 rounded-xl bg-slate-100 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
               <Package className="w-4 h-4" />
             </div>
           </div>
@@ -208,7 +208,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
 
           <div className="table-container flex-1">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2 px-3">Product</th>
                   <th className="py-2 px-3">Rack</th>
@@ -281,7 +281,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
 
           <div className="table-container flex-1">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2 px-3">Invoice #</th>
                   <th className="py-2 px-3">Customer</th>
@@ -325,7 +325,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
                       <td className="py-2 px-3 text-center">
                         <button
                           onClick={() => handleViewInvoice(sale.id)}
-                          className="p-1 rounded bg-slate-100 hover:bg-sky-50 dark:bg-[#162032] dark:hover:bg-sky-950/60 text-slate-600 hover:text-sky-600 dark:text-slate-300 dark:hover:text-sky-300 border border-slate-200 dark:border-slate-700 transition-colors"
+                          className="p-1 rounded-sm bg-slate-100 hover:bg-sky-50 dark:bg-[#162032] dark:hover:bg-sky-950/60 text-slate-600 hover:text-sky-600 dark:text-slate-300 dark:hover:text-sky-300 border border-slate-200 dark:border-slate-700 transition-colors"
                           title="View & Reprint Receipt"
                         >
                           <Eye className="w-3.5 h-3.5" />

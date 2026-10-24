@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { Prisma } from '@prisma/client';
+import { Prisma } from './generated/prisma/client';
 import { prisma, initPrisma } from './database/prisma';
 import {
   getBackupList,
@@ -23,17 +23,36 @@ import {
   startBackupScheduler
 } from './backup/scheduler';
 import crypto from 'crypto';
-import QRCode from 'qrcode';
+import fs from 'fs';
+import path from 'path';
 import { hashPassword, verifyPassword } from './security/passwords';
-import {
-  generateTotpSecret,
-  generateTotpCode,
-  verifyTotpCode,
-  generateTotpUri,
-  encryptTotpSecret,
-  decryptTotpSecret
-} from './security/totp';
 import { logSecurityAudit } from './security/audit';
+import { getDeveloperEmail, isDeveloperKeyConfigured } from './security/developerKey';
+import { verifyDeveloperCode, DEVELOPER_CODE_ERRORS, DEVELOPER_TOTP_STATE_KEYS } from './security/developerAuth';
+import { createSession, getBearerToken, resolveSession, revokeSession, revokeUserSessions } from './security/sessions';
+import { getLicenseState, licenseWrites, readLicenseRecord, saveLicense, LICENSE_SETTING_KEYS } from './security/license';
+import { buildDemoLicense, buildFullLicense, extendDemoLicense } from './security/licenseMath';
+import {
+  DEFAULT_ADMIN_PERMISSIONS,
+  DEFAULT_CASHIER_PERMISSIONS,
+  DEFAULT_PHARMACIST_PERMISSIONS,
+  normalizePermissions
+} from './security/permissions';
+import {
+  parseBody,
+  setupUnlockSchema,
+  setupCompleteSchema,
+  licenseUpdateSchema,
+  developerLoginSchema,
+  loginSchema,
+  createUserSchema,
+  updateUserSchema,
+  settingsSchema,
+  developerSettingsSchema,
+  backupScheduleSchema,
+  shiftReopenSchema,
+  createSaleSchema
+} from './validation/schemas';
 import {
   DEFAULT_DEVELOPER_FOOTER,
   FOOTER_MAX_LENGTH,
@@ -48,6 +67,55 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Routes reachable without a login session. Everything else under /api needs "Authorization: Bearer <token>".
+const PUBLIC_API_ROUTES = new Set([
+  'GET /api/status',
+  'GET /api/setup/status',
+  'POST /api/setup/unlock',
+  'POST /api/setup/complete',
+  'POST /api/auth/login',
+  'POST /api/auth/developer-login',
+  'GET /api/license/status',
+  'GET /api/settings'
+]);
+
+const SESSION_REQUIRED_ERROR = { error: 'Your session has ended. Please log in again.', code: 'SESSION_REQUIRED' };
+const LICENSE_EXPIRED_ERROR = {
+  error: 'The demo period for this pharmacy has ended. Please contact the developer to continue using PharmaCare Pro.',
+  code: 'LICENSE_EXPIRED'
+};
+
+app.use('/api', async (req: Request, res: Response, next) => {
+  try {
+    const token = getBearerToken(req.headers.authorization);
+    const session = resolveSession(token);
+    let actor: Actor | null = null;
+    if (session) {
+      const user = await prisma.user.findUnique({ where: { id: session.userId } });
+      if (user && user.status === 'active' && user.role === session.role) {
+        actor = { id: user.id, username: user.username, role: user.role, fullName: user.fullName };
+      } else {
+        revokeSession(token);
+      }
+    }
+    res.locals.actor = actor;
+    res.locals.sessionToken = actor ? token : null;
+
+    const routeKey = `${req.method} ${req.originalUrl.split('?')[0].replace(/\/+$/, '')}`;
+    if (PUBLIC_API_ROUTES.has(routeKey)) return next();
+    if (!actor) return res.status(401).json(SESSION_REQUIRED_ERROR);
+
+    // Expired demo: only the Developer can still work (to extend it or switch to Full)
+    if (actor.role !== 'developer' && (await getLicenseState()).expired) {
+      revokeSession(token);
+      return res.status(403).json(LICENSE_EXPIRED_ERROR);
+    }
+    next();
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
 
 // Declare toJSON for BigInt to enable seamless JSON serialization for SQLite aggregations
 declare global {
@@ -66,24 +134,19 @@ function getErrorMessage(error: unknown): string {
   return String(error);
 }
 
-// Helper to reliably extract and verify acting user from request headers
-async function getActingUser(req: Request): Promise<{ id: number; username: string; role: string; fullName: string } | null> {
-  const rawUserId = req.headers['x-user-id'];
-  if (!rawUserId) return null;
-  const userId = Number(rawUserId);
-  if (isNaN(userId)) return null;
-  try {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return null;
-    return {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      fullName: user.fullName
-    };
-  } catch {
-    return null;
-  }
+type Actor = { id: number; username: string; role: string; fullName: string };
+
+// The logged-in user, resolved by the session middleware from the bearer token (never from client headers)
+async function getActingUser(req: Request): Promise<Actor | null> {
+  return (req.res?.locals.actor as Actor | undefined) ?? null;
+}
+
+// Session user as the id/name fields older handlers used to read from the request body
+async function sessionIdentity(req: Request) {
+  const actor = await getActingUser(req);
+  const id = actor ? actor.id : null;
+  const name = actor ? actor.fullName || actor.username : null;
+  return { user_id: id, user_name: name, admin_id: id, admin_name: name };
 }
 
 // Developer always passes; Admin and custom roles are checked against their role's JSON permissions
@@ -320,29 +383,9 @@ async function ensureDefaultRoles(): Promise<void> {
   try {
     const roleCount = await prisma.role.count();
     if (roleCount === 0) {
-      const adminPerms = {
-        dashboard: true, pos: true, sales: true, shifts: true, khata: true, masters: true, purchases: true, reports: true, utilities: true, settings: true,
-        can_add_product: true, can_edit_product: true, can_delete_product: true, can_add_company: true, can_edit_company: true, can_delete_company: true,
-        can_delete_invoice: true, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: true, can_add_purchase: true,
-        can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: true, can_discount: true,
-        can_backup: true, can_restore: true, can_shift_close: true, can_manage_shifts: true, can_stock_zero: true, can_manage_users: true, can_manage_roles: true
-      };
-
-      const cashierPerms = {
-        dashboard: false, pos: true, sales: true, shifts: false, khata: true, masters: true, purchases: false, reports: false, utilities: false, settings: false,
-        can_add_product: true, can_edit_product: false, can_delete_product: false, can_add_company: true, can_edit_company: false, can_delete_company: false,
-        can_delete_invoice: false, can_return_sale: true, can_view_all_sales: false, can_view_financial_kpis: false, can_add_purchase: false,
-        can_add_customer: true, can_receive_payment: true, can_edit_customer: false, can_delete_customer: false, can_discount: true,
-        can_backup: false, can_restore: false, can_shift_close: true, can_manage_shifts: false, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
-      };
-
-      const pharmacistPerms = {
-        dashboard: true, pos: true, sales: true, shifts: false, khata: true, masters: true, purchases: true, reports: false, utilities: false, settings: false,
-        can_add_product: true, can_edit_product: true, can_delete_product: false, can_add_company: true, can_edit_company: true, can_delete_company: false,
-        can_delete_invoice: false, can_return_sale: true, can_view_all_sales: true, can_view_financial_kpis: false, can_add_purchase: true,
-        can_add_customer: true, can_receive_payment: true, can_edit_customer: true, can_delete_customer: false, can_discount: true,
-        can_backup: false, can_restore: false, can_shift_close: true, can_manage_shifts: false, can_stock_zero: false, can_manage_users: false, can_manage_roles: false
-      };
+      const adminPerms = DEFAULT_ADMIN_PERMISSIONS;
+      const cashierPerms = DEFAULT_CASHIER_PERMISSIONS;
+      const pharmacistPerms = DEFAULT_PHARMACIST_PERMISSIONS;
 
       await prisma.role.createMany({
         data: [
@@ -366,6 +409,24 @@ async function ensureDefaultRoles(): Promise<void> {
           }
         });
       }
+
+      // Roles saved before newer permission keys existed (e.g. 'shifts', 'can_manage_shifts') get those keys added
+      // with the built-in defaults. Existing values are never changed.
+      const roleDefaults: Record<string, Record<string, boolean>> = {
+        admin: DEFAULT_ADMIN_PERMISSIONS,
+        developer: DEFAULT_ADMIN_PERMISSIONS,
+        cashier: DEFAULT_CASHIER_PERMISSIONS,
+        pharmacist: DEFAULT_PHARMACIST_PERMISSIONS
+      };
+      for (const role of await prisma.role.findMany()) {
+        let stored: Record<string, unknown>;
+        try { stored = JSON.parse(role.permissions || '{}'); } catch { continue; }
+        const defaults = roleDefaults[role.name] ?? {};
+        const missing = Object.keys(DEFAULT_ADMIN_PERMISSIONS).filter(key => !(key in stored));
+        if (missing.length === 0) continue;
+        for (const key of missing) stored[key] = defaults[key] === true;
+        await prisma.role.update({ where: { id: role.id }, data: { permissions: JSON.stringify(stored) } });
+      }
     }
   } catch (error) {
     console.error('[Prisma] Role seeding check failed:', error);
@@ -378,197 +439,232 @@ ensureDefaultRoles().catch(err => {
 // -------------------------------------------------------------
 // 2.0 First-Time Setup Wizard & Offline TOTP Setup
 // -------------------------------------------------------------
+// Formats a user for login responses (never includes password or TOTP fields)
+async function sessionUserPayload(user: { id: number; username: string; email: string | null; fullName: string; role: string; status: string }) {
+  const roleRow = await prisma.role.findUnique({ where: { name: user.role } });
+  let permissions = null;
+  if (roleRow?.permissions) {
+    try { permissions = JSON.parse(roleRow.permissions); } catch {}
+  }
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    full_name: user.fullName,
+    role: user.role,
+    status: user.status,
+    role_display: roleRow ? roleRow.displayName : user.role,
+    permissions
+  };
+}
+
+async function isSetupLocked(): Promise<boolean> {
+  const setupSetting = await prisma.systemSetting.findUnique({ where: { key: 'setup_completed' } });
+  const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
+  return setupSetting?.value === 'true' && !!devUser;
+}
+
+const SETUP_LOCKED_ERROR = { error: 'Setup wizard is permanently locked. System is already initialized.' };
+
+// Setup unlock: only the developer's master authenticator code opens the wizard.
+// Failed attempts are limited in memory because no user row exists yet.
+const SETUP_TOKEN_TTL_MS = 30 * 60 * 1000;
+const SETUP_MAX_ATTEMPTS = 5;
+const SETUP_LOCK_MS = 15 * 60 * 1000;
+const setupTokens = new Map<string, number>();
+const setupUnlockLimiter = { failures: 0, lockedUntil: 0 };
+
+function hashSetupToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function isSetupTokenValid(token: string): boolean {
+  const expiresAt = setupTokens.get(hashSetupToken(token));
+  return !!expiresAt && expiresAt > Date.now();
+}
+
 app.get('/api/setup/status', async (_req: Request, res: Response) => {
   try {
-    const setupSetting = await prisma.systemSetting.findUnique({ where: { key: 'setup_completed' } });
-    const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
-
-    const isSetupCompleted = setupSetting?.value === 'true' && !!devUser;
     res.json({
       success: true,
-      isSetupCompleted,
-      developerEmail: devUser?.email || null
+      isSetupCompleted: await isSetupLocked(),
+      developerEmail: getDeveloperEmail(),
+      developerKeyConfigured: isDeveloperKeyConfigured()
     });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-app.post('/api/setup/initialize', async (req: Request, res: Response) => {
+app.post('/api/setup/unlock', async (req: Request, res: Response) => {
   try {
-    const setupSetting = await prisma.systemSetting.findUnique({ where: { key: 'setup_completed' } });
-    const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
-    if (setupSetting?.value === 'true' && devUser) {
-      return res.status(403).json({ error: 'Setup wizard is permanently locked. System is already initialized.' });
+    if (await isSetupLocked()) {
+      return res.status(403).json(SETUP_LOCKED_ERROR);
     }
-
-    const { developerEmail } = req.body;
-    if (!developerEmail || typeof developerEmail !== 'string' || !developerEmail.includes('@')) {
-      return res.status(400).json({ error: 'Valid developer email address is required' });
+    if (setupUnlockLimiter.lockedUntil > Date.now()) {
+      const remainingMins = Math.max(1, Math.ceil((setupUnlockLimiter.lockedUntil - Date.now()) / 60000));
+      return res.status(429).json({ error: `Too many wrong codes. Setup is locked for ${remainingMins} minute(s).` });
     }
+    if (!parseBody(setupUnlockSchema, req.body, res)) return;
 
-    const cleanEmail = developerEmail.trim().toLowerCase();
-    const secret = generateTotpSecret();
-    const uri = generateTotpUri(cleanEmail, secret, 'PharmaCare Pro');
-    const qrCodeDataUrl = await QRCode.toDataURL(uri, {
-      errorCorrectionLevel: 'M',
-      margin: 2,
-      scale: 6
-    });
-
-    const tempToken = encryptTotpSecret(secret);
-
-    res.json({
-      success: true,
-      secret,
-      qrCodeDataUrl,
-      uri,
-      tempToken
-    });
-  } catch (error: unknown) {
-    res.status(500).json({ error: getErrorMessage(error) });
-  }
-});
-
-app.post('/api/setup/verify', async (req: Request, res: Response) => {
-  try {
-    const setupSetting = await prisma.systemSetting.findUnique({ where: { key: 'setup_completed' } });
-    const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
-    if (setupSetting?.value === 'true' && devUser) {
-      return res.status(403).json({ error: 'Setup wizard is permanently locked. System is already initialized.' });
-    }
-
-    const { developerEmail, code, tempToken, storeName, storeAddress, adminPassword } = req.body;
-    if (!developerEmail || !code || !tempToken) {
-      return res.status(400).json({ error: 'Developer email, 6-digit TOTP code, and setup session token are required' });
-    }
-
-    const secret = decryptTotpSecret(tempToken);
-    if (!secret) {
-      return res.status(400).json({ error: 'Invalid or expired setup session token' });
-    }
-
-    const isValid = verifyTotpCode(secret, String(code).trim(), 1);
-    if (!isValid) {
-      return res.status(400).json({ error: 'Invalid verification code. Please check your authenticator app and try again.' });
-    }
-
-    const cleanEmail = developerEmail.trim().toLowerCase();
-    const encryptedSecret = encryptTotpSecret(secret);
-
-    // Save or update developer user
-    const existingDev = await prisma.user.findFirst({
-      where: { OR: [{ role: 'developer' }, { email: cleanEmail }, { username: 'developer' }] }
-    });
-
-    let savedDevUser;
-    if (existingDev) {
-      savedDevUser = await prisma.user.update({
-        where: { id: existingDev.id },
-        data: {
-          username: 'developer',
-          email: cleanEmail,
-          fullName: 'System Developer',
-          role: 'developer',
-          status: 'active',
-          totpSecret: encryptedSecret,
-          failedLoginAttempts: 0,
-          lockedUntil: null
+    const result = await verifyDeveloperCode(String(req.body.code));
+    if (result !== 'ok') {
+      if (result !== 'not_configured') {
+        setupUnlockLimiter.failures += 1;
+        if (setupUnlockLimiter.failures >= SETUP_MAX_ATTEMPTS) {
+          setupUnlockLimiter.failures = 0;
+          setupUnlockLimiter.lockedUntil = Date.now() + SETUP_LOCK_MS;
         }
-      });
-    } else {
-      savedDevUser = await prisma.user.create({
-        data: {
-          username: 'developer',
-          email: cleanEmail,
-          password: await hashPassword(crypto.randomBytes(16).toString('hex')),
-          fullName: 'System Developer',
-          role: 'developer',
-          status: 'active',
-          totpSecret: encryptedSecret
-        }
-      });
-    }
-
-    // If initial admin password provided, update admin account with bcrypt hash
-    if (adminPassword && typeof adminPassword === 'string' && adminPassword.trim().length > 0) {
-      const hashedAdminPassword = await hashPassword(adminPassword.trim());
-      const adminAcc = await prisma.user.findFirst({ where: { username: 'admin' } });
-      if (adminAcc) {
-        await prisma.user.update({
-          where: { id: adminAcc.id },
-          data: { password: hashedAdminPassword }
-        });
       }
-    } else {
-      // Ensure existing admin account password is secure
-      const adminAcc = await prisma.user.findFirst({ where: { username: 'admin' } });
-      if (adminAcc && !/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(adminAcc.password)) {
-        await prisma.user.update({
-          where: { id: adminAcc.id },
-          data: { password: await hashPassword(adminAcc.password) }
-        });
-      }
-    }
-
-    // Update store settings if provided
-    if (storeName && typeof storeName === 'string' && storeName.trim()) {
-      await prisma.systemSetting.upsert({
-        where: { key: 'store_name' },
-        update: { value: storeName.trim() },
-        create: { key: 'store_name', value: storeName.trim() }
-      });
-    }
-    if (storeAddress && typeof storeAddress === 'string' && storeAddress.trim()) {
-      await prisma.systemSetting.upsert({
-        where: { key: 'store_address' },
-        update: { value: storeAddress.trim() },
-        create: { key: 'store_address', value: storeAddress.trim() }
-      });
-    }
-
-    // Save developer settings and lock setup
-    await prisma.systemSetting.upsert({
-      where: { key: 'setup_completed' },
-      update: { value: 'true' },
-      create: { key: 'setup_completed', value: 'true' }
-    });
-    await prisma.systemSetting.upsert({
-      where: { key: 'developer_email' },
-      update: { value: cleanEmail },
-      create: { key: 'developer_email', value: cleanEmail }
-    });
-
-    // Record in audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'SETUP_COMPLETED',
+      await logSecurityAudit({
+        action: 'SETUP_UNLOCK',
         module: 'SECURITY',
-        details: `Initial setup completed. Developer account registered: ${cleanEmail}`,
-        userId: savedDevUser.id,
-        userName: savedDevUser.fullName
-      }
+        status: 'FAILED',
+        details: `Setup wizard unlock rejected (${result})`
+      });
+      return res.status(result === 'not_configured' ? 500 : 401).json({ error: DEVELOPER_CODE_ERRORS[result] });
+    }
+
+    setupUnlockLimiter.failures = 0;
+    const setupToken = crypto.randomBytes(32).toString('base64url');
+    setupTokens.clear();
+    setupTokens.set(hashSetupToken(setupToken), Date.now() + SETUP_TOKEN_TTL_MS);
+
+    await logSecurityAudit({
+      action: 'SETUP_UNLOCK',
+      module: 'SECURITY',
+      status: 'SUCCESS',
+      details: 'Setup wizard unlocked with the developer authenticator code'
     });
 
-    const roleRow = await prisma.role.findUnique({ where: { name: 'developer' } });
-    let permissions = null;
-    if (roleRow && roleRow.permissions) {
-      try { permissions = JSON.parse(roleRow.permissions); } catch {}
+    res.json({ success: true, setupToken, developerEmail: getDeveloperEmail(), expiresInMinutes: SETUP_TOKEN_TTL_MS / 60000 });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.post('/api/setup/complete', async (req: Request, res: Response) => {
+  try {
+    if (await isSetupLocked()) {
+      return res.status(403).json(SETUP_LOCKED_ERROR);
     }
+    if (!parseBody(setupCompleteSchema, req.body, res)) return;
+    const body = req.body as {
+      setupToken: string;
+      storeName: string;
+      storeAddress: string;
+      admin: { fullName: string; username: string; password: string };
+      backup: { dir?: string; frequency: string; time: string; weeklyDay?: number };
+      adminPermissions: Record<string, boolean>;
+      policies: Record<string, boolean>;
+      license: { mode: 'full' } | { mode: 'demo'; demoDays: number };
+    };
+
+    if (!isSetupTokenValid(body.setupToken)) {
+      return res.status(401).json({ error: 'Setup session expired. Unlock the wizard with the developer code again.' });
+    }
+
+    if (!isValidFrequency(body.backup.frequency)) {
+      return res.status(400).json({ error: 'Invalid backup frequency. Allowed: off, twice_daily, daily, weekly' });
+    }
+    if (!isValidBackupTime(body.backup.time)) {
+      return res.status(400).json({ error: 'Backup time must use 24-hour HH:MM format' });
+    }
+
+    // The backup folder must exist (or be creatable) and be writable on this computer
+    let backupDir = '';
+    if (body.backup.dir) {
+      backupDir = path.resolve(body.backup.dir);
+      try {
+        fs.mkdirSync(backupDir, { recursive: true });
+        fs.accessSync(backupDir, fs.constants.W_OK);
+      } catch {
+        return res.status(400).json({ error: `Backup folder is not writable: ${backupDir}` });
+      }
+    }
+
+    const adminUsername = body.admin.username.trim();
+    const developerEmail = getDeveloperEmail();
+    const existingAdmin = await prisma.user.findUnique({ where: { username: adminUsername } });
+    if (existingAdmin && existingAdmin.role !== 'admin') {
+      return res.status(400).json({ error: `Username "${adminUsername}" is already used by a ${existingAdmin.role} account` });
+    }
+
+    const adminPermissions = normalizePermissions(body.adminPermissions, DEFAULT_ADMIN_PERMISSIONS);
+    const now = Date.now();
+    const license = body.license.mode === 'demo' ? buildDemoLicense(body.license.demoDays, now) : buildFullLicense(now);
+    const adminPasswordHash = await hashPassword(body.admin.password);
+
+    const settings: Record<string, string> = {
+      store_name: body.storeName.trim(),
+      store_address: body.storeAddress.trim(),
+      backup_frequency: body.backup.frequency,
+      backup_scheduled_time: body.backup.time,
+      backup_weekly_day: String(body.backup.weeklyDay ?? 0),
+      allow_admin_create_cashier: String(body.policies.allow_admin_create_cashier),
+      allow_admin_create_admin: String(body.policies.allow_admin_create_admin),
+      allow_admin_edit_store_identity: String(body.policies.allow_admin_edit_store_identity),
+      allow_admin_hide_store_identity: String(body.policies.allow_admin_hide_store_identity),
+      developer_email: developerEmail,
+      setup_completed: 'true'
+    };
+    if (backupDir) settings.auto_backup_dir = backupDir;
+
+    const existingDev = await prisma.user.findFirst({
+      where: { OR: [{ role: 'developer' }, { email: developerEmail }, { username: 'developer' }] }
+    });
+    const developerData = {
+      username: 'developer',
+      email: developerEmail,
+      fullName: 'System Developer',
+      role: 'developer',
+      status: 'active',
+      totpSecret: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null
+    };
+    const adminData = {
+      username: adminUsername,
+      password: adminPasswordHash,
+      fullName: body.admin.fullName.trim(),
+      role: 'admin',
+      status: 'active'
+    };
+
+    const [devUser, adminUser] = await prisma.$transaction([
+      existingDev
+        ? prisma.user.update({ where: { id: existingDev.id }, data: developerData })
+        : prisma.user.create({ data: { ...developerData, password: await hashPassword(crypto.randomBytes(24).toString('hex')) } }),
+      existingAdmin
+        ? prisma.user.update({ where: { id: existingAdmin.id }, data: adminData })
+        : prisma.user.create({ data: adminData }),
+      prisma.role.upsert({
+        where: { name: 'admin' },
+        update: { permissions: JSON.stringify(adminPermissions) },
+        create: { name: 'admin', displayName: 'Administrator', description: 'Full system access and master privileges', isSystem: 1, permissions: JSON.stringify(adminPermissions) }
+      }),
+      ...licenseWrites(license),
+      ...Object.entries(settings).map(([key, value]) =>
+        prisma.systemSetting.upsert({ where: { key }, update: { value }, create: { key, value } })
+      )
+    ]);
+    setupTokens.clear();
+
+    await logSecurityAudit({
+      action: 'SETUP_COMPLETED',
+      module: 'SECURITY',
+      status: 'SUCCESS',
+      details: `Initial setup completed by developer ${developerEmail}. Admin account: ${adminUser.username}. License: ${license.mode}${license.mode === 'demo' ? ` (${license.demoDays} days)` : ''}`,
+      affectedUser: adminUser.username,
+      userId: devUser.id,
+      userName: devUser.fullName
+    });
 
     res.json({
       success: true,
-      message: 'Setup verified and locked successfully',
-      user: {
-        id: savedDevUser.id,
-        username: savedDevUser.username,
-        email: savedDevUser.email,
-        full_name: savedDevUser.fullName,
-        role: savedDevUser.role,
-        status: savedDevUser.status,
-        role_display: 'System Developer',
-        permissions
-      }
+      message: 'Setup completed and locked successfully',
+      token: createSession(devUser),
+      user: await sessionUserPayload(devUser)
     });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
@@ -579,20 +675,16 @@ app.post('/api/setup/verify', async (req: Request, res: Response) => {
 // 2.1 Authentication & Profile
 // -------------------------------------------------------------
 
-// 2.1a Developer Offline TOTP Login
+// 2.1a Developer login: fixed developer email + code from the developer's master authenticator
 app.post('/api/auth/developer-login', async (req: Request, res: Response) => {
   try {
+    if (!parseBody(developerLoginSchema, req.body, res)) return;
     const { email, code } = req.body;
-    if (!email || !code) {
-      return res.status(400).json({ error: 'Developer email and 6-digit TOTP code are required' });
-    }
 
     const cleanEmail = email.trim().toLowerCase();
-    const devUser = await prisma.user.findFirst({
-      where: { email: cleanEmail, role: 'developer' }
-    });
+    const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
 
-    if (!devUser) {
+    if (!devUser || cleanEmail !== getDeveloperEmail()) {
       return res.status(401).json({ error: 'Invalid developer credentials' });
     }
 
@@ -609,17 +701,17 @@ app.post('/api/auth/developer-login', async (req: Request, res: Response) => {
       });
     }
 
-    if (!devUser.totpSecret) {
-      return res.status(500).json({ error: 'Developer TOTP secret not configured on this system.' });
+    const result = await verifyDeveloperCode(String(code));
+    if (result === 'not_configured') {
+      return res.status(500).json({ error: DEVELOPER_CODE_ERRORS.not_configured });
     }
 
-    const secret = decryptTotpSecret(devUser.totpSecret);
-    const isValid = verifyTotpCode(secret, String(code).trim(), 1);
-
-    if (!isValid) {
+    if (result !== 'ok') {
       const attempts = (devUser.failedLoginAttempts || 0) + 1;
       let lockedUntil: Date | null = null;
-      let errorMsg = `Invalid TOTP code. (${Math.max(0, 5 - attempts)} attempt(s) remaining)`;
+      let errorMsg = result === 'replayed'
+        ? DEVELOPER_CODE_ERRORS.replayed
+        : `Invalid TOTP code. (${Math.max(0, 5 - attempts)} attempt(s) remaining)`;
 
       if (attempts >= 5) {
         lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
@@ -631,14 +723,13 @@ app.post('/api/auth/developer-login', async (req: Request, res: Response) => {
         data: { failedLoginAttempts: attempts, lockedUntil }
       });
 
-      await prisma.auditLog.create({
-        data: {
-          action: 'DEV_LOGIN_FAILED',
-          module: 'AUTH',
-          details: `Failed TOTP login attempt for developer ${cleanEmail}. Consecutive attempts: ${attempts}`,
-          userId: devUser.id,
-          userName: devUser.fullName
-        }
+      await logSecurityAudit({
+        action: 'DEV_LOGIN_FAILED',
+        module: 'AUTH',
+        status: 'FAILED',
+        details: `Failed developer login for ${cleanEmail} (${result}). Consecutive attempts: ${attempts}`,
+        userId: devUser.id,
+        userName: devUser.fullName
       });
 
       return res.status(attempts >= 5 ? 429 : 401).json({ error: errorMsg });
@@ -650,34 +741,19 @@ app.post('/api/auth/developer-login', async (req: Request, res: Response) => {
       data: { failedLoginAttempts: 0, lockedUntil: null }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        action: 'DEV_LOGIN_SUCCESS',
-        module: 'AUTH',
-        details: `Developer ${cleanEmail} logged in successfully via offline TOTP`,
-        userId: devUser.id,
-        userName: devUser.fullName
-      }
+    await logSecurityAudit({
+      action: 'DEV_LOGIN_SUCCESS',
+      module: 'AUTH',
+      status: 'SUCCESS',
+      details: `Developer ${cleanEmail} logged in with the master authenticator code`,
+      userId: devUser.id,
+      userName: devUser.fullName
     });
-
-    const roleRow = await prisma.role.findUnique({ where: { name: 'developer' } });
-    let permissions = null;
-    if (roleRow && roleRow.permissions) {
-      try { permissions = JSON.parse(roleRow.permissions); } catch {}
-    }
 
     res.json({
       success: true,
-      user: {
-        id: devUser.id,
-        username: devUser.username,
-        email: devUser.email,
-        full_name: devUser.fullName,
-        role: devUser.role,
-        status: devUser.status,
-        role_display: 'System Developer',
-        permissions
-      }
+      token: createSession(devUser),
+      user: await sessionUserPayload(devUser)
     });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
@@ -687,17 +763,16 @@ app.post('/api/auth/developer-login', async (req: Request, res: Response) => {
 // 2.1b Staff Login (Admin / Cashier) with bcrypt password verification
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
+    if (!parseBody(loginSchema, req.body, res)) return;
     const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
-    }
 
     const cleanUsername = username.trim();
     const user = await prisma.user.findFirst({
       where: { username: cleanUsername }
     });
 
-    if (!user) {
+    // The Developer signs in only with the master authenticator code, never with a password
+    if (!user || user.role === 'developer') {
       await logSecurityAudit({
         action: 'LOGIN',
         module: 'AUTH',
@@ -735,6 +810,20 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
+    // Expired demo: staff cannot sign in until the Developer extends it or switches to Full
+    if ((await getLicenseState()).expired) {
+      await logSecurityAudit({
+        action: 'LOGIN',
+        module: 'AUTH',
+        status: 'FAILED',
+        details: `Login blocked for ${user.username}: demo period has ended`,
+        affectedUser: user.username,
+        userId: user.id,
+        userName: user.username
+      });
+      return res.status(403).json(LICENSE_EXPIRED_ERROR);
+    }
+
     // Transparently upgrade legacy plaintext password to bcrypt hash
     if (needsRehash) {
       try {
@@ -758,42 +847,42 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       userName: user.username
     });
 
-    const roleRow = await prisma.role.findUnique({ where: { name: user.role } });
-    let permissions = null;
-    if (roleRow && roleRow.permissions) {
-      try {
-        permissions = JSON.parse(roleRow.permissions);
-      } catch {
-        permissions = null;
-      }
-    }
-
     res.json({
       success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        full_name: user.fullName,
-        role: user.role,
-        status: user.status,
-        role_display: roleRow ? roleRow.displayName : user.role,
-        permissions
-      }
+      token: createSession(user),
+      user: await sessionUserPayload(user)
     });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
+app.post('/api/auth/logout', async (req: Request, res: Response) => {
+  const actingUser = await getActingUser(req);
+  revokeSession(res.locals.sessionToken);
+  if (actingUser) {
+    await logSecurityAudit({
+      action: 'LOGOUT',
+      module: 'AUTH',
+      status: 'SUCCESS',
+      details: `User ${actingUser.username} logged out`,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+  }
+  res.json({ success: true });
+});
+
 app.put('/api/auth/profile', async (req: Request, res: Response) => {
   try {
-    const { userId, username, full_name, currentPassword, newPassword } = req.body;
-    if (!userId || !username || !full_name) {
+    const actingUser = await getActingUser(req);
+    const { username, full_name, currentPassword, newPassword } = req.body;
+    if (!actingUser || !username || !full_name) {
       return res.status(400).json({ error: 'Missing required user profile fields' });
     }
 
-    const idNum = Number(userId);
+    // Always the signed-in user; a userId in the body is ignored
+    const idNum = actingUser.id;
     const existingUser = await prisma.user.findUnique({ where: { id: idNum } });
     if (!existingUser) {
       return res.status(404).json({ error: 'User not found' });
@@ -826,6 +915,7 @@ app.put('/api/auth/profile', async (req: Request, res: Response) => {
           password: hashedNewPassword
         }
       });
+      revokeUserSessions(idNum, res.locals.sessionToken);
     } else {
       await prisma.user.update({
         where: { id: idNum },
@@ -860,8 +950,15 @@ app.put('/api/auth/profile', async (req: Request, res: Response) => {
 
 app.post('/api/auth/change-password', async (req: Request, res: Response) => {
   try {
-    const { userId, oldPassword, newPassword } = req.body;
-    const idNum = Number(userId);
+    const actingUser = await getActingUser(req);
+    const { oldPassword, newPassword } = req.body;
+    if (!actingUser) {
+      return res.status(401).json(SESSION_REQUIRED_ERROR);
+    }
+    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    }
+    const idNum = actingUser.id;
     const user = await prisma.user.findUnique({
       where: { id: idNum }
     });
@@ -879,6 +976,7 @@ app.post('/api/auth/change-password', async (req: Request, res: Response) => {
       where: { id: idNum },
       data: { password: hashedPassword }
     });
+    revokeUserSessions(idNum, res.locals.sessionToken);
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
@@ -886,8 +984,19 @@ app.post('/api/auth/change-password', async (req: Request, res: Response) => {
 });
 
 // 2.2 Users Management
-app.get('/api/users', async (_req: Request, res: Response) => {
+// Staff account management needs the 'can_manage_users' permission (the Developer always has it)
+async function requireUserManager(req: Request, res: Response): Promise<Actor | null> {
+  const actingUser = await getActingUser(req);
+  if (!actingUser || !(await hasRolePermission(actingUser.role, 'can_manage_users'))) {
+    res.status(403).json({ error: 'Access denied: user management permission required' });
+    return null;
+  }
+  return actingUser;
+}
+
+app.get('/api/users', async (req: Request, res: Response) => {
   try {
+    if (!(await requireUserManager(req, res))) return;
     const users = await prisma.user.findMany({
       orderBy: { id: 'asc' }
     });
@@ -912,13 +1021,12 @@ app.get('/api/users', async (_req: Request, res: Response) => {
 
 app.post('/api/users', async (req: Request, res: Response) => {
   try {
-    const actingUser = await getActingUser(req);
+    const actingUser = await requireUserManager(req, res);
+    if (!actingUser) return;
     const { username, password, full_name, role } = req.body;
     const targetRole = (role || 'cashier').toLowerCase();
 
-    if (!username || !password || !full_name) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
+    if (!parseBody(createUserSchema, req.body, res)) return;
 
     if (targetRole === 'developer') {
       await logSecurityAudit({
@@ -1006,8 +1114,10 @@ app.post('/api/users', async (req: Request, res: Response) => {
 
 app.put('/api/users/:id', async (req: Request, res: Response) => {
   try {
-    const actingUser = await getActingUser(req);
+    const actingUser = await requireUserManager(req, res);
+    if (!actingUser) return;
     const idNum = Number(req.params.id);
+    if (!parseBody(updateUserSchema, req.body, res)) return;
     const { username, full_name, role, status, password } = req.body;
 
     const existing = await prisma.user.findUnique({ where: { id: idNum } });
@@ -1046,6 +1156,22 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Developer role cannot be downgraded' });
     }
 
+    // Only the Developer may change an Admin account or grant the Admin role, unless the Developer allows Admins to create Admins
+    if (actingUser.role !== 'developer' && (existing.role === 'admin' || role?.toLowerCase() === 'admin') && existing.id !== actingUser.id) {
+      const adminSetting = await prisma.systemSetting.findUnique({ where: { key: 'allow_admin_create_admin' } });
+      if (adminSetting?.value !== 'true') {
+        return res.status(403).json({ error: 'Only the Developer can change administrator accounts' });
+      }
+    }
+
+    // Never leave the store without an active Admin
+    if (existing.role === 'admin' && ((role && role.toLowerCase() !== 'admin') || status === 'inactive')) {
+      const activeAdmins = await prisma.user.count({ where: { role: 'admin', status: 'active' } });
+      if (activeAdmins <= 1) {
+        return res.status(400).json({ error: 'The last active Administrator cannot be disabled or demoted' });
+      }
+    }
+
     if (username && username.trim() !== existing.username) {
       const duplicate = await prisma.user.findFirst({
         where: {
@@ -1072,6 +1198,10 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
       where: { id: idNum },
       data: updateData
     });
+    // A new password, role or status takes effect immediately: sign the user out everywhere
+    if (updateData.password || updateData.role !== existing.role || updateData.status !== existing.status) {
+      revokeUserSessions(idNum, idNum === actingUser.id ? res.locals.sessionToken : null);
+    }
 
     await logSecurityAudit({
       action: (password && password.trim() !== '') ? 'PASSWORD_CHANGE' : 'USER_UPDATE',
@@ -1091,7 +1221,8 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
 
 app.delete('/api/users/:id', async (req: Request, res: Response) => {
   try {
-    const actingUser = await getActingUser(req);
+    const actingUser = await requireUserManager(req, res);
+    if (!actingUser) return;
     const idNum = Number(req.params.id);
     const targetUser = await prisma.user.findUnique({ where: { id: idNum } });
     if (!targetUser) {
@@ -1111,11 +1242,21 @@ app.delete('/api/users/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Developer account cannot be deleted' });
     }
 
-    if (targetUser.id === 1 || targetUser.username === 'admin') {
-      return res.status(400).json({ error: 'Primary Administrator account cannot be deleted' });
+    if (targetUser.role === 'admin') {
+      if (actingUser.role !== 'developer') {
+        return res.status(403).json({ error: 'Only the Developer can delete administrator accounts' });
+      }
+      const activeAdmins = await prisma.user.count({ where: { role: 'admin', status: 'active' } });
+      if (activeAdmins <= 1 && targetUser.status === 'active') {
+        return res.status(400).json({ error: 'Primary Administrator account cannot be deleted' });
+      }
+    }
+    if (targetUser.id === actingUser.id) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
     }
 
     await prisma.user.delete({ where: { id: idNum } });
+    revokeUserSessions(idNum);
 
     await logSecurityAudit({
       action: 'USER_DELETE',
@@ -1180,6 +1321,8 @@ app.get('/api/developer/settings', async (req: Request, res: Response) => {
     for (const row of settingsRows) {
       devSettings[row.key] = row.value;
     }
+    // The developer sign-in email is fixed by the build's master key
+    devSettings.developer_email = getDeveloperEmail();
     if (devSettings.backup_frequency === 'on_shift_close') {
       devSettings.backup_frequency = 'daily';
     }
@@ -1205,6 +1348,8 @@ app.put('/api/developer/settings', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Access denied: Developer role required' });
     }
 
+    if (!parseBody(developerSettingsSchema, req.body, res)) return;
+
     const allowedKeys = [
       'backup_retention_limit',
       'backup_frequency',
@@ -1216,8 +1361,7 @@ app.put('/api/developer/settings', async (req: Request, res: Response) => {
       'allow_admin_hide_store_identity',
       'store_name',
       'store_address',
-      'developer_invoice_footer',
-      'developer_email'
+      'developer_invoice_footer'
     ];
 
     const updates: Record<string, string> = {};
@@ -1332,6 +1476,7 @@ app.post('/api/developer/users/:id/reset-password', async (req: Request, res: Re
       where: { id: targetId },
       data: { password: hashedPassword }
     });
+    revokeUserSessions(targetId);
 
     await logSecurityAudit({
       action: 'DEVELOPER_PASSWORD_RESET',
@@ -1344,6 +1489,113 @@ app.post('/api/developer/users/:id/reset-password', async (req: Request, res: Re
     });
 
     res.json({ success: true, message: `Password reset successfully for ${targetUser.username}` });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// 2.2c Demo / Full license
+app.get('/api/license/status', async (_req: Request, res: Response) => {
+  try {
+    if (!(await isSetupLocked())) {
+      return res.json({ configured: false, mode: null, expiresAt: null, daysLeft: null, expired: false });
+    }
+    const state = await getLicenseState();
+    res.json({ configured: true, mode: state.mode, expiresAt: state.expiresAt, daysLeft: state.daysLeft, expired: state.expired, reason: state.reason });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.put('/api/developer/license', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await getActingUser(req);
+    if (!actingUser || actingUser.role !== 'developer') {
+      await logSecurityAudit({
+        action: 'LICENSE_UPDATED',
+        module: 'LICENSE',
+        status: 'FAILED',
+        details: 'Unauthorized attempt to change the license without developer role',
+        userId: actingUser?.id,
+        userName: actingUser?.username
+      });
+      return res.status(403).json({ error: 'Access denied: Developer role required' });
+    }
+    if (!parseBody(licenseUpdateSchema, req.body, res)) return;
+    const body = req.body as { action: 'full' } | { action: 'demo' | 'extend'; demoDays: number };
+
+    const now = Date.now();
+    let next;
+    if (body.action === 'full') {
+      next = buildFullLicense(now);
+    } else if (body.action === 'demo') {
+      next = buildDemoLicense(body.demoDays, now);
+    } else {
+      // Extending a missing or tampered record starts a fresh demo
+      const current = await readLicenseRecord();
+      next = current ? extendDemoLicense(current, body.demoDays, now) : buildDemoLicense(body.demoDays, now);
+    }
+    await saveLicense(next);
+
+    await logSecurityAudit({
+      action: 'LICENSE_UPDATED',
+      module: 'LICENSE',
+      status: 'SUCCESS',
+      details: body.action === 'full'
+        ? 'License switched to Full'
+        : `License ${body.action === 'demo' ? 'set to a new demo of' : 'demo extended by'} ${body.demoDays} day(s); ends ${next.expiresAt}`,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+
+    const state = await getLicenseState();
+    res.json({ success: true, mode: state.mode, expiresAt: state.expiresAt, daysLeft: state.daysLeft, expired: state.expired });
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+// Admin role permissions, set by the Developer (Admins cannot change their own matrix)
+app.get('/api/developer/admin-permissions', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await getActingUser(req);
+    if (!actingUser || actingUser.role !== 'developer') {
+      return res.status(403).json({ error: 'Access denied: Developer role required' });
+    }
+    const role = await prisma.role.findUnique({ where: { name: 'admin' } });
+    let stored: Record<string, unknown> = {};
+    try { stored = JSON.parse(role?.permissions || '{}'); } catch {}
+    res.json(normalizePermissions(stored, DEFAULT_ADMIN_PERMISSIONS));
+  } catch (error: unknown) {
+    res.status(500).json({ error: getErrorMessage(error) });
+  }
+});
+
+app.put('/api/developer/admin-permissions', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await getActingUser(req);
+    if (!actingUser || actingUser.role !== 'developer') {
+      return res.status(403).json({ error: 'Access denied: Developer role required' });
+    }
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.values(body).some(v => typeof v !== 'boolean')) {
+      return res.status(400).json({ error: 'Admin permissions must be true/false values' });
+    }
+    const role = await prisma.role.findUnique({ where: { name: 'admin' } });
+    let stored: Record<string, unknown> = {};
+    try { stored = JSON.parse(role?.permissions || '{}'); } catch {}
+    const permissions = normalizePermissions({ ...stored, ...body }, DEFAULT_ADMIN_PERMISSIONS);
+
+    await prisma.role.update({ where: { name: 'admin' }, data: { permissions: JSON.stringify(permissions) } });
+    await logSecurityAudit({
+      action: 'ADMIN_PERMISSIONS_UPDATE',
+      module: 'DEVELOPER_SETTINGS',
+      status: 'SUCCESS',
+      details: `Admin permissions updated. Disabled: ${Object.entries(permissions).filter(([, v]) => !v).map(([k]) => k).join(', ') || 'none'}`,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+    res.json({ success: true, permissions });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
@@ -1410,6 +1662,18 @@ app.get('/api/developer/audit-logs', async (req: Request, res: Response) => {
 });
 
 // 2.3 Roles & Granular Permissions Management
+// Role management needs 'can_manage_roles'; the built-in admin and developer roles are changed only by the Developer
+async function requireRoleManager(req: Request, res: Response): Promise<Actor | null> {
+  const actingUser = await getActingUser(req);
+  if (!actingUser || !(await hasRolePermission(actingUser.role, 'can_manage_roles'))) {
+    res.status(403).json({ error: 'Access denied: role management permission required' });
+    return null;
+  }
+  return actingUser;
+}
+
+const DEVELOPER_MANAGED_ROLES = ['admin', 'developer'];
+
 app.get('/api/roles', async (_req: Request, res: Response) => {
   try {
     const roles = await prisma.role.findMany({
@@ -1441,12 +1705,16 @@ app.get('/api/roles', async (_req: Request, res: Response) => {
 
 app.post('/api/roles', async (req: Request, res: Response) => {
   try {
+    if (!(await requireRoleManager(req, res))) return;
     const { name, display_name, description, permissions } = req.body;
     if (!name || !display_name || !permissions) {
       return res.status(400).json({ error: 'Role identifier, display name, and permissions are required' });
     }
 
     const roleKey = name.toLowerCase().replace(/[^a-z0-9_]/g, '_').trim();
+    if (DEVELOPER_MANAGED_ROLES.includes(roleKey)) {
+      return res.status(400).json({ error: `A role with identifier "${roleKey}" already exists` });
+    }
     const existing = await prisma.role.findUnique({ where: { name: roleKey } });
     if (existing) {
       return res.status(400).json({ error: `A role with identifier "${roleKey}" already exists` });
@@ -1471,6 +1739,8 @@ app.post('/api/roles', async (req: Request, res: Response) => {
 
 app.put('/api/roles/:id', async (req: Request, res: Response) => {
   try {
+    const actingUser = await requireRoleManager(req, res);
+    if (!actingUser) return;
     const idNum = Number(req.params.id);
     const { display_name, description, permissions } = req.body;
 
@@ -1479,14 +1749,22 @@ app.put('/api/roles/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Role not found' });
     }
 
-    let permsJson = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
-    if (role.name === 'admin') {
-      const parsed = typeof permissions === 'string' ? JSON.parse(permissions) : permissions;
-      parsed.settings = true;
-      parsed.can_manage_roles = true;
-      parsed.can_manage_users = true;
-      permsJson = JSON.stringify(parsed);
+    if (DEVELOPER_MANAGED_ROLES.includes(role.name) && actingUser.role !== 'developer') {
+      await logSecurityAudit({
+        action: 'ROLE_UPDATE',
+        module: 'USERS',
+        status: 'FAILED',
+        details: `Attempt by ${actingUser.username} to change the ${role.name} role permissions`,
+        userId: actingUser.id,
+        userName: actingUser.username
+      });
+      return res.status(403).json({ error: 'Administrator permissions are managed by the Developer' });
     }
+
+    // Unknown keys are dropped; a missing permissions object keeps the current matrix
+    const permsJson = permissions === undefined
+      ? role.permissions
+      : JSON.stringify(normalizePermissions(typeof permissions === 'string' ? JSON.parse(permissions) : permissions, {}));
 
     await prisma.role.update({
       where: { id: idNum },
@@ -1505,6 +1783,7 @@ app.put('/api/roles/:id', async (req: Request, res: Response) => {
 
 app.delete('/api/roles/:id', async (req: Request, res: Response) => {
   try {
+    if (!(await requireRoleManager(req, res))) return;
     const idNum = Number(req.params.id);
     const role = await prisma.role.findUnique({ where: { id: idNum } });
     if (!role) {
@@ -1669,7 +1948,9 @@ app.put('/api/customers/:id', async (req: Request, res: Response) => {
 app.post('/api/customers/:id/payment', async (req: Request, res: Response) => {
   try {
     const idNum = Number(req.params.id);
-    const { amount, payment_method, notes, shift_id, user_id, user_name } = req.body;
+    const { amount, payment_method, notes, shift_id } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { user_id, user_name } = await sessionIdentity(req);
     const paymentAmt = parseFloat(amount);
     if (isNaN(paymentAmt) || paymentAmt <= 0) {
       return res.status(400).json({ error: 'Valid positive payment amount required' });
@@ -1993,14 +2274,25 @@ app.delete('/api/products/:id', async (req: Request, res: Response) => {
 app.post('/api/sales', async (req: Request, res: Response) => {
   try {
     const {
-      customer_id, customer_name, customer_phone, user_id, user_name,
-      items, total_gross, total_item_discount, bill_discount_pct, bill_discount_amt,
-      net_total, cash_tendered, change_due, payment_type, notes, shift_id
+      customer_id,
+      customer_name,
+      customer_phone,
+      items,
+      total_gross,
+      total_item_discount,
+      bill_discount_pct,
+      bill_discount_amt,
+      net_total,
+      cash_tendered,
+      change_due,
+      payment_type,
+      notes,
+      shift_id
     } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { user_id, user_name } = await sessionIdentity(req);
 
-    if (!items || items.length === 0) {
-      return res.status(400).json({ error: 'Sale must include at least one item.' });
-    }
+    if (!parseBody(createSaleSchema, req.body, res)) return;
 
     // Strict Shift Lock: Verify active open shift
     let activeShiftId = shift_id ? Number(shift_id) : null;
@@ -2273,7 +2565,9 @@ app.get('/api/sales/:id', async (req: Request, res: Response) => {
 
 app.post('/api/sales/return', async (req: Request, res: Response) => {
   try {
-    const { sale_id, original_invoice_no, customer_name, return_items, reason, user_id, user_name, shift_id } = req.body;
+    const { sale_id, original_invoice_no, customer_name, return_items, reason, shift_id } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { user_id, user_name } = await sessionIdentity(req);
     if (!return_items || return_items.length === 0) {
       return res.status(400).json({ error: 'No return items specified' });
     }
@@ -2400,9 +2694,19 @@ app.get('/api/purchases', async (_req: Request, res: Response) => {
 app.post('/api/purchases', async (req: Request, res: Response) => {
   try {
     const {
-      supplier_invoice_no, company_id, purchase_date, items,
-      total_gross, discount_amount, tax_amount, net_total, payment_status, notes, user_id
+      supplier_invoice_no,
+      company_id,
+      purchase_date,
+      items,
+      total_gross,
+      discount_amount,
+      tax_amount,
+      net_total,
+      payment_status,
+      notes
     } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { user_id } = await sessionIdentity(req);
 
     if (!items || items.length === 0) {
       return res.status(400).json({ error: 'Purchase must have items' });
@@ -2765,11 +3069,9 @@ app.put('/api/backups/schedule', async (req: Request, res: Response) => {
     const actingUser = await requireBackupPermission(req, res, 'can_backup', 'BACKUP_SCHEDULE_UPDATE');
     if (!actingUser) return;
 
-    const keys = Object.keys(req.body || {});
-    if (keys.length !== 1 || keys[0] !== 'backup_scheduled_time') {
-      return res.status(400).json({ error: 'Only backup_scheduled_time can be changed here. Backup frequency is managed by the Developer.' });
-    }
-    const time = req.body.backup_scheduled_time;
+    const body = parseBody(backupScheduleSchema, req.body, res);
+    if (!body) return;
+    const time = body.backup_scheduled_time;
     if (!isValidBackupTime(time)) {
       return res.status(400).json({ error: 'Backup time must use 24-hour HH:MM format' });
     }
@@ -2841,14 +3143,18 @@ app.post('/api/utilities/restore', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/utilities/stock-zero', (req: Request, res: Response) => {
-  const { company_id, confirmation_code, user_id, user_name } = req.body;
+app.post('/api/utilities/stock-zero', async (req: Request, res: Response) => {
+  const { company_id, confirmation_code } = req.body;
+  const actingUser = await getActingUser(req);
+  if (!actingUser || !(await hasRolePermission(actingUser.role, 'can_stock_zero'))) {
+    return res.status(403).json({ error: 'Access denied: stock reset permission required' });
+  }
   if (confirmation_code !== 'RESET-ZERO-CONFIRM') {
     return res.status(400).json({ error: 'Invalid confirmation code. Please enter RESET-ZERO-CONFIRM to proceed.' });
   }
 
   try {
-    const affected = resetStockZero(company_id ? Number(company_id) : undefined, user_id, user_name);
+    const affected = resetStockZero(company_id ? Number(company_id) : undefined, actingUser.id, actingUser.fullName || actingUser.username);
     res.json({ success: true, message: `Successfully zeroed stock for ${affected} product(s).`, affected });
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
@@ -2986,7 +3292,9 @@ app.get('/api/shifts/active', async (req: Request, res: Response) => {
 // 2. Open a new cashier shift
 app.post('/api/shifts/start', async (req: Request, res: Response) => {
   try {
-    const { user_id, user_name, opening_cash, notes } = req.body;
+    const { opening_cash, notes } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { user_id, user_name } = await sessionIdentity(req);
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
     }
@@ -3154,7 +3462,9 @@ app.get('/api/shifts/:id/summary', async (req: Request, res: Response) => {
 app.post('/api/shifts/:id/close', async (req: Request, res: Response) => {
   try {
     const shiftId = Number(req.params.id);
-    const { actual_cash, notes, user_id, user_name } = req.body;
+    const { actual_cash, notes } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { user_id, user_name } = await sessionIdentity(req);
 
     const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId } });
     if (!shift) {
@@ -3519,12 +3829,15 @@ app.get('/api/shifts/:id', async (req: Request, res: Response) => {
 // 7. Admin Exceptional Reopen
 app.post('/api/shifts/:id/admin/reopen', async (req: Request, res: Response) => {
   try {
-    const shiftId = Number(req.params.id);
-    const { admin_id, admin_name, reason } = req.body;
-
-    if (!reason || !reason.trim()) {
-      return res.status(400).json({ error: 'A mandatory reason is required for reopening a closed shift.' });
+    const shiftManager = await getActingUser(req);
+    if (!shiftManager || !(await hasRolePermission(shiftManager.role, 'can_manage_shifts'))) {
+      return res.status(403).json({ error: 'Access denied: shift management permission required' });
     }
+    const shiftId = Number(req.params.id);
+    if (!parseBody(shiftReopenSchema, req.body, res)) return;
+    const { reason } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { admin_id, admin_name } = await sessionIdentity(req);
 
     const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId } });
     if (!shift) {
@@ -3581,8 +3894,14 @@ app.post('/api/shifts/:id/admin/reopen', async (req: Request, res: Response) => 
 // 8. Admin Exceptional Cash Reconciliation Correction
 app.post('/api/shifts/:id/admin/correct', async (req: Request, res: Response) => {
   try {
+    const shiftManager = await getActingUser(req);
+    if (!shiftManager || !(await hasRolePermission(shiftManager.role, 'can_manage_shifts'))) {
+      return res.status(403).json({ error: 'Access denied: shift management permission required' });
+    }
     const shiftId = Number(req.params.id);
-    const { admin_id, admin_name, corrected_closing_cash, reason } = req.body;
+    const { corrected_closing_cash, reason } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { admin_id, admin_name } = await sessionIdentity(req);
 
     if (!reason || !reason.trim()) {
       return res.status(400).json({ error: 'A mandatory reason is required for correcting shift cash figures.' });
@@ -3644,8 +3963,14 @@ app.post('/api/shifts/:id/admin/correct', async (req: Request, res: Response) =>
 // 9. Admin Force-Close an Active Shift (emergency recovery for abandoned shifts)
 app.post('/api/shifts/:id/admin/force-close', async (req: Request, res: Response) => {
   try {
+    const shiftManager = await getActingUser(req);
+    if (!shiftManager || !(await hasRolePermission(shiftManager.role, 'can_manage_shifts'))) {
+      return res.status(403).json({ error: 'Access denied: shift management permission required' });
+    }
     const shiftId = Number(req.params.id);
-    const { admin_id, admin_name, actual_cash, notes, reason } = req.body;
+    const { actual_cash, notes, reason } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { admin_id, admin_name } = await sessionIdentity(req);
 
     if (!reason || !String(reason).trim()) {
       return res.status(400).json({ error: 'A mandatory administrative reason is required to force-close a shift.' });
@@ -3760,10 +4085,21 @@ app.post('/api/shifts/:id/admin/force-close', async (req: Request, res: Response
 app.post('/api/utilities/closing', async (req: Request, res: Response) => {
   try {
     const {
-      closing_date, opening_cash, total_sales_cash, total_sales_card, total_sales_credit,
-      total_returns, total_purchases_paid, expenses_total, expected_cash, actual_cash, difference,
-      notes, user_id, user_name
+      closing_date,
+      opening_cash,
+      total_sales_cash,
+      total_sales_card,
+      total_sales_credit,
+      total_returns,
+      total_purchases_paid,
+      expenses_total,
+      expected_cash,
+      actual_cash,
+      difference,
+      notes
     } = req.body;
+    // Identity always comes from the login session, never from the request body
+    const { user_id, user_name } = await sessionIdentity(req);
 
     const today = closing_date || new Date().toISOString().split('T')[0];
     const now = new Date();
@@ -3820,7 +4156,12 @@ app.post('/api/utilities/closing', async (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 9. System Settings
 // -------------------------------------------------------------
-app.get('/api/settings', async (_req: Request, res: Response) => {
+// Shown on the login screen before anyone signs in; everything else needs a session
+const PUBLIC_SETTING_KEYS = ['store_name', 'store_address', 'store_phone', 'currency_symbol'];
+// Signed license and TOTP replay state are never readable or writable through /api/settings
+const INTERNAL_SETTING_KEYS = [...LICENSE_SETTING_KEYS, ...DEVELOPER_TOTP_STATE_KEYS];
+
+app.get('/api/settings', async (req: Request, res: Response) => {
   try {
     const rows = await prisma.systemSetting.findMany();
     const settings: Record<string, string> = {
@@ -3878,15 +4219,20 @@ app.get('/api/settings', async (_req: Request, res: Response) => {
 
     // Developer identity is only served through the protected developer endpoint
     delete settings.developer_email;
+    for (const key of INTERNAL_SETTING_KEYS) delete settings[key];
+
+    if (!(await getActingUser(req))) {
+      return res.json(Object.fromEntries(PUBLIC_SETTING_KEYS.filter(key => settings[key] !== undefined).map(key => [key, settings[key]])));
+    }
     res.json(settings);
   } catch (error: unknown) {
     res.status(500).json({ error: getErrorMessage(error) });
   }
 });
 
-// Developer and Admin always manage settings; other roles need the 'settings' permission
+// Developer always manages settings; Admin and other roles need the 'settings' permission (Developer-controlled for Admin)
 async function canManageSettings(roleName: string): Promise<boolean> {
-  return roleName === 'admin' || hasRolePermission(roleName, 'settings');
+  return hasRolePermission(roleName, 'settings');
 }
 
 // Keys only the Developer may change through any settings endpoint
@@ -3928,12 +4274,14 @@ app.post('/api/settings', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Access denied: settings permission required' });
     }
 
+    if (!parseBody(settingsSchema, req.body, res)) return;
     const settings: Record<string, unknown> = { ...req.body };
     // Developer info is strictly mandatory
     settings.show_developer_info = 'true';
     // Setup lock and developer identity are only managed by the setup wizard / developer endpoint
     delete settings.setup_completed;
     delete settings.developer_email;
+    for (const key of INTERNAL_SETTING_KEYS) delete settings[key];
 
     // Thermal-only invoices: reject A3/A4/A5 sizes and retired sheet templates
     if (settings.default_invoice_template !== undefined && !isValidTemplate(settings.default_invoice_template)) {

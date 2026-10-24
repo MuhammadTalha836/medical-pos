@@ -205,16 +205,16 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
 
       {feedback && (
         <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{feedback}</span>
         </div>
       )}
 
       {/* Purchases Invoices Table */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Purchase Inv #</th>
                 <th className="py-3 px-4">Supplier Bill #</th>
@@ -305,14 +305,14 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       >
         <form onSubmit={handleSavePurchase} className="space-y-4">
           {/* Supplier & Header details */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0d131f] p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-surface-inset-dark p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Supplier / Company</label>
               <select
                 required
                 value={selectedCompanyId}
                 onChange={(e) => handleSelectCompanyInModal(e.target.value)}
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               >
                 {companies.map(c => (
                   <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
@@ -327,7 +327,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 value={supplierInvoiceNo}
                 onChange={(e) => setSupplierInvoiceNo(e.target.value)}
                 placeholder="e.g. DC-98421"
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               />
             </div>
 
@@ -338,7 +338,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 required
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               />
             </div>
 
@@ -347,7 +347,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
               <select
                 value={paymentStatus}
                 onChange={(e) => setPaymentStatus(e.target.value as any)}
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
               >
                 <option value="Paid">Paid</option>
                 <option value="Pending">Pending / Credit</option>
@@ -357,7 +357,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           </div>
 
           {/* Add Line Item Box */}
-          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
             <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider block">Add Medicine Line Item</span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="col-span-2">
@@ -365,7 +365,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 <select
                   value={lineProductId}
                   onChange={(e) => handleSelectProductInModal(e.target.value)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 >
                   <option value="">Select Medicine</option>
                   {products.map(p => (
@@ -381,7 +381,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   value={lineBatchNo}
                   onChange={(e) => setLineBatchNo(e.target.value.toUpperCase())}
                   placeholder="e.g. B-998"
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -391,7 +391,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   type="date"
                   value={lineExpiry}
                   onChange={(e) => setLineExpiry(e.target.value)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
             </div>
@@ -404,7 +404,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   min="1"
                   value={lineBoxes}
                   onChange={(e) => setLineBoxes(parseInt(e.target.value) || 1)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -415,7 +415,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   min="0"
                   value={lineBonus}
                   onChange={(e) => setLineBonus(parseInt(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -426,7 +426,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   step="0.01"
                   value={lineCost}
                   onChange={(e) => setLineCost(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -437,7 +437,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   step="0.01"
                   value={lineRetail}
                   onChange={(e) => setLineRetail(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                 />
               </div>
 
@@ -457,7 +457,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           {/* Draft Items Table */}
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2 px-3">Item</th>
                   <th className="py-2 px-3">Batch & Expiry</th>
@@ -506,7 +506,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           </div>
 
           {/* Totals Summary */}
-          <div className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center justify-between text-xs">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center justify-between text-xs">
             <div className="space-x-4 text-slate-600 dark:text-slate-400">
               <span>Lines: <strong className="text-slate-900 dark:text-white">{draftItems.length}</strong></span>
               <span>Total Boxes: <strong className="text-slate-900 dark:text-white">{draftItems.reduce((s, i) => s + i.quantity_boxes + i.bonus_boxes, 0)}</strong></span>
@@ -547,7 +547,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       >
         {viewInvoice && (
           <div className="space-y-4 text-xs">
-            <div className="bg-slate-50 dark:bg-[#0d131f] p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
               <div className="flex justify-between font-bold text-slate-900 dark:text-white">
                 <span>{viewInvoice.company_name}</span>
                 <span className="text-teal-600 dark:text-teal-400">{viewInvoice.invoice_no}</span>

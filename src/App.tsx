@@ -63,10 +63,12 @@ export const App: React.FC = () => {
     loadSettings();
   }, []);
 
-  // Sync active cashier shift when user is logged in
+  // Sync active cashier shift and the full settings once a user is logged in
+  // (before login the server only shares the store identity)
   useEffect(() => {
     if (user?.id) {
       fetchActiveShift(user.id);
+      loadSettings();
     }
   }, [user?.id]);
 
@@ -194,7 +196,8 @@ export const App: React.FC = () => {
           onCompleted={() => {
             setIsSetupCompleted(true);
             loadSettings();
-            setQuickNotification('System setup completed and secured with TOTP!');
+            setCurrentTab('developer');
+            setQuickNotification('Setup completed and locked. The Admin can now sign in with username and password.');
             setTimeout(() => setQuickNotification(null), 5000);
           }}
         />

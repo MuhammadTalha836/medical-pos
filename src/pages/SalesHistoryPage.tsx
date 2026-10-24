@@ -161,7 +161,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
 
       {successMessage && (
         <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
@@ -175,7 +175,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             value={searchInvoice}
             onChange={(e) => setSearchInvoice(e.target.value)}
             placeholder="Search by Invoice # (e.g. INV-2026...)"
-            className="w-full bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+            className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
           />
         </div>
 
@@ -188,7 +188,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
+            className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
           />
         </div>
 
@@ -198,7 +198,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="bg-slate-50 dark:bg-[#0d131f] border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
+            className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
           />
         </div>
 
@@ -229,7 +229,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       <div className="table-container">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Invoice #</th>
                 <th className="py-3 px-4">Date & Time</th>
@@ -360,7 +360,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       >
         <div className="space-y-4">
           <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-200 flex items-start space-x-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
               Specify the returned quantity for each medicine item below. Returned inventory will be automatically restored to the available stock in SQLite.
             </div>
@@ -368,7 +368,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
 
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 dark:bg-[#0d131f] text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
+              <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">Product Name</th>
                   <th className="py-2.5 px-3 text-center">Billed Qty</th>
@@ -399,7 +399,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                               [prodId]: { ...prev[prodId], qty: val }
                             }));
                           }}
-                          className="w-16 text-center bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-none focus:border-teal-500"
+                          className="w-16 text-center bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-hidden focus:border-teal-500"
                         />
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
@@ -418,7 +418,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
               type="text"
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
-              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             />
           </div>
 

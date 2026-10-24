@@ -1,7 +1,13 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaClient } from '../generated/prisma/client';
 import { migrateLegacyInvoiceSettings } from '../invoice/invoiceSettings';
+import { DB_PATH } from './paths';
+
+// Prisma 7 connects through the better-sqlite3 driver adapter, using the same file as db.ts
+const adapter = new PrismaBetterSqlite3({ url: `file:${DB_PATH}` });
 
 export const prisma = new PrismaClient({
+  adapter,
   log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
 });
 

@@ -64,20 +64,48 @@ export interface SetupStatusResponse {
   success: boolean;
   isSetupCompleted: boolean;
   developerEmail?: string | null;
+  developerKeyConfigured?: boolean;
 }
 
-export interface SetupInitializeResponse {
+export interface SetupUnlockResponse {
   success: boolean;
-  secret: string;
-  qrCodeDataUrl: string;
-  uri: string;
-  tempToken: string;
+  setupToken: string;
+  developerEmail: string;
+  expiresInMinutes: number;
 }
 
-export interface SetupVerifyResponse {
+export type LicenseChoice = { mode: 'full' } | { mode: 'demo'; demoDays: number };
+
+export interface SetupCompletePayload {
+  setupToken: string;
+  storeName: string;
+  storeAddress: string;
+  admin: { fullName: string; username: string; password: string };
+  backup: { dir?: string; frequency: string; time: string; weeklyDay?: number };
+  adminPermissions: Record<string, boolean>;
+  policies: {
+    allow_admin_create_cashier: boolean;
+    allow_admin_create_admin: boolean;
+    allow_admin_edit_store_identity: boolean;
+    allow_admin_hide_store_identity: boolean;
+  };
+  license: LicenseChoice;
+}
+
+export interface LoginResponse {
   success: boolean;
-  message: string;
+  token: string;
   user: User;
+  message?: string;
+}
+
+export interface LicenseStatus {
+  configured?: boolean;
+  mode: 'demo' | 'full' | null;
+  expiresAt: string | null;
+  daysLeft: number | null;
+  expired: boolean;
+  reason?: 'ok' | 'expired' | 'missing' | 'tampered';
 }
 
 export interface Company {

@@ -1,11 +1,13 @@
 process.env.NODE_ENV = 'test';
 process.env.TEST_MODE = 'true';
 
+import './testEnv';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { app } from '../api';
+import { authHeaders, adminAuthHeaders, useFullTestLicense } from './testAuth';
 
 let BASE_URL = 'http://localhost:3001/api';
 let server: http.Server | null = null;
@@ -26,11 +28,13 @@ function assert(condition: boolean, msg: string) {
 }
 
 async function request(url: string, options?: RequestInit) {
+  const auth = options?.headers && 'Authorization' in (options.headers as Record<string, string>) ? {} : await adminAuthHeaders();
   const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
   const res = await fetch(fullUrl, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...auth,
       ...options?.headers,
     },
   });
@@ -50,29 +54,15 @@ async function request(url: string, options?: RequestInit) {
 }
 
 async function runTestSuite() {
-  // Check if port 3001 is already running, else start ephemeral server
-  try {
-    const probe = await fetch('http://localhost:3001/api/status').catch(() => null);
-    if (probe && probe.ok) {
-      BASE_URL = 'http://localhost:3001/api';
-    } else {
-      await new Promise<void>((resolve) => {
-        server = app.listen(0, () => {
-          const addr = server!.address() as any;
-          BASE_URL = `http://localhost:${addr.port}/api`;
-          resolve();
-        });
-      });
-    }
-  } catch {
-    await new Promise<void>((resolve) => {
-      server = app.listen(0, () => {
-        const addr = server!.address() as any;
-        BASE_URL = `http://localhost:${addr.port}/api`;
-        resolve();
-      });
+  // Always an in-process server: login sessions live in this process
+  await new Promise<void>((resolve) => {
+    server = app.listen(0, () => {
+      const addr = server!.address() as any;
+      BASE_URL = `http://localhost:${addr.port}/api`;
+      resolve();
     });
-  }
+  });
+  await useFullTestLicense();
   console.log(colors.bold(colors.cyan('\n======================================================')));
   console.log(colors.bold(colors.cyan('  PharmaCare Pro - Automated Functional Test Suite   ')));
   console.log(colors.bold(colors.cyan('======================================================\n')));
@@ -526,7 +516,7 @@ async function runTestSuite() {
       }
 
       // Backups go to the saved folders; point the secondary destination at the test vault for this step
-      const adminHeaders = { 'x-user-id': String(adminUser.id) };
+      const adminHeaders = authHeaders(adminUser);
       const originalSecondary = (await request('/settings')).secondary_backup_dir ?? '';
       await request('/settings', {
         method: 'POST',
@@ -645,7 +635,7 @@ async function runTestSuite() {
     // 14. Thermal Invoice Settings & Templates (Requirement 9 / Phase 3)
     // ---------------------------------------------------------
     await step('Thermal Invoice Settings, Templates & Developer Attribution Security', async () => {
-      const adminHeaders = { 'x-user-id': String(adminUser.id) };
+      const adminHeaders = authHeaders(adminUser);
 
       // 1. Fetch initial invoice settings
       const initialSettings = await request('/settings');

@@ -16,12 +16,14 @@
 process.env.NODE_ENV = 'test';
 process.env.TEST_MODE = 'true';
 
+import './testEnv';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import http from 'http';
 import Database from 'better-sqlite3';
 import { app } from '../api';
+import { authHeaders, adminAuthHeaders, useFullTestLicense } from './testAuth';
 import { prisma } from '../database/prisma';
 import { db } from '../database/db';
 import { hashPassword } from '../security/passwords';
@@ -52,10 +54,14 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 let server: http.Server | undefined;
 let baseUrl: string;
 
+// Explicitly no session (the request helper otherwise signs requests in as an admin)
+const ANONYMOUS = { Authorization: '' };
+
 async function request(p: string, options?: RequestInit) {
+  const auth = options?.headers && 'Authorization' in (options.headers as Record<string, string>) ? {} : await adminAuthHeaders();
   const res = await fetch(`${baseUrl}${p}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { 'Content-Type': 'application/json', ...auth, ...options?.headers },
   });
   const text = await res.text();
   let json: any;
@@ -115,6 +121,7 @@ async function runPhase4Tests() {
       resolve();
     });
   });
+  await useFullTestLicense();
   console.log(`[Phase4 Test] Target API: ${baseUrl}\n`);
 
   let passed = 0;
@@ -165,9 +172,9 @@ async function runPhase4Tests() {
   });
   createdUserIds.push(adminUser.id, cashierUser.id);
 
-  const devHeaders = { 'x-user-id': String(devUser.id) };
-  const adminHeaders = { 'x-user-id': String(adminUser.id) };
-  const cashierHeaders = { 'x-user-id': String(cashierUser.id) };
+  const devHeaders = authHeaders(devUser);
+  const adminHeaders = authHeaders(adminUser);
+  const cashierHeaders = authHeaders(cashierUser);
 
   try {
     // Keep backups of this run away from any real secondary drive
@@ -416,7 +423,7 @@ async function runPhase4Tests() {
     });
 
     await test('Status: requires sign-in and hides file paths from cashiers', async () => {
-      const anon = await request('/backups/status');
+      const anon = await request('/backups/status', { headers: ANONYMOUS });
       assert(anon.status === 401, `expected 401 for anonymous, got ${anon.status}`);
       await setRawSetting('last_backup_file', path.join(schedulerDir, 'example.db'));
       const cashier = await request('/backups/status', { headers: cashierHeaders });
@@ -430,12 +437,13 @@ async function runPhase4Tests() {
     // 7. RBAC and policy validation
     // -------------------------------------------------------------
     await test('RBAC: Cashier and anonymous users cannot list, create or restore backups', async () => {
-      for (const headers of [cashierHeaders, {}]) {
+      // No session -> 401 before any route runs; a signed-in cashier -> 403
+      for (const [headers, expected] of [[cashierHeaders, 403], [ANONYMOUS, 401]] as const) {
         const list = await request('/utilities/backups', { headers });
         const create = await request('/utilities/backup', { method: 'POST', headers });
         const restore = await request('/utilities/restore', { method: 'POST', headers, body: JSON.stringify({ backupFilePath: garbageFile }) });
-        assert(list.status === 403 && create.status === 403 && restore.status === 403,
-          `expected 403s, got list=${list.status} create=${create.status} restore=${restore.status}`);
+        assert(list.status === expected && create.status === expected && restore.status === expected,
+          `expected ${expected}s, got list=${list.status} create=${create.status} restore=${restore.status}`);
       }
       const audit = await prisma.auditLog.findFirst({ where: { module: 'BACKUP', status: 'FAILED', userId: cashierUser.id } });
       assert(!!audit, 'denied backup access should be audited');

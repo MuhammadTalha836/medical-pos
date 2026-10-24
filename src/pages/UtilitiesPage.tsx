@@ -266,7 +266,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
             onClick={() => setActiveSubTab('shifts')}
             className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg transition-all ${
               activeSubTab === 'shifts'
-                ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-sm font-bold'
+                ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -278,7 +278,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
             onClick={() => setActiveSubTab('backups')}
             className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg transition-all ${
               activeSubTab === 'backups'
-                ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-sm font-bold'
+                ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -290,7 +290,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
             onClick={() => setActiveSubTab('guide')}
             className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg transition-all ${
               activeSubTab === 'guide'
-                ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-sm font-bold'
+                ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
@@ -307,9 +307,9 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
             : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300'
         }`}>
           {message.type === 'success' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           ) : (
-            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
           )}
           <span>{message.text}</span>
         </div>
@@ -365,7 +365,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         value={customBackupDir}
                         onChange={(e) => setCustomBackupDir(e.target.value)}
                         placeholder="./backups"
-                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
                       />
                       <button
                         type="button"
@@ -395,7 +395,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         value={secondaryBackupDir}
                         onChange={(e) => setSecondaryBackupDir(e.target.value)}
                         placeholder="e.g. E:\PharmacyBackups or /media/usb/backups"
-                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
+                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
                       />
                       <button
                         type="button"
@@ -430,7 +430,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         value={backupTime}
                         onChange={(e) => setBackupTime(e.target.value)}
                         disabled={!backupStatus || backupStatus.frequency === 'off'}
-                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
                       />
                     </div>
 
@@ -468,7 +468,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <button
                     onClick={handleCreateBackup}
                     disabled={loading}
-                    className="btn-primary px-5 py-2.5 text-xs flex items-center space-x-2 shadow-sm"
+                    className="btn-primary px-5 py-2.5 text-xs flex items-center space-x-2 shadow-xs"
                   >
                     <Download className="w-4 h-4" />
                     <span>Create Snapshot Now</span>
@@ -489,7 +489,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
 
                 <div className="table-container max-h-64 overflow-y-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800/90 backdrop-blur-sm text-slate-700 dark:text-slate-300 font-bold text-[10px] uppercase border-b border-slate-200 dark:border-slate-700">
+                    <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800/90 backdrop-blur-xs text-slate-700 dark:text-slate-300 font-bold text-[10px] uppercase border-b border-slate-200 dark:border-slate-700">
                       <tr>
                         <th className="py-2.5 px-3">Filename</th>
                         <th className="py-2.5 px-3">Type</th>
@@ -543,7 +543,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                                   </span>
                                   <button
                                     onClick={() => copyChecksum(file.checksum)}
-                                    className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors text-slate-500 hover:text-teal-600"
+                                    className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-sm transition-colors text-slate-500 hover:text-teal-600"
                                     title="Copy SHA-256 Checksum"
                                   >
                                     {copiedHash === file.checksum ? (
@@ -614,7 +614,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <button
                     onClick={handleOptimizeDatabase}
                     disabled={loading}
-                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition-colors flex items-center justify-center space-x-2 shadow-sm"
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition-colors flex items-center justify-center space-x-2 shadow-xs"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                     <span>Run VACUUM & Optimize</span>
@@ -644,7 +644,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                     <select
                       value={stockZeroCompanyId}
                       onChange={(e) => setStockZeroCompanyId(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-rose-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-rose-500"
                     >
                       <option value="">ALL PRODUCTS (Entire Inventory)</option>
                       {companies.map(c => (
@@ -662,7 +662,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                       value={stockZeroConfirmText}
                       onChange={(e) => setStockZeroConfirmText(e.target.value)}
                       placeholder="RESET-ZERO-CONFIRM"
-                      className="w-full bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 rounded-xl px-3 py-2 text-xs font-mono text-rose-800 dark:text-rose-300 focus:outline-none focus:ring-1 focus:ring-rose-500"
+                      className="w-full bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 rounded-xl px-3 py-2 text-xs font-mono text-rose-800 dark:text-rose-300 focus:outline-hidden focus:ring-1 focus:ring-rose-500"
                     />
                   </div>
 
@@ -708,7 +708,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Hardware Replacement</h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  In case of total POS hardware failure (burned motherboard or drive crash), set up any replacement PC (Windows 10/11 or Linux). Install Node.js v18+ LTS, clone or extract the PharmaCare Pro folder, and run <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono text-teal-600 dark:text-teal-400">npm install</code>.
+                  In case of total POS hardware failure (burned motherboard or drive crash), set up any replacement PC (Windows 10/11 or Linux). Install Node.js v18+ LTS, clone or extract the PharmaCare Pro folder, and run <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm font-mono text-teal-600 dark:text-teal-400">npm install</code>.
                 </p>
               </div>
 
@@ -719,7 +719,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Locate External Backup USB</h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Plug in the secondary backup USB flash drive configured on the previous machine. Navigate to the vault folder (e.g. <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">E:\PharmacyBackups</code>) and locate the latest <code className="font-mono">.db</code> file and its matching <code className="font-mono">.sha256</code> hash file.
+                  Plug in the secondary backup USB flash drive configured on the previous machine. Navigate to the vault folder (e.g. <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm font-mono">E:\PharmacyBackups</code>) and locate the latest <code className="font-mono">.db</code> file and its matching <code className="font-mono">.sha256</code> hash file.
                 </p>
               </div>
 
@@ -747,7 +747,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Restore & Resume Operations</h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Start PharmaCare Pro, open this <strong>Backup & Recovery</strong> tab, click <strong>"Restore from File..."</strong>, and select the verified backup. Alternatively, copy the backup file directly into <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded font-mono">./data/pharmacy.db</code> while the app is stopped.
+                  Start PharmaCare Pro, open this <strong>Backup & Recovery</strong> tab, click <strong>"Restore from File..."</strong>, and select the verified backup. Alternatively, copy the backup file directly into <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm font-mono">./data/pharmacy.db</code> while the app is stopped.
                 </p>
               </div>
             </div>

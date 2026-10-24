@@ -1,0 +1,20 @@
+# PharmaCare Pro desktop packaging (electron-builder)
+# appId and productName must never change after the first client release (Windows uses them for upgrades).
+appId: com.pharmacarepro.desktop
+productName: PharmaCare Pro
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target: dir

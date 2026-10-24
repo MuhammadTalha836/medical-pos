@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '../generated/prisma/client';
 
 // Phase 3: invoices are thermal-only (58mm / 80mm rolls) with three built-in designs.
 export const INVOICE_TEMPLATES = ['classic', 'compact', 'detailed'] as const;

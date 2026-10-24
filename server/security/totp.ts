@@ -1,6 +1,7 @@
 import crypto from 'crypto';
+import { authenticator } from 'otplib';
 
-// RFC 4648 Base32 Alphabet
+// RFC 4648 Base32 Alphabet (helpers kept for callers that encode/decode raw keys)
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 /**
@@ -56,12 +57,18 @@ export function base32Decode(base32Str: string): Buffer {
   return Buffer.from(bytes);
 }
 
+// RFC 6238 TOTP (SHA-1, 6 digits, 30 s step) via otplib's Google Authenticator-compatible preset
+const TOTP_OPTIONS = { step: 30, digits: 6 };
+
+function authenticatorAt(timestampSec: number, window: number = 0) {
+  return authenticator.clone({ ...TOTP_OPTIONS, window, epoch: timestampSec * 1000 });
+}
+
 /**
  * Generates a cryptographically random 20-byte Base32 secret for TOTP.
  */
 export function generateTotpSecret(): string {
-  const randomBytes = crypto.randomBytes(20);
-  return base32Encode(randomBytes);
+  return authenticator.generateSecret(20);
 }
 
 /**
@@ -78,25 +85,7 @@ export function generateTotpCode(
   stepSec: number = 30,
   digits: number = 6
 ): string {
-  const key = base32Decode(secret);
-  const counter = Math.floor(timestampSec / stepSec);
-
-  // 8-byte big-endian counter buffer
-  const counterBuf = Buffer.alloc(8);
-  counterBuf.writeBigInt64BE(BigInt(counter));
-
-  const hmac = crypto.createHmac('sha1', key).update(counterBuf).digest();
-
-  // Dynamic truncation
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const code =
-    ((hmac[offset] & 0x7f) << 24) |
-    ((hmac[offset + 1] & 0xff) << 16) |
-    ((hmac[offset + 2] & 0xff) << 8) |
-    (hmac[offset + 3] & 0xff);
-
-  const otp = code % Math.pow(10, digits);
-  return otp.toString().padStart(digits, '0');
+  return authenticator.clone({ step: stepSec, digits, epoch: timestampSec * 1000 }).generate(secret);
 }
 
 /**
@@ -115,20 +104,35 @@ export function verifyTotpCode(
 ): boolean {
   if (!userCode || typeof userCode !== 'string') return false;
   const cleanedCode = userCode.trim().replace(/\s/g, '');
-  if (cleanedCode.length !== 6 || !/^\d{6}$/.test(cleanedCode)) return false;
+  if (!/^\d{6}$/.test(cleanedCode)) return false;
 
-  const stepSec = 30;
-  const currentStep = Math.floor(currentTimestampSec / stepSec);
-
-  for (let offset = -window; offset <= window; offset++) {
-    const stepTime = (currentStep + offset) * stepSec;
-    const expected = generateTotpCode(secret, stepTime, stepSec, 6);
-    if (crypto.timingSafeEqual(Buffer.from(cleanedCode), Buffer.from(expected))) {
-      return true;
-    }
+  try {
+    return authenticatorAt(currentTimestampSec, window).check(cleanedCode, secret);
+  } catch {
+    return false;
   }
+}
 
-  return false;
+/**
+ * Like verifyTotpCode, but returns the matched 30 s time step (or null). Callers store the step
+ * and reject any code whose step is not newer, so a code can never be used twice.
+ */
+export function verifyTotpStep(
+  secret: string,
+  userCode: string,
+  window: number = 1,
+  currentTimestampSec: number = Math.floor(Date.now() / 1000)
+): number | null {
+  if (!userCode || typeof userCode !== 'string') return null;
+  const cleanedCode = userCode.trim().replace(/\s/g, '');
+  if (!/^\d{6}$/.test(cleanedCode)) return null;
+
+  try {
+    const delta = authenticatorAt(currentTimestampSec, window).checkDelta(cleanedCode, secret);
+    return delta === null ? null : Math.floor(currentTimestampSec / TOTP_OPTIONS.step) + delta;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -139,9 +143,7 @@ export function generateTotpUri(
   secret: string,
   issuer: string = 'PharmaCare Pro'
 ): string {
-  const encodedIssuer = encodeURIComponent(issuer);
-  const encodedAccount = encodeURIComponent(account);
-  return `otpauth://totp/${encodedIssuer}:${encodedAccount}?secret=${secret}&issuer=${encodedIssuer}&algorithm=SHA1&digits=6&period=30`;
+  return authenticator.clone(TOTP_OPTIONS).keyuri(account, issuer, secret);
 }
 
 // ----------------------------------------------------------------------------

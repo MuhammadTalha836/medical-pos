@@ -262,7 +262,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
   const developerFooterBlock = (
     <div
       data-testid="developer-invoice-footer"
-      className="text-center pt-2 mt-2 border-t border-dashed border-black text-[8px] text-gray-600 font-mono tracking-wide whitespace-pre-wrap [overflow-wrap:anywhere]"
+      className="text-center pt-2 mt-2 border-t border-dashed border-black text-[8px] text-gray-600 font-mono tracking-wide whitespace-pre-wrap wrap-anywhere"
     >
       {developerFooter}
     </div>
@@ -289,7 +289,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-lg shadow-sm transition-colors flex items-center space-x-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-lg shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print Invoice</span>
@@ -312,7 +312,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
         id="thermal-receipt-printable"
         data-template={template}
         data-paper-size={paperSize}
-        className={`bg-white text-black shadow-xl border border-slate-300 rounded-xs transition-all break-words ${
+        className={`bg-white text-black shadow-xl border border-slate-300 rounded-xs transition-all wrap-break-word ${
           is58 ? 'print-paper-58mm w-[58mm] p-2' : 'print-paper-80mm w-[80mm] p-3'
         }`}
       >

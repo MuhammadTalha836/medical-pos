@@ -125,7 +125,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-slate-50 dark:bg-[#0d131f] p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2 text-slate-600 dark:text-slate-400">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2 text-slate-600 dark:text-slate-400">
             <div className="flex justify-between">
               <span>Shift Identifier:</span>
               <span className="font-bold font-mono text-slate-900 dark:text-white">{closedShiftResult.shift_no}</span>
@@ -183,7 +183,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
         <div className="space-y-4 text-xs">
           {error && (
             <div className="p-2.5 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/50 rounded-xl flex items-center space-x-2 text-rose-700 dark:text-rose-300">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -221,7 +221,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
           {/* Drawer Reconciliation Breakdown Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Left: System Drawer Calculations */}
-            <div className="bg-slate-50 dark:bg-[#0d131f] p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block border-b border-slate-200 dark:border-slate-800 pb-1">
                 System Drawer Accounting
               </span>
@@ -327,7 +327,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
           </div>
 
           <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start space-x-2 text-amber-800 dark:text-amber-300 text-[11px]">
-            <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <Lock className="w-4 h-4 mt-0.5 shrink-0" />
             <span>
               <strong>Shift Locking Policy:</strong> Once closed, this shift will be locked permanently. You will not be able to invoice under this shift again. If you continue working, a new shift must be started.
             </span>

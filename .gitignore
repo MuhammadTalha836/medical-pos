@@ -6,6 +6,8 @@ node_modules/
 # Production build outputs
 dist/
 dist-electron/
+out/
+release/
 dist-server/
 
 # SQLite Databases & WAL/SHM Runtime Files
@@ -30,6 +32,8 @@ backups/pharmacy_backup_*
 .env.development.local
 .env.test.local
 .env.production.local
+# Developer master TOTP key (created by npm run developer:key)
+.env.developer
 
 # Logs & debugging
 *.log
@@ -44,3 +48,4 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+server/generated/

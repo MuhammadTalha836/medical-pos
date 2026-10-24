@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User, RolePermissions } from '../types';
+import { api, SESSION_ENDED_EVENT, SESSION_STORAGE_KEY } from '../services/apiService';
 
 const DEFAULT_ADMIN_PERMISSIONS: RolePermissions = {
   dashboard: true,
@@ -37,71 +38,79 @@ const DEFAULT_ADMIN_PERMISSIONS: RolePermissions = {
   can_manage_roles: true
 };
 
-const DEFAULT_ADMIN_USER: User = {
-  id: 1,
-  username: 'admin',
-  full_name: 'Administrator (Dr. Ahmed)',
-  role: 'admin',
-  role_display: 'Administrator',
-  status: 'active',
-  permissions: DEFAULT_ADMIN_PERMISSIONS
-};
-
 interface AuthState {
   user: User | null;
   permissions: RolePermissions | null;
   isAuthenticated: boolean;
-  setUser: (user: User | null) => void;
+  token: string | null;
+  // Pass the token returned by a login; omit it to keep the current session's token
+  setUser: (user: User | null, token?: string) => void;
   updateCurrentUser: (updated: Partial<User>) => void;
   logout: () => void;
   hasModuleAccess: (moduleKey: string) => boolean;
   hasPermission: (permissionKey: keyof RolePermissions) => boolean;
 }
 
-const getStoredSession = (): { user: User | null; permissions: RolePermissions | null } => {
+// A stored session needs both the user and the server token; anything else means "logged out"
+const getStoredSession = (): { user: User | null; permissions: RolePermissions | null; token: string | null } => {
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('pharmacare_user_session');
+      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.user) {
+        if (parsed?.user && parsed?.token) {
           return {
             user: parsed.user,
-            permissions: parsed.user.permissions || DEFAULT_ADMIN_PERMISSIONS
+            permissions: parsed.user.permissions || null,
+            token: parsed.token
           };
         }
       }
     } catch {
-      // Fallback
+      // Fall through to logged out
     }
   }
-  return {
-    user: DEFAULT_ADMIN_USER,
-    permissions: DEFAULT_ADMIN_PERMISSIONS
-  };
+  return { user: null, permissions: null, token: null };
+};
+
+const storeSession = (user: User | null, token: string | null) => {
+  if (typeof window === 'undefined') return;
+  if (user && token) {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ user, token }));
+  } else {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+  }
 };
 
 export const useAuthStore = create<AuthState>((set, get) => {
   const initial = getStoredSession();
 
+  // The server ended the session (restart, idle timeout, password reset, demo ended)
+  if (typeof window !== 'undefined') {
+    window.addEventListener(SESSION_ENDED_EVENT, () => {
+      if (get().user) {
+        storeSession(null, null);
+        set({ user: null, permissions: null, token: null, isAuthenticated: false });
+      }
+    });
+  }
+
   return {
     user: initial.user,
     permissions: initial.permissions,
+    token: initial.token,
     isAuthenticated: initial.user !== null,
 
-    setUser: (user) => {
+    setUser: (user, token) => {
       const perms = user?.permissions || (user?.role === 'admin' || user?.role === 'developer' ? DEFAULT_ADMIN_PERMISSIONS : null);
-      if (typeof window !== 'undefined') {
-        if (user) {
-          localStorage.setItem('pharmacare_user_session', JSON.stringify({ user: { ...user, permissions: perms } }));
-        } else {
-          localStorage.removeItem('pharmacare_user_session');
-        }
-      }
+      const nextToken = user ? token ?? get().token : null;
+      const nextUser = user ? { ...user, permissions: perms || undefined } : null;
+      storeSession(nextUser, nextToken);
       set({
-        user: user ? { ...user, permissions: perms || undefined } : null,
+        user: nextUser,
         permissions: perms,
-        isAuthenticated: user !== null
+        token: nextToken,
+        isAuthenticated: user !== null && !!nextToken
       });
     },
 
@@ -109,9 +118,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
       const current = get().user;
       if (!current) return;
       const merged = { ...current, ...updated };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pharmacare_user_session', JSON.stringify({ user: merged }));
-      }
+      storeSession(merged, get().token);
       set({
         user: merged,
         permissions: merged.permissions || get().permissions
@@ -119,10 +126,10 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     logout: () => {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('pharmacare_user_session');
-      }
-      set({ user: null, permissions: null, isAuthenticated: false });
+      // Revoke the server session; the local session is cleared even if the server is unreachable
+      if (get().token) api.logout().catch(() => {});
+      storeSession(null, null);
+      set({ user: null, permissions: null, token: null, isAuthenticated: false });
     },
 
     hasModuleAccess: (moduleKey: string) => {
@@ -131,7 +138,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
       if (moduleKey === 'developer') {
         return user.role === 'developer';
       }
-      if (user.role === 'admin' || user.role === 'developer') return true;
+      // The Developer sets the Admin's permissions, so only the Developer bypasses the matrix
+      if (user.role === 'developer') return true;
       if (!permissions) return false;
       return Boolean((permissions as any)[moduleKey]);
     },
@@ -139,7 +147,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     hasPermission: (permissionKey: keyof RolePermissions) => {
       const { user, permissions } = get();
       if (!user) return false;
-      if (user.role === 'admin' || user.role === 'developer') return true;
+      if (user.role === 'developer') return true;
       if (!permissions) return false;
       return Boolean(permissions[permissionKey]);
     }
