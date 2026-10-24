@@ -74,10 +74,13 @@ export const useShiftStore = create<ShiftState>((set, get) => ({
   fetchShiftSummary: async (shiftId: number) => {
     try {
       const res = await api.getShiftSummary(shiftId);
-      set({
-        activeShift: res.shift,
-        activeSummary: res.summary
-      });
+      // A late response must not bring back a shift that was closed (or replaced) meanwhile
+      if (res.shift.status === 'open' && get().activeShift?.id === shiftId) {
+        set({
+          activeShift: res.shift,
+          activeSummary: res.summary
+        });
+      }
       return res.summary;
     } catch (err) {
       console.error('Failed to fetch shift summary:', err);

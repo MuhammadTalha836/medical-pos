@@ -42,18 +42,22 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
   const [closedShiftResult, setClosedShiftResult] = useState<CashierShift | null>(null);
   const [showPrintSlip, setShowPrintSlip] = useState<boolean>(false);
 
+  // Runs once per opening: keyed on the shift id, because each summary load replaces the activeShift object
+  const activeShiftId = activeShift?.id;
   useEffect(() => {
-    if (isOpen && activeShift) {
-      fetchShiftSummary(activeShift.id).then((summary) => {
+    if (!isOpen) return;
+    setError(null);
+    setNotes('');
+    setClosedShiftResult(null);
+    setShowPrintSlip(false);
+    if (activeShiftId) {
+      fetchShiftSummary(activeShiftId).then((summary) => {
         if (summary) {
           setActualCash(summary.expected_cash || summary.opening_cash);
         }
       });
-      setError(null);
-      setClosedShiftResult(null);
-      setShowPrintSlip(false);
     }
-  }, [isOpen, activeShift]);
+  }, [isOpen, activeShiftId]);
 
   if (!isOpen) return null;
 
@@ -94,7 +98,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={closedShiftResult ? () => {} : onClose}
+      onClose={onClose}
       title={
         closedShiftResult
           ? `Shift ${closedShiftResult.shift_no} Closed & Locked`
