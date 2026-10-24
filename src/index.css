@@ -188,6 +188,21 @@
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #475569;
   }
+
+  /* Native control parts (date/time picker icons, select arrows) follow the theme */
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.75;
+  }
+  input::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
 }
 
 /* POS High-speed input typography */
