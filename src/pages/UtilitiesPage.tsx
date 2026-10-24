@@ -167,6 +167,13 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
     }
   };
 
+  // The server signs everyone out after a restore (users, roles and shifts may differ), so start fresh
+  const finishRestore = (text: string) => {
+    alert(`${text}\n\nEveryone has been signed out. Sign in again to work with the restored data.`);
+    useAuthStore.getState().logout();
+    window.location.reload();
+  };
+
   const handleRestoreBackup = async (filepath: string, filename: string) => {
     if (!confirm(`CAUTION: Restoring will overwrite the current database with "${filename}".\n\nAn automatic safety snapshot (pre_restore) will be taken immediately before restoring.\n\nDo you want to proceed?`)) {
       return;
@@ -176,10 +183,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
       setLoading(true);
       setMessage(null);
       const res = await api.restoreBackup(filepath);
-      if (res.success) {
-        setMessage({ type: 'success', text: res.message });
-        loadData();
-      }
+      if (res.success) finishRestore(res.message);
     } catch (err: any) {
       setMessage({ type: 'error', text: 'Restore failed: ' + err.message });
     } finally {
@@ -575,10 +579,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
               {backupStatus && backupStatus.cloud.mode !== 'offline' && backupStatus.cloud.connected && hasPermission('can_restore') && (
                 <CloudBackupList
                   accountEmail={backupStatus.cloud.account_email}
-                  onRestored={text => {
-                    setMessage({ type: 'success', text });
-                    loadData();
-                  }}
+                  onRestored={finishRestore}
                   onError={text => setMessage({ type: 'error', text })}
                 />
               )}

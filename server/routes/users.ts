@@ -42,6 +42,9 @@ router.post('/api/users', async (req: Request, res: Response) => {
     const targetRole = (role || 'cashier').toLowerCase();
 
     if (!parseBody(createUserSchema, req.body, res)) return;
+    if (!(await prisma.role.findUnique({ where: { name: targetRole } }))) {
+      return res.status(400).json({ error: 'The selected role does not exist' });
+    }
 
     if (targetRole === 'developer') {
       await logSecurityAudit({
@@ -171,6 +174,14 @@ router.put('/api/users/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Developer role cannot be downgraded' });
     }
 
+    const roleChanges = !!role && role !== existing.role;
+    if (roleChanges && existing.id === actingUser.id && actingUser.role !== 'developer') {
+      return res.status(403).json({ error: 'You cannot change your own role. Ask another administrator or the Developer.' });
+    }
+    if (roleChanges && !(await prisma.role.findUnique({ where: { name: role } }))) {
+      return res.status(400).json({ error: 'The selected role does not exist' });
+    }
+
     // Only the Developer may change an Admin account or grant the Admin role, unless the Developer allows Admins to create Admins
     if (actingUser.role !== 'developer' && (existing.role === 'admin' || role?.toLowerCase() === 'admin') && existing.id !== actingUser.id) {
       const adminSetting = await prisma.systemSetting.findUnique({ where: { key: 'allow_admin_create_admin' } });
@@ -199,7 +210,7 @@ router.put('/api/users/:id', async (req: Request, res: Response) => {
       }
     }
 
-    const updateData: { username: string; fullName: string; role: string; status: string; password?: string } = {
+    const updateData: { username: string; fullName: string; role: string; status: string; password?: string; failedLoginAttempts?: number; lockedUntil?: null } = {
       username: username ? username.trim() : existing.username,
       fullName: full_name ? full_name.trim() : existing.fullName,
       role: role || existing.role,
@@ -207,6 +218,9 @@ router.put('/api/users/:id', async (req: Request, res: Response) => {
     };
     if (password && password.trim() !== '') {
       updateData.password = await hashPassword(password.trim());
+      // A reset also unlocks an account locked by wrong passwords
+      updateData.failedLoginAttempts = 0;
+      updateData.lockedUntil = null;
     }
 
     await prisma.user.update({

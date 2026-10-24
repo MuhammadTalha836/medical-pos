@@ -29,6 +29,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { currencySymbol, formatDuration, moneyFormatter } from '../utils/format';
+import { saleStatus } from '../utils/saleStatus';
 
 interface ShiftsAdminPageProps {
   settings?: SystemSettings | null;
@@ -647,7 +648,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                         <td className="py-1.5 px-3 text-slate-500 font-mono text-xs">{new Date(sale.sale_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded-sm text-2xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">{sale.payment_type}</span></td>
                         <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{money(Number(sale.net_total))}</td>
-                        <td className="py-1.5 px-3 text-center"><span className={sale.status === 'completed' ? 'badge-success' : sale.status === 'returned' ? 'badge-danger' : 'badge-warning'}>{sale.status?.toUpperCase()}</span></td>
+                        <td className="py-1.5 px-3 text-center"><span className={saleStatus(sale.status).badge}>{saleStatus(sale.status).label}</span></td>
                       </tr>
                     ))}
                   </tbody>

@@ -58,6 +58,11 @@ export function revokeUserSessions(userId: number, exceptToken?: string | null):
   }
 }
 
+/** Logs everyone out, e.g. after a restore replaced the users and their roles. */
+export function revokeAllSessions(): void {
+  sessions.clear();
+}
+
 /** Reads "Authorization: Bearer <token>". */
 export function getBearerToken(authorization: string | undefined): string | null {
   if (!authorization) return null;

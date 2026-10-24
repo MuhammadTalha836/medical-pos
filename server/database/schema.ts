@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS sales (
   cash_tendered REAL NOT NULL DEFAULT 0.0,
   change_due REAL NOT NULL DEFAULT 0.0,
   payment_type TEXT NOT NULL DEFAULT 'Cash', -- 'Cash', 'Card', 'Credit'
-  status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'returned', 'cancelled'
+  status TEXT NOT NULL DEFAULT 'completed', -- 'completed', 'partially_returned', 'returned', 'cancelled'
   notes TEXT,
   shift_id INTEGER REFERENCES cashier_shifts(id),
   store_name_snapshot TEXT,

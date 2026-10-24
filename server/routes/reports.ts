@@ -1,14 +1,15 @@
 import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
-import { sendError } from '../http/context';
+import { requirePermission, sendError } from '../http/context';
 
 // Stock, profit/loss and sales reports
 const router = Router();
 
 // Available Stock with valuation
-router.get('/api/reports/stock/available', async (_req: Request, res: Response) => {
+router.get('/api/reports/stock/available', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
     const stock = await prisma.$queryRaw<any[]>`
       SELECT 
         p.id, p.c_code, p.p_code, p.name, p.generic_name, p.unit_type, p.packing,
@@ -31,6 +32,7 @@ router.get('/api/reports/stock/available', async (_req: Request, res: Response) 
 // Expired & Near-Expiry Products
 router.get('/api/reports/stock/expired', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
     const days = req.query.days ? String(req.query.days) : '0';
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + Number(days));
@@ -56,8 +58,9 @@ router.get('/api/reports/stock/expired', async (req: Request, res: Response) => 
 });
 
 // Finished / Zero stock
-router.get('/api/reports/stock/finished', async (_req: Request, res: Response) => {
+router.get('/api/reports/stock/finished', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
     const finished = await prisma.$queryRaw<any[]>`
       SELECT p.id, p.c_code, p.p_code, p.name, p.unit_type, p.location_rack, p.box_retail_price, c.name as company_name
       FROM products p
@@ -74,8 +77,10 @@ router.get('/api/reports/stock/finished', async (_req: Request, res: Response) =
 // Sales & Profit/Loss Summary
 router.get('/api/reports/financial/pnl-summary', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
+    if (!(await requirePermission(req, res, 'can_view_financial_kpis', 'You do not have permission to view profit and revenue reports.'))) return;
     const { date_from, date_to } = req.query;
-    const conditions: Prisma.Sql[] = [Prisma.sql`s.status = 'completed'`];
+    const conditions: Prisma.Sql[] = [Prisma.sql`s.status IN ('completed', 'partially_returned')`];
 
     if (date_from) {
       conditions.push(Prisma.sql`DATE(s.sale_date) >= ${String(date_from)}`);
@@ -106,8 +111,10 @@ router.get('/api/reports/financial/pnl-summary', async (req: Request, res: Respo
 // Invoice-wise P&L
 router.get('/api/reports/financial/invoice-pnl', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
+    if (!(await requirePermission(req, res, 'can_view_financial_kpis', 'You do not have permission to view profit and revenue reports.'))) return;
     const { date_from, date_to } = req.query;
-    const conditions: Prisma.Sql[] = [Prisma.sql`s.status = 'completed'`];
+    const conditions: Prisma.Sql[] = [Prisma.sql`s.status IN ('completed', 'partially_returned')`];
 
     if (date_from) {
       conditions.push(Prisma.sql`DATE(s.sale_date) >= ${String(date_from)}`);
@@ -140,8 +147,9 @@ router.get('/api/reports/financial/invoice-pnl', async (req: Request, res: Respo
 });
 
 // Product-wise sales
-router.get('/api/reports/sales/product-wise', async (_req: Request, res: Response) => {
+router.get('/api/reports/sales/product-wise', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
     const list = await prisma.$queryRaw<any[]>`
       SELECT 
         si.product_id, si.c_code, si.p_code, si.product_name, si.unit_type,
@@ -151,7 +159,7 @@ router.get('/api/reports/sales/product-wise', async (_req: Request, res: Respons
         (SUM(si.net_amount) - SUM(si.quantity * si.unit_cost)) as gross_profit
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
-      WHERE s.status = 'completed'
+      WHERE s.status IN ('completed', 'partially_returned')
       GROUP BY si.product_id
       ORDER BY total_sales_amount DESC
       LIMIT 50
@@ -163,8 +171,9 @@ router.get('/api/reports/sales/product-wise', async (_req: Request, res: Respons
 });
 
 // Company-wise sales
-router.get('/api/reports/sales/company-wise', async (_req: Request, res: Response) => {
+router.get('/api/reports/sales/company-wise', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
     const list = await prisma.$queryRaw<any[]>`
       SELECT 
         si.c_code as company_code,
@@ -175,7 +184,7 @@ router.get('/api/reports/sales/company-wise', async (_req: Request, res: Respons
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
       LEFT JOIN companies c ON si.c_code = c.code
-      WHERE s.status = 'completed'
+      WHERE s.status IN ('completed', 'partially_returned')
       GROUP BY si.c_code
       ORDER BY total_revenue DESC
     `;

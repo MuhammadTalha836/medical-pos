@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Response } from 'express';
 import { CUSTOMER_NAME_MAX, PHONE_MAX_DIGITS, PHONE_MIN_DIGITS, isValidPhone } from '../../shared/customers';
 import { BACKUP_MODES } from '../../shared/backup';
+import { PASSWORD_MIN, PASSWORD_MIN_MESSAGE } from '../../shared/passwords';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
 // Objects are loose: unknown keys pass through untouched and handlers keep their domain rules.
@@ -78,7 +79,7 @@ export const loginSchema = z.looseObject({
 const createUserMessage = 'All fields are required';
 export const createUserSchema = z.looseObject({
   username: requiredText(createUserMessage),
-  password: z.string({ error: createUserMessage }).min(1, { error: createUserMessage }),
+  password: z.string({ error: createUserMessage }).trim().min(1, { error: createUserMessage }).min(PASSWORD_MIN, { error: PASSWORD_MIN_MESSAGE }),
   full_name: requiredText(createUserMessage),
   role: z.string().optional()
 });
@@ -88,7 +89,8 @@ export const updateUserSchema = z.looseObject({
   full_name: z.string().trim().min(1, { error: 'Full name cannot be empty' }).optional(),
   role: z.string().optional(),
   status: z.enum(['active', 'inactive'], { error: "Status must be 'active' or 'inactive'" }).optional(),
-  password: z.string().optional()
+  // Empty means "keep the current password"
+  password: z.string().optional().refine(v => !v || v.trim() === '' || v.trim().length >= PASSWORD_MIN, { error: PASSWORD_MIN_MESSAGE })
 });
 
 export const settingsSchema = z.record(z.string(), settingValue);
@@ -106,11 +108,25 @@ export const shiftReopenSchema = z.looseObject({
 
 const saleItemSchema = z.looseObject({
   product_id: z.coerce.number({ error: 'Each sale item needs a valid product_id' }).int().positive({ error: 'Each sale item needs a valid product_id' }),
-  quantity: z.coerce.number({ error: 'Each sale item needs a quantity greater than zero' }).positive({ error: 'Each sale item needs a quantity greater than zero' })
+  quantity: z.coerce.number({ error: 'Each sale item needs a quantity greater than zero' })
+    .int({ error: 'Quantities must be whole numbers' })
+    .positive({ error: 'Each sale item needs a quantity greater than zero' })
 });
 
 export const createSaleSchema = z.looseObject({
   items: z.array(saleItemSchema, { error: 'Sale must include at least one item.' }).min(1, { error: 'Sale must include at least one item.' })
+});
+
+export const saleReturnSchema = z.looseObject({
+  sale_id: z.coerce.number({ error: 'Choose the invoice the items are returned from' }).int().positive({ error: 'Choose the invoice the items are returned from' }),
+  reason: z.string().max(300, { error: 'Reason cannot exceed 300 characters' }).nullish(),
+  return_items: z.array(z.looseObject({
+    product_id: z.coerce.number({ error: 'Each returned item needs a valid product' }).int().positive({ error: 'Each returned item needs a valid product' }),
+    is_loose: z.union([z.boolean(), z.number(), z.string()]).optional(),
+    quantity: z.coerce.number({ error: 'Each returned item needs a quantity' })
+      .int({ error: 'Returned quantities must be whole numbers' })
+      .positive({ error: 'Each returned item needs a quantity greater than zero' })
+  }), { error: 'No return items specified' }).min(1, { error: 'No return items specified' })
 });
 
 const customerPhone = z.string({ error: 'Customer phone number is required' }).trim()

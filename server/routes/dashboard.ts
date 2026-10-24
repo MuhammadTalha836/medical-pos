@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
-import { sendError } from '../http/context';
+import { hasRolePermission, requirePermission, sendError } from '../http/context';
 
 // Health check and dashboard KPIs
 const router = Router();
@@ -9,8 +9,11 @@ router.get('/api/status', (_req: Request, res: Response) => {
   res.json({ status: 'ok', version: '1.0.0', time: new Date().toISOString() });
 });
 
-router.get('/api/dashboard/stats', async (_req: Request, res: Response) => {
+router.get('/api/dashboard/stats', async (req: Request, res: Response) => {
   try {
+    const actor = await requirePermission(req, res, 'dashboard', 'You do not have access to the dashboard.');
+    if (!actor) return;
+    const canSeeRevenue = await hasRolePermission(actor.role, 'can_view_financial_kpis');
     const today = new Date().toISOString().split('T')[0];
     const startOfToday = new Date(today + 'T00:00:00.000Z');
     const endOfToday = new Date(today + 'T23:59:59.999Z');
@@ -21,7 +24,7 @@ router.get('/api/dashboard/stats', async (_req: Request, res: Response) => {
           gte: startOfToday,
           lte: endOfToday
         },
-        status: 'completed'
+        status: { in: ['completed', 'partially_returned'] }
       },
       _count: { id: true },
       _sum: {
@@ -32,10 +35,11 @@ router.get('/api/dashboard/stats', async (_req: Request, res: Response) => {
 
     const totalRevenue = todaySalesAgg._sum.netTotal || 0;
     const totalGross = todaySalesAgg._sum.totalGross || 0;
+    // Revenue figures only for roles allowed to see them; the page hides the card for everyone else
     const todaySales = {
       total_invoices: todaySalesAgg._count.id || 0,
-      total_revenue: totalRevenue,
-      total_discount: totalGross - totalRevenue
+      total_revenue: canSeeRevenue ? totalRevenue : null,
+      total_discount: canSeeRevenue ? totalGross - totalRevenue : null
     };
 
     const totalProducts = await prisma.product.count({ where: { status: 'active' } });

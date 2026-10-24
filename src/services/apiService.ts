@@ -147,6 +147,8 @@ export const api = {
       store_name_snapshot?: string | null;
       store_address_snapshot?: string | null;
       invoice_footer_snapshot?: string | null;
+      /** The sale as the server priced and stored it */
+      sale: SaleInvoice;
     }>('/sales', data),
   getSales: (params?: DateRange & { invoice_no?: string }) => get<SaleInvoice[]>('/sales', params),
   getSaleById: (id: number) => get<SaleInvoice>(`/sales/${id}`),

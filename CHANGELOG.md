@@ -14,6 +14,19 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Fixed (audit phase 1: money and security on the server)
+- Sales are priced by the server from the medicine record. Tampered rates, discounts or totals are refused or recalculated; the receipt shows the sale exactly as stored. Changing a rate or giving a discount needs the "Give Discounts" permission, and the bill discount stays within the store maximum.
+- A sale that needs more stock than is on the shelf is refused (before, stock silently dropped to 0). Cash less than the bill total is refused; leaving cash empty still means exact payment. Quantities must be whole numbers.
+- Sales, returns and khata payments always go to the signed-in user's own open shift.
+- Returns: each invoice line (box or loose) is returned separately, loose units go back as loose units, at most what was sold (minus earlier returns), and the refund is what the customer paid (bill discount included). A partial return marks the invoice "Part returned" so the rest can still come back; returns need the "Process Sale Returns" permission.
+- Shift cash: refunds of credit and card invoices no longer lower the expected cash in the drawer; Online sales count with Card/digital. Closing needs the counted cash, is done once (two closes at once cannot both win), and only by the shift's own cashier or a shift manager. A shift is not reopened while the cashier has another open one.
+- Khata payments: the balance is read and updated in one step (two payments at once no longer overwrite each other); a payment above the balance is refused; it needs the "Receive Cash Recoveries" permission.
+- Roles: an Admin can no longer create or edit a role with permissions their own account does not have, change their own role, or assign a role that does not exist.
+- Medicines, companies, purchases, reports, the Dashboard revenue figures and database optimization now check the role's permissions on the server.
+- Restore: one restore at a time, and everyone is signed out afterwards (the restored data may have other users and roles).
+- Staff sign-in: five wrong passwords in a row lock the account for 15 minutes (an Admin password reset unlocks it). One minimum password length (6) for every staff password.
+- Invoice, return and shift numbers use the local date (after midnight they used yesterday's date).
+
 ### Fixed
 - Credit sales now reach the customer's khata: they require a saved customer, raise the balance and appear in the ledger (before, the POS never linked the customer, so khata balances did not change). Credit sales past the customer's credit limit are blocked (0 = no limit). Returning goods from a credit sale lowers the balance.
 - New and edited khata customers need a phone number, unique per customer.

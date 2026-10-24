@@ -8,12 +8,16 @@ import { logSecurityAudit } from '../security/audit';
 // Customers and credit ledger (khata)
 const router = Router();
 
+const CUSTOMER_NOT_FOUND = 'Customer not found';
+
 router.get('/api/customers', async (_req: Request, res: Response) => {
   try {
     const customers = await prisma.$queryRaw<any[]>`
       SELECT c.id, c.name, c.phone, c.address, c.credit_limit, c.current_balance, c.created_at,
         (SELECT COUNT(*) FROM sales s WHERE s.customer_id = c.id) as invoices_count,
-        (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.status != 'returned') as total_purchases,
+        (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.status != 'returned')
+          - (SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id
+             WHERE s.customer_id = c.id AND s.status = 'partially_returned') as total_purchases,
         (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.payment_type = 'Credit') as total_credit_sales,
         (SELECT COALESCE(SUM(p.amount), 0) FROM customer_payments p WHERE p.customer_id = c.id) as total_payments
       FROM customers c
@@ -139,37 +143,33 @@ router.put('/api/customers/:id', async (req: Request, res: Response) => {
 
 router.post('/api/customers/:id/payment', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_receive_payment', 'You do not have permission to receive khata payments.'))) return;
     const idNum = Number(req.params.id);
-    const { amount, payment_method, notes, shift_id } = req.body;
+    const { amount, payment_method, notes } = req.body;
     // Identity always comes from the login session, never from the request body
     const { user_id, user_name } = await sessionIdentity(req);
-    const paymentAmt = parseFloat(amount);
+    const paymentAmt = Math.round(parseFloat(amount) * 100) / 100;
     if (isNaN(paymentAmt) || paymentAmt <= 0) {
       return res.status(400).json({ error: 'Valid positive payment amount required' });
     }
 
-    const customer = await prisma.customer.findUnique({ where: { id: idNum } });
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
-    }
+    // The payment is counted in the receiving user's own open shift (never a shift id from the client)
+    const activeShift = user_id
+      ? await prisma.cashierShift.findFirst({ where: { userId: Number(user_id), status: 'open' }, orderBy: { id: 'desc' }, select: { id: true } })
+      : null;
 
-    let activeShiftId = shift_id ? Number(shift_id) : null;
-    if (!activeShiftId && user_id) {
-      const activeShift = await prisma.cashierShift.findFirst({
-        where: { userId: Number(user_id), status: 'open' },
-        orderBy: { id: 'desc' }
-      });
-      if (activeShift) {
-        activeShiftId = activeShift.id;
+    // Read and write the balance in one transaction, so two payments at once cannot overwrite each other
+    const newBalance = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({ where: { id: idNum } });
+      if (!customer) throw new Error(CUSTOMER_NOT_FOUND);
+      if (paymentAmt > customer.currentBalance + 0.005) {
+        throw new Error(`The payment (${paymentAmt.toFixed(2)}) is more than ${customer.name}'s balance (${customer.currentBalance.toFixed(2)}).`);
       }
-    }
+      const balanceAfter = Math.max(0, Math.round((customer.currentBalance - paymentAmt) * 100) / 100);
 
-    const newBalance = Math.max(0, customer.currentBalance - paymentAmt);
-
-    await prisma.$transaction(async (tx) => {
       await tx.customer.update({
         where: { id: idNum },
-        data: { currentBalance: newBalance }
+        data: { currentBalance: balanceAfter }
       });
 
       await tx.customerPayment.create({
@@ -179,9 +179,9 @@ router.post('/api/customers/:id/payment', async (req: Request, res: Response) =>
           paymentMethod: payment_method || 'cash',
           notes: notes || null,
           previousBalance: customer.currentBalance,
-          newBalance: newBalance,
+          newBalance: balanceAfter,
           userName: user_name || 'Cashier',
-          shiftId: activeShiftId
+          shiftId: activeShift?.id ?? null
         }
       });
 
@@ -189,15 +189,16 @@ router.post('/api/customers/:id/payment', async (req: Request, res: Response) =>
         data: {
           action: 'CUSTOMER_PAYMENT',
           module: 'Khata',
-          details: `Payment received: ${paymentAmt} (${payment_method || 'Cash'}). Previous: ${customer.currentBalance}, New Balance: ${newBalance}. Notes: ${notes || 'None'}`,
-          userName: 'Cashier'
+          details: `Payment received from ${customer.name}: ${paymentAmt} (${payment_method || 'Cash'}). Previous: ${customer.currentBalance}, New Balance: ${balanceAfter}. Notes: ${notes || 'None'}`,
+          userName: user_name || 'Cashier'
         }
       });
+      return balanceAfter;
     });
 
     res.json({ success: true, new_balance: newBalance });
   } catch (error: unknown) {
-    sendError(res, error);
+    sendError(res, error, error instanceof Error && error.message === CUSTOMER_NOT_FOUND ? 404 : 400);
   }
 });
 

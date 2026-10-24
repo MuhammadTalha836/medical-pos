@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import { CustomerInvoiceRow, CustomerLedger } from '../../types';
+import { saleStatus } from '../../utils/saleStatus';
 
 /** A customer's ledger as loaded for an expanded row */
 export type LedgerState = CustomerLedger | 'loading' | { error: string };
@@ -61,9 +62,7 @@ export const CustomerInvoiceList: React.FC<CustomerInvoiceListProps> = ({ invoic
             </td>
             <td className="py-2 px-3 text-right font-mono font-semibold whitespace-nowrap text-slate-900 dark:text-white">{money(Number(inv.net_total))}</td>
             <td className="py-2 px-3 text-center">
-              <span className={inv.status === 'returned' ? 'badge-warning' : 'badge-success'}>
-                {inv.status === 'returned' ? 'Returned' : 'Completed'}
-              </span>
+              <span className={saleStatus(inv.status).badge}>{saleStatus(inv.status).label}</span>
             </td>
             <td className="py-2 px-3 text-slate-400"><ChevronRight className="w-4 h-4" /></td>
           </tr>

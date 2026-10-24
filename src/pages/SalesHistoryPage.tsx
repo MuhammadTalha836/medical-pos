@@ -15,9 +15,24 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { moneyFormatter } from '../utils/format';
+import { saleStatus } from '../utils/saleStatus';
 
 interface SalesHistoryPageProps {
   settings?: SystemSettings | null;
+}
+
+/** One invoice line in the return form (box and loose lines of the same medicine stay separate) */
+interface ReturnLine {
+  productId: number;
+  isLoose: boolean;
+  name: string;
+  unitLabel: string;
+  sold: number;
+  /** Still returnable: sold minus earlier returns */
+  maxQty: number;
+  /** Price actually paid per unit, bill discount included (the server works out the final refund) */
+  price: number;
+  qty: number;
 }
 
 export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) => {
@@ -33,7 +48,9 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
   const [selectedInvoice, setSelectedInvoice] = useState<SaleInvoice | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [returnInvoice, setReturnInvoice] = useState<SaleInvoice | null>(null);
-  const [returnItems, setReturnItems] = useState<{ [productId: number]: { qty: number; maxQty: number; price: number; name: string } }>({});
+  const [returnLines, setReturnLines] = useState<ReturnLine[]>([]);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
   const [returnReason, setReturnReason] = useState('');
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
@@ -50,8 +67,9 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
         date_to: dateTo || undefined
       });
       setSales(data);
-    } catch (err) {
-      console.error('Failed to load sales history:', err);
+      setPageError(null);
+    } catch (err: any) {
+      setPageError(`Could not load invoices: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -71,8 +89,8 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       const inv = await api.getSaleById(saleId);
       setSelectedInvoice(inv);
       setIsReceiptModalOpen(true);
-    } catch (err) {
-      console.error('Failed to fetch invoice:', err);
+    } catch (err: any) {
+      setPageError(`Could not open the invoice: ${err.message}`);
     }
   };
 
@@ -81,57 +99,49 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       const inv = await api.getSaleById(saleId);
       setReturnInvoice(inv);
 
-      // Initialize return map
-      const map: { [id: number]: { qty: number; maxQty: number; price: number; name: string } } = {};
-      inv.items?.forEach((item) => {
-        map[item.product_id] = {
-          qty: 0,
-          maxQty: item.quantity,
-          price: item.net_amount / item.quantity,
-          name: item.product_name
-        };
-      });
-      setReturnItems(map);
+      // The bill discount is shared over the lines, so the refund matches what the customer paid
+      const items = inv.items ?? [];
+      const subtotal = items.reduce((sum, item) => sum + item.net_amount, 0);
+      const paidShare = subtotal > 0 ? Math.min(1, inv.net_total / subtotal) : 0;
+      setReturnLines(items.map(item => ({
+        productId: item.product_id,
+        isLoose: !!item.is_loose,
+        name: item.product_name,
+        unitLabel: item.is_loose ? item.unit_type : 'Box',
+        sold: item.quantity,
+        maxQty: Math.max(0, item.quantity - (item.returned_qty ?? 0)),
+        price: item.quantity > 0 ? (item.net_amount * paidShare) / item.quantity : 0,
+        qty: 0
+      })));
       setReturnReason('Customer returned medicine in original packaging');
+      setReturnError(null);
       setIsReturnModalOpen(true);
-    } catch (err) {
-      console.error('Failed to fetch invoice for return:', err);
+    } catch (err: any) {
+      setPageError(`Could not open the invoice for return: ${err.message}`);
     }
   };
 
   const handleExecuteReturn = async () => {
     if (!returnInvoice) return;
 
-    const itemsToReturn: any[] = [];
-    let refundSum = 0;
+    if (isSubmittingReturn) return;
 
-    Object.entries(returnItems).forEach(([productId, data]) => {
-      if (data.qty > 0) {
-        const itemRefund = data.qty * data.price;
-        refundSum += itemRefund;
-        itemsToReturn.push({
-          product_id: Number(productId),
-          quantity: data.qty,
-          unit_refund_price: data.price,
-          total_refund: itemRefund
-        });
-      }
-    });
+    const itemsToReturn = returnLines
+      .filter(line => line.qty > 0)
+      .map(line => ({ product_id: line.productId, is_loose: line.isLoose, quantity: line.qty }));
 
     if (itemsToReturn.length === 0) {
-      alert('Please select at least 1 unit to return.');
+      setReturnError('Enter the quantity being returned for at least one item.');
       return;
     }
 
     try {
       setIsSubmittingReturn(true);
+      setReturnError(null);
       const res = await api.createSaleReturn({
         sale_id: returnInvoice.id,
-        original_invoice_no: returnInvoice.invoice_no,
-        customer_name: returnInvoice.customer_name,
         return_items: itemsToReturn,
-        reason: returnReason,
-        shift_id: activeShift?.id || null
+        reason: returnReason
       });
 
       if (res.success) {
@@ -139,12 +149,12 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
           fetchShiftSummary(activeShift.id);
         }
         setIsReturnModalOpen(false);
-        setSuccessMessage(`Return voucher ${res.returnNo} generated. Refund amount: ${money(refundSum)}. Stock restored.`);
+        setSuccessMessage(`Return voucher ${res.returnNo} saved. Refund: ${money(res.totalRefund)}. Stock restored.`);
         loadSales();
         setTimeout(() => setSuccessMessage(null), 6000);
       }
     } catch (err: any) {
-      alert('Return failed: ' + err.message);
+      setReturnError(err.message);
     } finally {
       setIsSubmittingReturn(false);
     }
@@ -164,6 +174,13 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
         <div className="flex items-center space-x-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-medium">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{successMessage}</span>
+        </div>
+      )}
+
+      {pageError && (
+        <div className="flex items-center space-x-2 px-4 py-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 rounded-xl text-xs font-medium" role="alert">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{pageError}</span>
         </div>
       )}
 
@@ -301,9 +318,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                       {money(sale.net_total)}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className={sale.status === 'completed' ? 'badge-success' : 'badge-warning'}>
-                        {sale.status.toUpperCase()}
-                      </span>
+                      <span className={saleStatus(sale.status).badge}>{saleStatus(sale.status).label}</span>
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center space-x-1.5">
@@ -316,7 +331,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                           <span>Receipt</span>
                         </button>
 
-                        {sale.status !== 'returned' && hasPermission('can_return_sale') && (
+                        {(sale.status === 'completed' || sale.status === 'partially_returned') && hasPermission('can_return_sale') && (
                           <button
                             onClick={() => handleOpenReturnModal(sale.id)}
                             className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold border border-amber-300 dark:border-amber-700/60 transition-colors flex items-center space-x-1"
@@ -355,7 +370,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       {/* Sale Return Modal */}
       <Modal
         isOpen={isReturnModalOpen}
-        onClose={() => setIsReturnModalOpen(false)}
+        onClose={() => { if (!isSubmittingReturn) setIsReturnModalOpen(false); }}
         title={`Process Sale Return - Invoice ${returnInvoice?.invoice_no}`}
         maxWidth="max-w-2xl"
       >
@@ -363,7 +378,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
           <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-200 flex items-start space-x-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
-              Specify the returned quantity for each medicine item below. Returned inventory will be automatically restored to the available stock.
+              Enter the returned quantity for each item. Stock goes back in the unit it was sold in, and the refund is what the customer paid (bill discount included).
             </div>
           </div>
 
@@ -372,43 +387,43 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
               <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2.5 px-3">Product Name</th>
-                  <th className="py-2.5 px-3 text-center">Billed Qty</th>
-                  <th className="py-2.5 px-3 text-right">Unit Rate</th>
+                  <th className="py-2.5 px-3 text-center">Sold</th>
+                  <th className="py-2.5 px-3 text-center">Can return</th>
+                  <th className="py-2.5 px-3 text-right">Paid per unit</th>
                   <th className="py-2.5 px-3 text-center">Return Qty</th>
                   <th className="py-2.5 px-3 text-right">Refund Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                {Object.entries(returnItems).map(([prodIdStr, data]) => {
-                  const prodId = Number(prodIdStr);
-                  const refund = data.qty * data.price;
-                  return (
-                    <tr key={prodId} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
-                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">{data.name}</td>
-                      <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400">{data.maxQty}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{money(data.price)}</td>
-                      <td className="py-2.5 px-3 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          max={data.maxQty}
-                          value={data.qty}
-                          onChange={(e) => {
-                            const val = Math.min(data.maxQty, Math.max(0, parseFloat(e.target.value) || 0));
-                            setReturnItems(prev => ({
-                              ...prev,
-                              [prodId]: { ...prev[prodId], qty: val }
-                            }));
-                          }}
-                          className="field-input field-sm w-16 text-center font-mono"
-                        />
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-                        {money(refund)}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {returnLines.map((line, index) => (
+                  <tr key={`${line.productId}-${line.isLoose ? 1 : 0}-${index}`} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
+                    <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">
+                      {line.name}
+                      <span className="ml-1.5 text-2xs text-slate-500 dark:text-slate-400">({line.unitLabel})</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400">{line.sold}</td>
+                    <td className="py-2.5 px-3 text-center font-mono text-slate-700 dark:text-slate-300">{line.maxQty}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{money(line.price)}</td>
+                    <td className="py-2.5 px-3 text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        max={line.maxQty}
+                        value={line.qty}
+                        disabled={line.maxQty === 0 || isSubmittingReturn}
+                        onChange={(e) => {
+                          const val = Math.min(line.maxQty, Math.max(0, Math.floor(Number(e.target.value) || 0)));
+                          setReturnLines(prev => prev.map((l, i) => (i === index ? { ...l, qty: val } : l)));
+                        }}
+                        className="field-input field-sm w-16 text-center font-mono"
+                      />
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
+                      {money(line.qty * line.price)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -423,17 +438,25 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             />
           </div>
 
+          {returnError && (
+            <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 rounded-xl p-3 text-xs text-rose-700 dark:text-rose-300 flex items-start space-x-2" role="alert">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{returnError}</span>
+            </div>
+          )}
+
           <div className="flex justify-end space-x-2 pt-2">
             <button
               onClick={() => setIsReturnModalOpen(false)}
+              disabled={isSubmittingReturn}
               className="btn-secondary"
             >
               Cancel
             </button>
             <button
               onClick={handleExecuteReturn}
-              disabled={isSubmittingReturn}
-              className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+              disabled={isSubmittingReturn || returnLines.every(line => line.qty === 0)}
+              className="btn-primary"
             >
               {isSubmittingReturn ? 'Processing...' : 'Confirm Return & Refund'}
             </button>

@@ -458,7 +458,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         bill_discount_pct: billDiscountPct,
         bill_discount_amt: totals.billDiscountAmt,
         net_total: totals.netTotal,
-        cash_tendered: cashTendered > 0 ? cashTendered : totals.netTotal,
+        // 0 = paid exact; the server checks the amount against its own total
+        cash_tendered: cashTendered,
         change_due: totals.changeDue,
         payment_type: paymentType,
         notes: notes || null
@@ -467,43 +468,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       const result = await api.createSale(salePayload);
 
       if (result.success) {
-        // Construct printable invoice object
-        const invoiceObj: SaleInvoice = {
-          id: result.saleId,
-          invoice_no: result.invoiceNo,
-          customer_name: customerName || 'Counter Customer',
-          customer_phone: customerPhone || null,
-          user_name: user?.full_name || 'Cashier',
-          sale_date: new Date().toISOString(),
-          total_gross: totals.grossTotal,
-          total_item_discount: totals.itemDiscounts,
-          bill_discount_pct: billDiscountPct,
-          bill_discount_amt: totals.billDiscountAmt,
-          net_total: totals.netTotal,
-          cash_tendered: cashTendered > 0 ? cashTendered : totals.netTotal,
-          change_due: totals.changeDue,
-          payment_type: paymentType,
-          status: 'completed',
-          items: cart.map(i => ({
-            product_id: i.product.id,
-            c_code: i.product.c_code,
-            p_code: i.product.p_code,
-            product_name: i.product.name,
-            unit_type: i.product.unit_type,
-            location_rack: i.product.location_rack,
-            is_loose: i.is_loose ? 1 : 0,
-            quantity: i.quantity,
-            unit_price: i.unit_price,
-            unit_cost: i.is_loose ? i.product.unit_trade_price : i.product.box_trade_price,
-            gross_amount: i.gross_amount,
-            discount_pct: i.discount_pct,
-            discount_amount: i.discount_amount,
-            net_amount: i.net_amount
-          })),
-          store_name_snapshot: result.store_name_snapshot ?? null,
-          store_address_snapshot: result.store_address_snapshot ?? null,
-          invoice_footer_snapshot: result.invoice_footer_snapshot ?? null
-        };
+        // The receipt shows the sale exactly as the server priced and stored it
+        const invoiceObj: SaleInvoice = result.sale;
 
         // The sold invoice's tab closes; other open invoices stay as they were
         completeActiveInvoice(invoiceObj);

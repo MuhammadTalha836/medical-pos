@@ -28,6 +28,7 @@ npm run test:phase4      # backup retention, verification, offline scheduler, ba
 npm run test:phase5      # server sessions, Developer-only admin permissions, Demo/Full license
 npm run test:phase6      # khata customers: unique phone, credit sales need a saved customer, credit limit, credit returns
 npm run test:phase7      # online backup to Google Drive (Google faked by a fetch stub): mode, sign-in, encrypted upload, retry, restore
+npm run test:phase8      # server-side sale pricing, oversell/cash checks, returns, shift cash, khata payments, role escalation, login lockout
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -78,8 +79,10 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 **Auth and RBAC.**
 - **Sessions** (`server/security/sessions.ts`): logins return a random token, held only in the API process (a restart logs everyone out). The client stores `{ user, token }` in `localStorage` (`pharmacare_user_session`), and every call in `src/services/apiService.ts` goes through `apiFetch`, which sends `Authorization: Bearer`. A 401 `SESSION_REQUIRED` or 403 `LICENSE_EXPIRED` fires `SESSION_ENDED_EVENT`, which logs the UI out.
 - A middleware at the top of `api.ts` resolves the token into `res.locals.actor`. Every `/api` route needs a session except `PUBLIC_API_ROUTES`. `getActingUser(req)` returns that actor; **never read identity from headers or body fields** (old `user_id`/`admin_id` body fields are overwritten by `sessionIdentity(req)`).
-- Logout, password change/reset, disabling and deleting a user revoke sessions (`revokeUserSessions`).
-- Enforcement must be server-side; the UI only hides or locks controls. Only users, roles, shift admin actions, stock zero, settings, backups and developer routes check permissions so far; other routes only require a login (`docs/PROGRESS.md` 2.1). New or changed routes must call `requirePermission` / `hasRolePermission`.
+- Logout, password change/reset, disabling and deleting a user revoke sessions (`revokeUserSessions`); a restore revokes every session (`revokeAllSessions`).
+- Staff login locks after 5 wrong passwords for 15 minutes (`failedLoginAttempts`/`lockedUntil`; a password reset unlocks). Every staff password uses `PASSWORD_MIN` (`shared/passwords.ts`); the setup wizard asks for 8.
+- Roles: a non-Developer cannot grant a permission their own role lacks (`assertGrantable` in `roles.ts`), change their own role, or assign an unknown role.
+- Enforcement must be server-side; the UI only hides or locks controls. Users, roles, shifts, sales returns, khata payments, products/companies writes, purchases, reports, dashboard revenue, stock zero, optimize, settings, backups and developer routes check permissions; reading products and creating sales only require a login (`docs/PROGRESS.md` 2.1). New or changed routes must call `requirePermission` / `hasRolePermission`.
 - Roles: `developer` (one account, signs in with the fixed developer email + a master-key TOTP code, never a password), `admin`, `cashier`, plus custom roles stored in the `roles` table with JSON `permissions`. Only the Developer bypasses the matrix (client and server). The `admin`/`developer` roles are changed only by the Developer (`/api/developer/admin-permissions`). Permission keys, labels and defaults live in `shared/permissions.ts`; the role checkbox matrix is `src/components/settings/RolePermissionEditor.tsx`.
 - Security-relevant actions call `logSecurityAudit` (`server/security/audit.ts`), which redacts secrets.
 
@@ -106,7 +109,10 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - Printing goes through `src/utils/printReceipt.ts`. With "Print without dialog" on (per computer, `localStorage`), the receipt's HTML plus the app CSS is sent to the `print:thermal` IPC, which prints it silently from a hidden sandboxed window sized to the receipt. Otherwise `window.print()` runs, and `@media print` in `src/index.css` hides everything except `#thermal-receipt-printable`.
 
 **Sales and shifts.**
-- `POST /api/sales` requires an open cashier shift.
+- `POST /api/sales` requires the session user's own open shift (a `shift_id` in the body is ignored).
+- **The server prices every sale** (`server/sales/saleMath.ts`, pure + spec): rates come from the product, a changed rate or a line discount above the medicine's default needs `can_discount`, the bill discount is a percentage capped by `max_bill_discount_pct`, and client totals are ignored. It refuses overselling and Cash below the total (blank/0 cash = exact). The response carries the stored sale (`sale`), which the POS prints.
+- **Returns** (`POST /api/sales/return`, needs `can_return_sale`) are checked per product + unit type against the invoice minus earlier returns (`priceReturn`); the refund shares the bill discount out. The sale becomes `partially_returned` or `returned`; reports and the dashboard count `completed` + `partially_returned`. `GET /api/sales/:id` adds `returned_qty` to each line.
+- **Shift totals** come from one place (`server/shifts/shiftTotals.ts` + `loadShiftTotals`): only refunds of Cash invoices leave the drawer, Online counts with Card. Closing runs in one transaction (`updateMany where status open`), needs the counted cash, and only the owner or `can_manage_shifts` may close.
 - Customers: a sale may carry `customer_id` (a saved khata customer; the sale then stores that customer's saved name/phone). A Credit sale **requires** one and is blocked past the customer's `credit_limit` (0 = no limit); returning a credit sale lowers the balance. Customers need a phone, unique by digits (`normalizePhone` in `shared/customers.ts`); a duplicate answers 409 with the existing customer. The POS picks customers with `CustomerPicker.tsx` (`GET /api/customers/search`). The Customers page (`src/pages/CustomersPage.tsx`, tab id `khata`) has a Customers tab and a Khata (Udhaar) tab; a customer can be deleted only with no invoices, payments or balance.
 - It generates `INV-YYYYMMDD-NNNN` inside `prisma.$transaction`, with a 5-attempt retry on `SQLITE_BUSY` / unique collisions.
 - Stock is tracked as boxes + loose units (`packing` units per box). Products can forbid loose ("open") sales and set a minimum sale quantity.

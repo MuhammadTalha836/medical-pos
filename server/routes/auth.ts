@@ -9,9 +9,14 @@ import { getLicenseState } from '../security/license';
 import { parseBody, developerLoginSchema, loginSchema } from '../validation/schemas';
 import { getActingUser, sendError, SESSION_REQUIRED_ERROR, LICENSE_EXPIRED_ERROR } from '../http/context';
 import { sessionUserPayload } from '../http/formatters';
+import { PASSWORD_MIN_MESSAGE, isValidPassword } from '../../shared/passwords';
 
 // Developer and staff login, logout, profile and password change
 const router = Router();
+
+// Staff passwords: 5 wrong tries in a row lock the account for 15 minutes
+const STAFF_MAX_FAILED_LOGINS = 5;
+const STAFF_LOCK_MS = 15 * 60 * 1000;
 
 // 2.1a Developer login: fixed developer email + code from the developer's master authenticator
 router.post('/api/auth/developer-login', async (req: Request, res: Response) => {
@@ -120,6 +125,40 @@ router.post('/api/auth/login', async (req: Request, res: Response) => {
       });
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+    if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+      const remainingMins = Math.max(1, Math.ceil((new Date(user.lockedUntil).getTime() - Date.now()) / 60000));
+      return res.status(429).json({
+        error: `Too many wrong passwords. This account is locked for ${remainingMins} more minute(s), or until an Administrator resets the password.`
+      });
+    }
+
+    // Verify password with bcrypt + legacy auto-rehash (before anything that would reveal the account exists)
+    const { valid, needsRehash } = await verifyPassword(password, user.password);
+    if (!valid) {
+      const attempts = (user.failedLoginAttempts || 0) + 1;
+      const locked = attempts >= STAFF_MAX_FAILED_LOGINS;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: locked ? 0 : attempts,
+          lockedUntil: locked ? new Date(Date.now() + STAFF_LOCK_MS) : null
+        }
+      });
+      await logSecurityAudit({
+        action: 'LOGIN',
+        module: 'AUTH',
+        status: 'FAILED',
+        details: `Failed login attempt (invalid password) for user: ${cleanUsername}. Consecutive attempts: ${attempts}${locked ? ' (account locked)' : ''}`,
+        affectedUser: cleanUsername,
+        userId: user.id,
+        userName: user.username
+      });
+      if (locked) {
+        return res.status(429).json({ error: `Too many wrong passwords. This account is locked for ${STAFF_LOCK_MS / 60000} minutes.` });
+      }
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
     if (user.status !== 'active') {
       await logSecurityAudit({
         action: 'LOGIN',
@@ -133,19 +172,8 @@ router.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'This user account has been disabled. Please contact Administrator.' });
     }
 
-    // Verify password with bcrypt + legacy auto-rehash
-    const { valid, needsRehash } = await verifyPassword(password, user.password);
-    if (!valid) {
-      await logSecurityAudit({
-        action: 'LOGIN',
-        module: 'AUTH',
-        status: 'FAILED',
-        details: `Failed login attempt (invalid password) for user: ${cleanUsername}`,
-        affectedUser: cleanUsername,
-        userId: user.id,
-        userName: user.username
-      });
-      return res.status(401).json({ error: 'Invalid username or password' });
+    if (user.failedLoginAttempts || user.lockedUntil) {
+      await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
     }
 
     // Expired demo: staff cannot sign in until the Developer extends it or switches to Full
@@ -237,6 +265,9 @@ router.put('/api/auth/profile', async (req: Request, res: Response) => {
     }
 
     if (newPassword) {
+      if (!isValidPassword(newPassword)) {
+        return res.status(400).json({ error: PASSWORD_MIN_MESSAGE });
+      }
       if (!currentPassword) {
         return res.status(400).json({ error: 'Current password is required to change password' });
       }
@@ -282,8 +313,8 @@ router.post('/api/auth/change-password', async (req: Request, res: Response) => 
     if (!actingUser) {
       return res.status(401).json(SESSION_REQUIRED_ERROR);
     }
-    if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    if (!isValidPassword(newPassword)) {
+      return res.status(400).json({ error: PASSWORD_MIN_MESSAGE });
     }
     const idNum = actingUser.id;
     const user = await prisma.user.findUnique({

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
-import { sendError } from '../http/context';
+import { requirePermission, sendError } from '../http/context';
 
 // Products master
 const router = Router();
@@ -104,6 +104,7 @@ router.get('/api/products/:id', async (req: Request, res: Response) => {
 
 router.post('/api/products', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_add_product', 'You do not have permission to add medicines.'))) return;
     const {
       company_id, c_code, p_code, barcode, name, generic_name, unit_type,
       packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
@@ -144,6 +145,7 @@ router.post('/api/products', async (req: Request, res: Response) => {
 
 router.put('/api/products/:id', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_edit_product', 'You do not have permission to edit medicines.'))) return;
     const idNum = Number(req.params.id);
     const {
       company_id, c_code, p_code, barcode, name, generic_name, unit_type,
@@ -186,6 +188,7 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
 
 router.delete('/api/products/:id', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_delete_product', 'You do not have permission to delete medicines.'))) return;
     const idNum = Number(req.params.id);
     await prisma.product.delete({ where: { id: idNum } });
     res.json({ success: true });

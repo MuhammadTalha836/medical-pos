@@ -5,10 +5,30 @@ import { getCloudStatus, keepingCloudConnection, listCloudBackups, restoreFromCl
 import { getScheduleState, isValidBackupTime, runRecordedBackup } from '../backup/scheduler';
 import { logSecurityAudit } from '../security/audit';
 import { parseBody, backupScheduleSchema } from '../validation/schemas';
-import { getActingUser, hasRolePermission, sendError } from '../http/context';
+import { getActingUser, hasRolePermission, requirePermission, sendError } from '../http/context';
+import { revokeAllSessions } from '../security/sessions';
 
 // Backups, restore, stock zero and database optimization
 const router = Router();
+
+const RESTORE_BUSY = 'Another restore is already running. Wait for it to finish.';
+let restoreRunning = false;
+
+/**
+ * Runs one restore at a time (two at once would write over the database together). Afterwards everyone is
+ * signed out: the restored data may have different users, roles and open shifts.
+ */
+async function exclusiveRestore<T>(restore: () => Promise<T>): Promise<T> {
+  if (restoreRunning) throw new Error(RESTORE_BUSY);
+  restoreRunning = true;
+  try {
+    const result = await restore();
+    revokeAllSessions();
+    return result;
+  } finally {
+    restoreRunning = false;
+  }
+}
 
 async function requireBackupPermission(req: Request, res: Response, permissionKey: 'can_backup' | 'can_restore', action: string) {
   const actingUser = await getActingUser(req);
@@ -138,7 +158,7 @@ router.post('/api/utilities/restore', async (req: Request, res: Response) => {
   }
 
   try {
-    const result = await keepingCloudConnection(() => restoreDatabase(backupFilePath));
+    const result = await exclusiveRestore(() => keepingCloudConnection(() => restoreDatabase(backupFilePath)));
     await logSecurityAudit({
       action: 'DATABASE_RESTORE',
       module: 'BACKUP',
@@ -181,7 +201,7 @@ router.post('/api/utilities/restore-cloud', async (req: Request, res: Response) 
   }
 
   try {
-    const result = await restoreFromCloud(fileId);
+    const result = await exclusiveRestore(() => restoreFromCloud(fileId));
     await logSecurityAudit({
       action: 'DATABASE_RESTORE',
       module: 'BACKUP',
@@ -222,8 +242,10 @@ router.post('/api/utilities/stock-zero', async (req: Request, res: Response) => 
   }
 });
 
-router.post('/api/utilities/optimize', (_req: Request, res: Response) => {
+router.post('/api/utilities/optimize', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_backup', 'You do not have permission to optimize the database.'))) return;
+    if (restoreRunning) return res.status(409).json({ error: RESTORE_BUSY });
     const result = optimizeDatabase();
     res.json(result);
   } catch (error: unknown) {

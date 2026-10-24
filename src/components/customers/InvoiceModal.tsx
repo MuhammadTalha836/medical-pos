@@ -44,8 +44,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ saleId, settings, on
         <div className="py-10 text-center text-sm text-slate-500">Loading invoice…</div>
       ) : (
         <div className="space-y-3">
-          {invoice.status === 'returned' && (
-            <p className="badge-warning inline-flex">Items on this invoice were returned</p>
+          {(invoice.status === 'returned' || invoice.status === 'partially_returned') && (
+            <p className="badge-warning inline-flex">
+              {invoice.status === 'returned' ? 'All items on this invoice were returned' : 'Some items on this invoice were returned'}
+            </p>
           )}
           <UnifiedInvoice invoice={invoice} settings={settings} onClose={onClose} />
         </div>

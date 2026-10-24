@@ -191,7 +191,7 @@ export interface SaleInvoice {
   cash_tendered: number;
   change_due: number;
   payment_type: 'Cash' | 'Card' | 'Credit' | 'Online';
-  status: 'completed' | 'returned' | 'cancelled';
+  status: 'completed' | 'partially_returned' | 'returned' | 'cancelled';
   notes?: string | null;
   shift_id?: number | null;
   items?: SaleItem[];
@@ -220,6 +220,8 @@ export interface SaleItem {
   discount_amount: number;
   net_amount: number;
   batch_id?: number;
+  /** Already returned from this line (invoice details only) */
+  returned_qty?: number;
 }
 
 export interface PurchaseItem {

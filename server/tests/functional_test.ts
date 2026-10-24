@@ -236,7 +236,7 @@ async function runTestSuite() {
       const preReturnTotalUnits = (preReturnProduct.stock_boxes * preReturnProduct.packing) + preReturnProduct.stock_loose;
 
       const returnPayload = {
-        sale_id: createdInvoice.invoiceId,
+        sale_id: createdInvoice.saleId,
         original_invoice_no: createdInvoice.invoiceNo,
         customer_name: 'Walk-in Cash Test',
         shift_id: testShift.id,
@@ -375,7 +375,7 @@ async function runTestSuite() {
         await request('/sales/return', {
           method: 'POST',
           body: JSON.stringify({
-            sale_id: validSale.invoiceId,
+            sale_id: validSale.saleId,
             original_invoice_no: validSale.invoiceNo,
             shift_id: testShift.id,
             reason: 'Defective unit',

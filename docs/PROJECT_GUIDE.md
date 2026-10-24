@@ -32,7 +32,8 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 
 2. **Cashier Register & Shift Management (`ShiftsAdminPage.tsx`, `ShiftClosingModal.tsx`, `ShiftThermalReceipt.tsx`)**:
    - **Active Register Tracking**: Cashiers start shifts with a recorded opening cash float. All POS sales, returns, and payment types are tracked against the active shift.
-   - **Multi-Payment Reconciliation**: Tracks Cash, Card, Credit (Khata), and Online payment totals in real-time.
+   - **Multi-Payment Reconciliation**: Tracks Cash, Card/Online (digital) and Credit (Khata) totals in real time. One calculation (`server/shifts/shiftTotals.ts`) serves the live summary, the close, the shift list and details, and the admin force-close. Expected cash = opening + cash sales + cash khata recoveries − refunds of cash invoices (a credit return lowers the khata balance instead).
+   - **Closing**: needs the counted cash, runs in one transaction (a second close fails), and only the shift's cashier or a user with `can_manage_shifts` may close it. A closed shift is not reopened while that cashier has another open shift.
    - **Shift Balancing & Discrepancies**: Calculates expected closing cash versus counted cash, recording exact cash shortage or excess.
    - **Admin Shift Hub**: Dedicated admin section with cashier, date range, and status filters, and line-item invoice inspector.
    - **Automated Backup on Shift Closure**: Shift closing triggers a verified `shift_close` backup alongside the timed schedule, unless the Developer has set the backup frequency to Off.
@@ -69,6 +70,8 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - Filterable invoice history by invoice number, customer, and date range.
    - Invoice reprints using the store identity & footer snapshot captured at sale time.
    - Line-item and full sale return engine that automatically restores returned units back into SQLite inventory while respecting open-sale restrictions.
+   - **Returns are checked by the server** (`priceReturn` in `server/sales/saleMath.ts`): each invoice line (box or loose) is returned on its own, up to what was sold minus earlier returns (`returned_qty` on `GET /api/sales/:id`); loose units go back as loose units; the refund is the price actually paid with the bill discount shared out. A partial return sets the invoice to `partially_returned` ("Part returned"), so the rest can still be returned; once everything is back it is `returned`.
+   - **Sales are priced by the server** from the medicine record (`priceSaleLine` / `totalSale` / `settleCash`): a changed rate or extra discount needs `can_discount`, the bill discount is capped by the store maximum, overselling and cash below the total are refused, and the POS prints the sale the server stored.
 
 7. **Coding & Masters (`MastersPage.tsx`)**:
    - Pharmaceutical Company Management (distributors/manufacturers with unique **C-Codes**).

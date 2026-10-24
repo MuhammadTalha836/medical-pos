@@ -11,6 +11,7 @@ import {
 } from '../backup/cloud/cloudBackup';
 import { isBackupMode } from '../../shared/backup';
 import { hashPassword } from '../security/passwords';
+import { PASSWORD_MIN_MESSAGE, isValidPassword } from '../../shared/passwords';
 import { logSecurityAudit } from '../security/audit';
 import { getDeveloperEmail } from '../security/developerKey';
 import { revokeUserSessions } from '../security/sessions';
@@ -261,8 +262,8 @@ router.post('/api/developer/users/:id/reset-password', async (req: Request, res:
 
     const targetId = Number(req.params.id);
     const { new_password } = req.body;
-    if (!new_password || typeof new_password !== 'string' || new_password.trim().length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+    if (!isValidPassword(new_password)) {
+      return res.status(400).json({ error: PASSWORD_MIN_MESSAGE });
     }
 
     const targetUser = await prisma.user.findUnique({ where: { id: targetId } });

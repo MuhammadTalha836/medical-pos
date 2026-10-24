@@ -4,9 +4,99 @@ import { prisma } from '../database/prisma';
 import { runShiftCloseBackup } from '../backup/scheduler';
 import { parseBody, shiftReopenSchema } from '../validation/schemas';
 import { getActingUser, sessionIdentity, hasRolePermission, sendError } from '../http/context';
+import { loadShiftTotals } from '../shifts/loadShiftTotals';
+import type { ShiftTotals } from '../shifts/shiftTotals';
+import { localDateKey } from '../../shared/dates';
 
 // Cashier shifts and drawer reconciliation
 const router = Router();
+
+type ShiftRecord = Prisma.CashierShiftGetPayload<object>;
+
+/** A shift in the client's snake_case shape; open shifts show live totals, closed ones their saved figures */
+function shiftPayload(shift: ShiftRecord, live: ShiftTotals | null, durationMinutes: number | null) {
+  return {
+    id: shift.id,
+    shift_no: shift.shiftNo,
+    user_id: shift.userId,
+    user_name: shift.userName,
+    start_time: shift.startTime,
+    end_time: shift.endTime,
+    duration_minutes: durationMinutes,
+    opening_cash: shift.openingCash,
+    closing_cash: shift.closingCash,
+    expected_cash: live ? live.expectedCash : shift.expectedCash,
+    cash_difference: shift.cashDifference,
+    total_sales_count: live ? live.salesCount : shift.totalSalesCount,
+    total_sales_amount: live ? live.totalSalesAmount : shift.totalSalesAmount,
+    total_cash_sales: live ? live.totalCashSales : shift.totalCashSales,
+    total_card_sales: live ? live.totalCardSales : shift.totalCardSales,
+    total_credit_sales: live ? live.totalCreditSales : shift.totalCreditSales,
+    total_returns_amount: live ? live.totalReturnsCash : shift.totalReturnsAmount,
+    total_customer_payments: live ? live.totalCustomerPaymentsCash : shift.totalCustomerPayments,
+    notes: shift.notes,
+    status: shift.status,
+    created_at: shift.createdAt,
+    updated_at: shift.updatedAt
+  };
+}
+
+function summaryPayload(shift: ShiftRecord, totals: ShiftTotals, durationMinutes: number) {
+  return {
+    opening_cash: shift.openingCash,
+    total_sales_cash: totals.totalCashSales,
+    total_sales_card: totals.totalCardSales,
+    total_sales_credit: totals.totalCreditSales,
+    total_returns_cash: totals.totalReturnsCash,
+    total_customer_payments_cash: totals.totalCustomerPaymentsCash,
+    expected_cash: totals.expectedCash,
+    invoices_count: totals.salesCount,
+    returns_count: totals.returnsCount,
+    duration_formatted: formatShiftDuration(durationMinutes)
+  };
+}
+
+const minutesSince = (start: Date, end: Date = new Date()) =>
+  Math.max(0, Math.floor((end.getTime() - new Date(start).getTime()) / 60000));
+
+/** Closes an open shift with its final totals. Fails if it was closed meanwhile (two closes at once). */
+async function closeShiftRecord(shift: ShiftRecord, closingCash: number, notes: string | null) {
+  return prisma.$transaction(async (tx) => {
+    const totals = await loadShiftTotals(shift, tx);
+    const now = new Date();
+    const durationMinutes = Math.max(1, Math.round((now.getTime() - new Date(shift.startTime).getTime()) / 60000));
+    const difference = Math.round((closingCash - totals.expectedCash) * 100) / 100;
+    const closed = await tx.cashierShift.updateMany({
+      where: { id: shift.id, status: 'open' },
+      data: {
+        status: 'closed',
+        endTime: now,
+        durationMinutes,
+        closingCash,
+        expectedCash: totals.expectedCash,
+        cashDifference: difference,
+        totalSalesCount: totals.salesCount,
+        totalSalesAmount: totals.totalSalesAmount,
+        totalCashSales: totals.totalCashSales,
+        totalCardSales: totals.totalCardSales,
+        totalCreditSales: totals.totalCreditSales,
+        totalReturnsAmount: totals.totalReturnsCash,
+        totalCustomerPayments: totals.totalCustomerPaymentsCash,
+        notes
+      }
+    });
+    if (closed.count === 0) throw new Error('Shift is already closed and locked.');
+    const updated = await tx.cashierShift.findUniqueOrThrow({ where: { id: shift.id } });
+    return { updated, totals, durationMinutes, difference };
+  });
+}
+
+/** A cash amount from the request: a finite number of at least 0, or null */
+function cashAmount(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+}
 
 function formatShiftDuration(minutes: number): string {
   const h = Math.floor(minutes / 60);
@@ -35,88 +125,11 @@ router.get('/api/shifts/active', async (req: Request, res: Response) => {
       return res.json({ activeShift: null });
     }
 
-    // Compute live shift stats
-    const [sales, returns, customerPayments] = await Promise.all([
-      prisma.sale.findMany({
-        where: { shiftId: shift.id },
-        select: { netTotal: true, cashTendered: true, changeDue: true, paymentType: true }
-      }),
-      prisma.saleReturn.findMany({
-        where: { shiftId: shift.id },
-        select: { refundAmount: true }
-      }),
-      prisma.customerPayment.findMany({
-        where: { shiftId: shift.id },
-        select: { amount: true, paymentMethod: true }
-      })
-    ]);
-
-    let totalCashSales = 0;
-    let totalCardSales = 0;
-    let totalCreditSales = 0;
-    let totalSalesAmount = 0;
-
-    for (const s of sales) {
-      totalSalesAmount += s.netTotal;
-      if (s.paymentType === 'Cash') {
-        totalCashSales += s.netTotal;
-      } else if (s.paymentType === 'Card') {
-        totalCardSales += s.netTotal;
-      } else if (s.paymentType === 'Credit') {
-        totalCreditSales += s.netTotal;
-      }
-    }
-
-    let totalReturnsCash = 0;
-    for (const r of returns) {
-      totalReturnsCash += r.refundAmount;
-    }
-
-    let totalCustomerPaymentsCash = 0;
-    for (const cp of customerPayments) {
-      if (cp.paymentMethod.toLowerCase() === 'cash') {
-        totalCustomerPaymentsCash += cp.amount;
-      }
-    }
-
-    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
-    const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(shift.startTime).getTime()) / 60000));
-
+    const totals = await loadShiftTotals(shift);
+    const elapsedMinutes = minutesSince(shift.startTime);
     res.json({
-      activeShift: {
-        id: shift.id,
-        shift_no: shift.shiftNo,
-        user_id: shift.userId,
-        user_name: shift.userName,
-        start_time: shift.startTime,
-        end_time: shift.endTime,
-        duration_minutes: elapsedMinutes,
-        opening_cash: shift.openingCash,
-        closing_cash: shift.closingCash,
-        expected_cash: expectedCash,
-        cash_difference: shift.cashDifference,
-        total_sales_count: sales.length,
-        total_sales_amount: totalSalesAmount,
-        total_cash_sales: totalCashSales,
-        total_card_sales: totalCardSales,
-        total_credit_sales: totalCreditSales,
-        total_returns_amount: totalReturnsCash,
-        total_customer_payments: totalCustomerPaymentsCash,
-        notes: shift.notes,
-        status: shift.status
-      },
-      summary: {
-        opening_cash: shift.openingCash,
-        total_sales_cash: totalCashSales,
-        total_sales_card: totalCardSales,
-        total_sales_credit: totalCreditSales,
-        total_returns_cash: totalReturnsCash,
-        total_customer_payments_cash: totalCustomerPaymentsCash,
-        expected_cash: expectedCash,
-        invoices_count: sales.length,
-        returns_count: returns.length,
-        duration_formatted: formatShiftDuration(elapsedMinutes)
-      }
+      activeShift: shiftPayload(shift, totals, elapsedMinutes),
+      summary: summaryPayload(shift, totals, elapsedMinutes)
     });
   } catch (error: unknown) {
     sendError(res, error);
@@ -131,6 +144,10 @@ router.post('/api/shifts/start', async (req: Request, res: Response) => {
     const { user_id, user_name } = await sessionIdentity(req);
     if (!user_id) {
       return res.status(400).json({ error: 'user_id is required' });
+    }
+    const openingCash = opening_cash === undefined || opening_cash === '' ? 0 : cashAmount(opening_cash);
+    if (openingCash === null) {
+      return res.status(400).json({ error: 'Opening cash must be a number of 0 or more.' });
     }
 
     // Check if user already has an open shift
@@ -149,7 +166,7 @@ router.post('/api/shifts/start', async (req: Request, res: Response) => {
     }
 
     // Generate unique shift number: e.g. SH-YYYYMMDD-0001
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const today = localDateKey();
     const countToday = await prisma.cashierShift.count({
       where: { shiftNo: { startsWith: `SH-${today}-` } }
     });
@@ -161,7 +178,7 @@ router.post('/api/shifts/start', async (req: Request, res: Response) => {
         userId: Number(user_id),
         userName: user_name || 'Cashier',
         startTime: new Date(),
-        openingCash: parseFloat(opening_cash) || 0,
+        openingCash,
         notes: notes || null,
         status: 'open'
       }
@@ -171,7 +188,7 @@ router.post('/api/shifts/start', async (req: Request, res: Response) => {
       data: {
         action: 'SHIFT_OPENED',
         module: 'Shift Management',
-        details: `Shift ${shiftNo} opened by ${user_name} with opening float ${opening_cash || 0}`,
+        details: `Shift ${shiftNo} opened by ${user_name} with opening float ${openingCash}`,
         userId: Number(user_id),
         userName: user_name || 'Cashier'
       }
@@ -204,88 +221,21 @@ router.get('/api/shifts/:id/summary', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Shift not found' });
     }
 
-    const [sales, returns, customerPayments] = await Promise.all([
-      prisma.sale.findMany({
-        where: { shiftId: shift.id },
-        select: { id: true, invoiceNo: true, netTotal: true, cashTendered: true, changeDue: true, paymentType: true, saleDate: true }
-      }),
-      prisma.saleReturn.findMany({
-        where: { shiftId: shift.id },
-        select: { id: true, returnNo: true, refundAmount: true, createdAt: true }
-      }),
-      prisma.customerPayment.findMany({
-        where: { shiftId: shift.id },
-        select: { id: true, amount: true, paymentMethod: true, paymentDate: true }
-      })
-    ]);
-
-    let totalCashSales = 0;
-    let totalCardSales = 0;
-    let totalCreditSales = 0;
-    let totalSalesAmount = 0;
-
-    for (const s of sales) {
-      totalSalesAmount += s.netTotal;
-      if (s.paymentType === 'Cash') {
-        totalCashSales += s.netTotal;
-      } else if (s.paymentType === 'Card') {
-        totalCardSales += s.netTotal;
-      } else if (s.paymentType === 'Credit') {
-        totalCreditSales += s.netTotal;
-      }
-    }
-
-    let totalReturnsCash = 0;
-    for (const r of returns) {
-      totalReturnsCash += r.refundAmount;
-    }
-
-    let totalCustomerPaymentsCash = 0;
-    for (const cp of customerPayments) {
-      if (cp.paymentMethod.toLowerCase() === 'cash') {
-        totalCustomerPaymentsCash += cp.amount;
-      }
-    }
-
-    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
-    const endTime = shift.endTime || new Date();
-    const durationMinutes = Math.max(1, Math.round((new Date(endTime).getTime() - new Date(shift.startTime).getTime()) / 60000));
-
+    const totals = await loadShiftTotals(shift);
+    const durationMinutes = Math.max(1, minutesSince(shift.startTime, shift.endTime || new Date()));
+    // A closed shift keeps the figures it was closed with
+    const live = shift.status === 'open' ? totals : null;
     res.json({
-      shift: {
-        id: shift.id,
-        shift_no: shift.shiftNo,
-        user_id: shift.userId,
-        user_name: shift.userName,
-        start_time: shift.startTime,
-        end_time: shift.endTime,
-        duration_minutes: durationMinutes,
-        opening_cash: shift.openingCash,
-        closing_cash: shift.closingCash,
-        expected_cash: shift.expectedCash || expectedCash,
-        cash_difference: shift.cashDifference,
-        total_sales_count: sales.length,
-        total_sales_amount: totalSalesAmount,
-        total_cash_sales: totalCashSales,
-        total_card_sales: totalCardSales,
-        total_credit_sales: totalCreditSales,
-        total_returns_amount: totalReturnsCash,
-        total_customer_payments: totalCustomerPaymentsCash,
-        notes: shift.notes,
-        status: shift.status
-      },
-      summary: {
-        opening_cash: shift.openingCash,
-        total_sales_cash: totalCashSales,
-        total_sales_card: totalCardSales,
-        total_sales_credit: totalCreditSales,
-        total_returns_cash: totalReturnsCash,
-        total_customer_payments_cash: totalCustomerPaymentsCash,
-        expected_cash: expectedCash,
-        invoices_count: sales.length,
-        returns_count: returns.length,
-        duration_formatted: formatShiftDuration(durationMinutes)
-      }
+      shift: shiftPayload(shift, live, durationMinutes),
+      summary: summaryPayload(shift, live ? totals : {
+        ...totals,
+        totalCashSales: shift.totalCashSales,
+        totalCardSales: shift.totalCardSales,
+        totalCreditSales: shift.totalCreditSales,
+        totalReturnsCash: shift.totalReturnsAmount,
+        totalCustomerPaymentsCash: shift.totalCustomerPayments,
+        expectedCash: shift.expectedCash ?? totals.expectedCash
+      }, durationMinutes)
     });
   } catch (error: unknown) {
     sendError(res, error);
@@ -309,68 +259,18 @@ router.post('/api/shifts/:id/close', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Shift is already closed and locked.' });
     }
 
-    const [sales, returns, customerPayments] = await Promise.all([
-      prisma.sale.findMany({
-        where: { shiftId: shift.id },
-        select: { netTotal: true, paymentType: true }
-      }),
-      prisma.saleReturn.findMany({
-        where: { shiftId: shift.id },
-        select: { refundAmount: true }
-      }),
-      prisma.customerPayment.findMany({
-        where: { shiftId: shift.id },
-        select: { amount: true, paymentMethod: true }
-      })
-    ]);
-
-    let totalCashSales = 0;
-    let totalCardSales = 0;
-    let totalCreditSales = 0;
-    let totalSalesAmount = 0;
-
-    for (const s of sales) {
-      totalSalesAmount += s.netTotal;
-      if (s.paymentType === 'Cash') totalCashSales += s.netTotal;
-      else if (s.paymentType === 'Card') totalCardSales += s.netTotal;
-      else if (s.paymentType === 'Credit') totalCreditSales += s.netTotal;
+    // A cashier closes their own shift; someone else's needs shift management (the admin force-close)
+    const actor = await getActingUser(req);
+    if (!actor || (shift.userId !== actor.id && !(await hasRolePermission(actor.role, 'can_manage_shifts')))) {
+      return res.status(403).json({ error: 'You can only close your own shift.' });
     }
 
-    let totalReturnsCash = 0;
-    for (const r of returns) {
-      totalReturnsCash += r.refundAmount;
+    const actualCashNum = cashAmount(actual_cash);
+    if (actualCashNum === null) {
+      return res.status(400).json({ error: 'Enter the cash counted in the drawer (0 or more).' });
     }
-
-    let totalCustomerPaymentsCash = 0;
-    for (const cp of customerPayments) {
-      if (cp.paymentMethod.toLowerCase() === 'cash') totalCustomerPaymentsCash += cp.amount;
-    }
-
-    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
-    const actualCashNum = parseFloat(actual_cash) || 0;
-    const difference = actualCashNum - expectedCash;
-    const now = new Date();
-    const durationMinutes = Math.max(1, Math.round((now.getTime() - new Date(shift.startTime).getTime()) / 60000));
-
-    const updatedShift = await prisma.cashierShift.update({
-      where: { id: shift.id },
-      data: {
-        status: 'closed',
-        endTime: now,
-        durationMinutes: durationMinutes,
-        closingCash: actualCashNum,
-        expectedCash: expectedCash,
-        cashDifference: difference,
-        totalSalesCount: sales.length,
-        totalSalesAmount: totalSalesAmount,
-        totalCashSales: totalCashSales,
-        totalCardSales: totalCardSales,
-        totalCreditSales: totalCreditSales,
-        totalReturnsAmount: totalReturnsCash,
-        totalCustomerPayments: totalCustomerPaymentsCash,
-        notes: notes || shift.notes
-      }
-    });
+    const { updated: updatedShift, totals, durationMinutes, difference } = await closeShiftRecord(shift, actualCashNum, notes || shift.notes);
+    const expectedCash = totals.expectedCash;
 
     // Shift-close backup runs alongside the schedule unless the Developer switched automatic backups off
     const backupResult = await runShiftCloseBackup({ id: shift.userId, username: shift.userName });
@@ -389,32 +289,11 @@ router.post('/api/shifts/:id/close', async (req: Request, res: Response) => {
     res.json({
       success: true,
       message: 'Shift reconciled and locked successfully.',
-      shift: {
-        id: updatedShift.id,
-        shift_no: updatedShift.shiftNo,
-        user_id: updatedShift.userId,
-        user_name: updatedShift.userName,
-        start_time: updatedShift.startTime,
-        end_time: updatedShift.endTime,
-        duration_minutes: updatedShift.durationMinutes,
-        opening_cash: updatedShift.openingCash,
-        closing_cash: updatedShift.closingCash,
-        expected_cash: updatedShift.expectedCash,
-        cash_difference: updatedShift.cashDifference,
-        total_sales_count: updatedShift.totalSalesCount,
-        total_sales_amount: updatedShift.totalSalesAmount,
-        total_cash_sales: updatedShift.totalCashSales,
-        total_card_sales: updatedShift.totalCardSales,
-        total_credit_sales: updatedShift.totalCreditSales,
-        total_returns_amount: updatedShift.totalReturnsAmount,
-        total_customer_payments: updatedShift.totalCustomerPayments,
-        notes: updatedShift.notes,
-        status: updatedShift.status
-      },
+      shift: shiftPayload(updatedShift, null, updatedShift.durationMinutes),
       backup: backupResult
     });
   } catch (error: unknown) {
-    sendError(res, error);
+    sendError(res, error, 400);
   }
 });
 
@@ -437,90 +316,11 @@ router.get('/api/shifts', async (req: Request, res: Response) => {
       orderBy: { id: 'desc' }
     });
 
-    const result = await Promise.all(shifts.map(async (s) => {
-      if (s.status === 'open') {
-        const [sales, returns, customerPayments] = await Promise.all([
-          prisma.sale.findMany({
-            where: { shiftId: s.id },
-            select: { netTotal: true, paymentType: true }
-          }),
-          prisma.saleReturn.findMany({
-            where: { shiftId: s.id },
-            select: { refundAmount: true }
-          }),
-          prisma.customerPayment.findMany({
-            where: { shiftId: s.id },
-            select: { amount: true, paymentMethod: true }
-          })
-        ]);
-
-        let totalCashSales = 0;
-        let totalCardSales = 0;
-        let totalCreditSales = 0;
-        let totalSalesAmount = 0;
-        for (const sale of sales) {
-          totalSalesAmount += sale.netTotal;
-          if (sale.paymentType === 'Cash') totalCashSales += sale.netTotal;
-          else if (sale.paymentType === 'Card') totalCardSales += sale.netTotal;
-          else if (sale.paymentType === 'Credit') totalCreditSales += sale.netTotal;
-        }
-
-        const totalReturnsAmount = returns.reduce((sum, r) => sum + r.refundAmount, 0);
-        const totalCustomerPayments = customerPayments.filter(p => p.paymentMethod.toLowerCase() === 'cash').reduce((sum, p) => sum + p.amount, 0);
-        const expectedCash = s.openingCash + totalCashSales + totalCustomerPayments - totalReturnsAmount;
-        const durationMinutes = Math.max(0, Math.floor((Date.now() - new Date(s.startTime).getTime()) / 60000));
-
-        return {
-          id: s.id,
-          shift_no: s.shiftNo,
-          user_id: s.userId,
-          user_name: s.userName,
-          start_time: s.startTime,
-          end_time: s.endTime,
-          duration_minutes: durationMinutes,
-          opening_cash: s.openingCash,
-          closing_cash: s.closingCash,
-          expected_cash: expectedCash,
-          cash_difference: s.cashDifference,
-          total_sales_count: sales.length,
-          total_sales_amount: totalSalesAmount,
-          total_cash_sales: totalCashSales,
-          total_card_sales: totalCardSales,
-          total_credit_sales: totalCreditSales,
-          total_returns_amount: totalReturnsAmount,
-          total_customer_payments: totalCustomerPayments,
-          notes: s.notes,
-          status: s.status,
-          created_at: s.createdAt,
-          updated_at: s.updatedAt
-        };
-      }
-
-      return {
-        id: s.id,
-        shift_no: s.shiftNo,
-        user_id: s.userId,
-        user_name: s.userName,
-        start_time: s.startTime,
-        end_time: s.endTime,
-        duration_minutes: s.durationMinutes,
-        opening_cash: s.openingCash,
-        closing_cash: s.closingCash,
-        expected_cash: s.expectedCash,
-        cash_difference: s.cashDifference,
-        total_sales_count: s.totalSalesCount,
-        total_sales_amount: s.totalSalesAmount,
-        total_cash_sales: s.totalCashSales,
-        total_card_sales: s.totalCardSales,
-        total_credit_sales: s.totalCreditSales,
-        total_returns_amount: s.totalReturnsAmount,
-        total_customer_payments: s.totalCustomerPayments,
-        notes: s.notes,
-        status: s.status,
-        created_at: s.createdAt,
-        updated_at: s.updatedAt
-      };
-    }));
+    const result = await Promise.all(shifts.map(async (s) =>
+      s.status === 'open'
+        ? shiftPayload(s, await loadShiftTotals(s), minutesSince(s.startTime))
+        : shiftPayload(s, null, s.durationMinutes)
+    ));
 
     res.json(result);
   } catch (error: unknown) {
@@ -577,57 +377,9 @@ router.get('/api/shifts/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Shift not found' });
     }
 
-    let totalSalesCount = shift.totalSalesCount;
-    let totalSalesAmount = shift.totalSalesAmount;
-    let totalCashSales = shift.totalCashSales;
-    let totalCardSales = shift.totalCardSales;
-    let totalCreditSales = shift.totalCreditSales;
-    let totalReturnsAmount = shift.totalReturnsAmount;
-    let totalCustomerPayments = shift.totalCustomerPayments;
-    let expectedCash = shift.expectedCash;
-    let durationMinutes = shift.durationMinutes;
-
-    if (shift.status === 'open') {
-      totalSalesCount = shift.sales.length;
-      totalSalesAmount = 0;
-      totalCashSales = 0;
-      totalCardSales = 0;
-      totalCreditSales = 0;
-      for (const s of shift.sales) {
-        totalSalesAmount += s.netTotal;
-        if (s.paymentType === 'Cash') totalCashSales += s.netTotal;
-        else if (s.paymentType === 'Card') totalCardSales += s.netTotal;
-        else if (s.paymentType === 'Credit') totalCreditSales += s.netTotal;
-      }
-      totalReturnsAmount = shift.saleReturns.reduce((sum, r) => sum + r.refundAmount, 0);
-      totalCustomerPayments = shift.customerPayments.filter(p => p.paymentMethod.toLowerCase() === 'cash').reduce((sum, p) => sum + p.amount, 0);
-      expectedCash = shift.openingCash + totalCashSales + totalCustomerPayments - totalReturnsAmount;
-      durationMinutes = Math.max(0, Math.floor((Date.now() - new Date(shift.startTime).getTime()) / 60000));
-    }
-
+    const live = shift.status === 'open' ? await loadShiftTotals(shift) : null;
     res.json({
-      shift: {
-        id: shift.id,
-        shift_no: shift.shiftNo,
-        user_id: shift.userId,
-        user_name: shift.userName,
-        start_time: shift.startTime,
-        end_time: shift.endTime,
-        duration_minutes: durationMinutes,
-        opening_cash: shift.openingCash,
-        closing_cash: shift.closingCash,
-        expected_cash: expectedCash,
-        cash_difference: shift.cashDifference,
-        total_sales_count: totalSalesCount,
-        total_sales_amount: totalSalesAmount,
-        total_cash_sales: totalCashSales,
-        total_card_sales: totalCardSales,
-        total_credit_sales: totalCreditSales,
-        total_returns_amount: totalReturnsAmount,
-        total_customer_payments: totalCustomerPayments,
-        notes: shift.notes,
-        status: shift.status
-      },
+      shift: shiftPayload(shift, live, live ? minutesSince(shift.startTime) : shift.durationMinutes),
       sales: shift.sales.map(s => ({
         id: s.id,
         invoice_no: s.invoiceNo,
@@ -681,6 +433,12 @@ router.post('/api/shifts/:id/admin/reopen', async (req: Request, res: Response) 
     if (shift.status === 'open') {
       return res.status(400).json({ error: 'Shift is already open.' });
     }
+    if (shift.userId) {
+      const otherOpen = await prisma.cashierShift.findFirst({ where: { userId: shift.userId, status: 'open' }, select: { shiftNo: true } });
+      if (otherOpen) {
+        return res.status(400).json({ error: `${shift.userName} already has an open shift (${otherOpen.shiftNo}). Close it before reopening this one.` });
+      }
+    }
 
     const updated = await prisma.cashierShift.update({
       where: { id: shift.id },
@@ -704,21 +462,7 @@ router.post('/api/shifts/:id/admin/reopen', async (req: Request, res: Response) 
     res.json({
       success: true,
       message: `Shift ${shift.shiftNo} reopened successfully.`,
-      shift: {
-        id: updated.id,
-        shift_no: updated.shiftNo,
-        user_id: updated.userId,
-        user_name: updated.userName,
-        start_time: updated.startTime,
-        end_time: updated.endTime,
-        duration_minutes: updated.durationMinutes,
-        opening_cash: updated.openingCash,
-        closing_cash: updated.closingCash,
-        expected_cash: updated.expectedCash,
-        cash_difference: updated.cashDifference,
-        status: updated.status,
-        notes: updated.notes
-      }
+      shift: shiftPayload(updated, null, updated.durationMinutes)
     });
   } catch (error: unknown) {
     sendError(res, error);
@@ -746,9 +490,12 @@ router.post('/api/shifts/:id/admin/correct', async (req: Request, res: Response)
       return res.status(404).json({ error: 'Shift not found' });
     }
 
-    const newClosingCash = parseFloat(corrected_closing_cash) || 0;
+    const newClosingCash = cashAmount(corrected_closing_cash);
+    if (newClosingCash === null) {
+      return res.status(400).json({ error: 'Enter the corrected cash amount (0 or more).' });
+    }
     const expected = shift.expectedCash || 0;
-    const newDifference = newClosingCash - expected;
+    const newDifference = Math.round((newClosingCash - expected) * 100) / 100;
     const oldClosingCash = shift.closingCash;
 
     const updated = await prisma.cashierShift.update({
@@ -773,21 +520,7 @@ router.post('/api/shifts/:id/admin/correct', async (req: Request, res: Response)
     res.json({
       success: true,
       message: `Shift ${shift.shiftNo} cash figures corrected successfully.`,
-      shift: {
-        id: updated.id,
-        shift_no: updated.shiftNo,
-        user_id: updated.userId,
-        user_name: updated.userName,
-        start_time: updated.startTime,
-        end_time: updated.endTime,
-        duration_minutes: updated.durationMinutes,
-        opening_cash: updated.openingCash,
-        closing_cash: updated.closingCash,
-        expected_cash: updated.expectedCash,
-        cash_difference: updated.cashDifference,
-        status: updated.status,
-        notes: updated.notes
-      }
+      shift: shiftPayload(updated, null, updated.durationMinutes)
     });
   } catch (error: unknown) {
     sendError(res, error);
@@ -818,61 +551,17 @@ router.post('/api/shifts/:id/admin/force-close', async (req: Request, res: Respo
       return res.status(400).json({ error: 'Shift is already closed.' });
     }
 
-    const [sales, returns, customerPayments] = await Promise.all([
-      prisma.sale.findMany({
-        where: { shiftId: shift.id },
-        select: { netTotal: true, paymentType: true }
-      }),
-      prisma.saleReturn.findMany({
-        where: { shiftId: shift.id },
-        select: { refundAmount: true }
-      }),
-      prisma.customerPayment.findMany({
-        where: { shiftId: shift.id },
-        select: { amount: true, paymentMethod: true }
-      })
-    ]);
-
-    let totalCashSales = 0, totalCardSales = 0, totalCreditSales = 0, totalSalesAmount = 0;
-    for (const s of sales) {
-      totalSalesAmount += s.netTotal;
-      if (s.paymentType === 'Cash') totalCashSales += s.netTotal;
-      else if (s.paymentType === 'Card') totalCardSales += s.netTotal;
-      else if (s.paymentType === 'Credit') totalCreditSales += s.netTotal;
+    // No count given: the drawer is taken as holding exactly the expected cash
+    const counted = cashAmount(actual_cash);
+    if (actual_cash !== undefined && actual_cash !== null && actual_cash !== '' && counted === null) {
+      return res.status(400).json({ error: 'Enter the cash counted in the drawer (0 or more).' });
     }
-    let totalReturnsCash = 0;
-    for (const r of returns) totalReturnsCash += r.refundAmount;
-    let totalCustomerPaymentsCash = 0;
-    for (const cp of customerPayments) {
-      if (cp.paymentMethod.toLowerCase() === 'cash') totalCustomerPaymentsCash += cp.amount;
-    }
-
-    const expectedCash = shift.openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash;
-    const actualCashNum = parseFloat(actual_cash) ?? expectedCash;
-    const difference = actualCashNum - expectedCash;
-    const now = new Date();
-    const durationMinutes = Math.max(1, Math.round((now.getTime() - new Date(shift.startTime).getTime()) / 60000));
-
     const adminNote = `[Force-Closed by ${admin_name || 'Admin'}: ${String(reason).trim()}]`;
-    const updatedShift = await prisma.cashierShift.update({
-      where: { id: shift.id },
-      data: {
-        status: 'closed',
-        endTime: now,
-        durationMinutes,
-        closingCash: actualCashNum,
-        expectedCash,
-        cashDifference: difference,
-        totalSalesCount: sales.length,
-        totalSalesAmount,
-        totalCashSales,
-        totalCardSales,
-        totalCreditSales,
-        totalReturnsAmount: totalReturnsCash,
-        totalCustomerPayments: totalCustomerPaymentsCash,
-        notes: notes ? `${notes} | ${adminNote}` : adminNote
-      }
-    });
+    const expectedNow = (await loadShiftTotals(shift)).expectedCash;
+    const { updated: updatedShift, totals, durationMinutes, difference } =
+      await closeShiftRecord(shift, counted ?? expectedNow, notes ? `${notes} | ${adminNote}` : adminNote);
+    const expectedCash = totals.expectedCash;
+    const actualCashNum = updatedShift.closingCash ?? 0;
 
     await prisma.auditLog.create({
       data: {
@@ -887,31 +576,10 @@ router.post('/api/shifts/:id/admin/force-close', async (req: Request, res: Respo
     res.json({
       success: true,
       message: `Shift ${shift.shiftNo} has been force-closed by admin.`,
-      shift: {
-        id: updatedShift.id,
-        shift_no: updatedShift.shiftNo,
-        user_id: updatedShift.userId,
-        user_name: updatedShift.userName,
-        start_time: updatedShift.startTime,
-        end_time: updatedShift.endTime,
-        duration_minutes: updatedShift.durationMinutes,
-        opening_cash: updatedShift.openingCash,
-        closing_cash: updatedShift.closingCash,
-        expected_cash: updatedShift.expectedCash,
-        cash_difference: updatedShift.cashDifference,
-        total_sales_count: updatedShift.totalSalesCount,
-        total_sales_amount: updatedShift.totalSalesAmount,
-        total_cash_sales: updatedShift.totalCashSales,
-        total_card_sales: updatedShift.totalCardSales,
-        total_credit_sales: updatedShift.totalCreditSales,
-        total_returns_amount: updatedShift.totalReturnsAmount,
-        total_customer_payments: updatedShift.totalCustomerPayments,
-        notes: updatedShift.notes,
-        status: updatedShift.status
-      }
+      shift: shiftPayload(updatedShift, null, updatedShift.durationMinutes)
     });
   } catch (error: unknown) {
-    sendError(res, error);
+    sendError(res, error, 400);
   }
 });
 

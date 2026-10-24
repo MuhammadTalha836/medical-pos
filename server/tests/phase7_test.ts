@@ -9,7 +9,7 @@
 import './testEnv';
 import http from 'http';
 import { app } from '../api';
-import { adminAuthHeaders, authHeaders, ensureTestDeveloper, useFullTestLicense } from './testAuth';
+import { adminAuthHeaders, authHeaders, ensureTestAdmin, ensureTestDeveloper, useFullTestLicense } from './testAuth';
 import { prisma } from '../database/prisma';
 import { countRetainedBackups } from '../database/backup';
 import { resetCloudRetry, runCloudUploads } from '../backup/cloud/cloudBackup';
@@ -184,8 +184,8 @@ async function runPhase7Tests() {
   }
 
   const dev = await ensureTestDeveloper();
-  const devHeaders = authHeaders(dev);
-  const adminHeaders = await adminAuthHeaders();
+  let devHeaders = authHeaders(dev);
+  let adminHeaders = await adminAuthHeaders();
   const backupNow = async () => {
     const res = await request('/utilities/backup', adminHeaders, { method: 'POST' });
     assert(res.status === 200, `Backup: expected 200, got ${res.status} ${JSON.stringify(res.body)}`);
@@ -307,6 +307,12 @@ async function runPhase7Tests() {
       assert(phone?.value !== marker, 'Data came back from the online backup');
       const email = await prisma.systemSetting.findUnique({ where: { key: 'gdrive_account_email' } });
       assert(email?.value === 'owner@gmail.test', 'Google connection kept after restore');
+
+      // A restore signs everyone out (the restored users and roles may differ)
+      const stale = await request('/backups/status', adminHeaders);
+      assert(stale.status === 401, `Old session after restore: expected 401, got ${stale.status}`);
+      devHeaders = authHeaders(await ensureTestDeveloper());
+      adminHeaders = authHeaders(await ensureTestAdmin());
 
       const foreign = await request('/utilities/restore-cloud', adminHeaders, { method: 'POST', body: JSON.stringify({ fileId: 'not-in-the-folder-123' }) });
       assert(foreign.status === 400, `Unknown file: expected 400, got ${foreign.status}`);

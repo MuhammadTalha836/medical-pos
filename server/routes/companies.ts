@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
-import { sendError } from '../http/context';
+import { requirePermission, sendError } from '../http/context';
 
 // Companies / manufacturers
 const router = Router();
@@ -35,6 +35,7 @@ router.get('/api/companies', async (_req: Request, res: Response) => {
 
 router.post('/api/companies', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_add_company', 'You do not have permission to add companies.'))) return;
     const { code, name, contact_person, phone, email, address } = req.body;
     const newCompany = await prisma.company.create({
       data: {
@@ -55,6 +56,7 @@ router.post('/api/companies', async (req: Request, res: Response) => {
 
 router.put('/api/companies/:id', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_edit_company', 'You do not have permission to edit companies.'))) return;
     const idNum = Number(req.params.id);
     const { code, name, contact_person, phone, email, address, status } = req.body;
     await prisma.company.update({
@@ -77,6 +79,7 @@ router.put('/api/companies/:id', async (req: Request, res: Response) => {
 
 router.delete('/api/companies/:id', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_delete_company', 'You do not have permission to delete companies.'))) return;
     const idNum = Number(req.params.id);
     await prisma.company.delete({ where: { id: idNum } });
     res.json({ success: true });

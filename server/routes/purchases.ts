@@ -1,12 +1,13 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
-import { sessionIdentity, sendError } from '../http/context';
+import { sessionIdentity, requirePermission, sendError } from '../http/context';
 
 // Supplier purchases (stock inward)
 const router = Router();
 
-router.get('/api/purchases', async (_req: Request, res: Response) => {
+router.get('/api/purchases', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'purchases', 'You do not have access to purchases.'))) return;
     const purchases = await prisma.$queryRaw<any[]>`
       SELECT p.*, c.name as company_name, c.code as company_code
       FROM purchases p
@@ -21,6 +22,7 @@ router.get('/api/purchases', async (_req: Request, res: Response) => {
 
 router.post('/api/purchases', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_add_purchase', 'You do not have permission to record purchases.'))) return;
     const {
       supplier_invoice_no,
       company_id,
