@@ -143,13 +143,13 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Search users by name, username, or role..."
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                  className="field-input field-sm w-full pl-9 pr-3"
                 />
               </div>
 
               <button
                 onClick={() => setIsAddUserModalOpen(true)}
-                className="btn-save flex items-center space-x-1.5 px-4 py-2 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                className="btn-primary text-white"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>Create New Staff Account</span>
@@ -157,7 +157,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
             </div>
 
             {/* Users Table */}
-            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                   <tr>
@@ -179,23 +179,23 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
                           <div className="flex items-center space-x-2">
                             <span className="font-bold text-teal-600 dark:text-teal-400">@{u.username}</span>
                             {isCurrent && (
-                              <span className="text-[10px] bg-teal-500/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold px-1.5 py-0.5 rounded-sm border border-teal-500/30">
+                              <span className="text-2xs bg-teal-500/10 dark:bg-teal-500/20 text-teal-700 dark:text-teal-300 font-bold px-1.5 py-0.5 rounded-sm border border-teal-500/30">
                                 You
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-slate-400">ID #{u.id}</div>
+                          <div className="text-2xs text-slate-400">ID #{u.id}</div>
                         </td>
 
                         <td className="py-3 px-4">
                           <div className="font-semibold text-slate-900 dark:text-white text-sm">{u.full_name}</div>
                           {u.created_at && (
-                            <div className="text-[10px] text-slate-400">Added: {new Date(u.created_at).toLocaleDateString()}</div>
+                            <div className="text-2xs text-slate-400">Added: {new Date(u.created_at).toLocaleDateString()}</div>
                           )}
                         </td>
 
                         <td className="py-3 px-4 text-center">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          <span className={`px-2.5 py-1 rounded-full text-2xs font-bold ${
                             u.role === 'admin'
                               ? 'badge-danger'
                               : u.role === 'pharmacist'
@@ -207,7 +207,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
                         </td>
 
                         <td className="py-3 px-4 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                          <span className={`px-2 py-0.5 rounded text-2xs font-semibold border ${
                             u.status === 'active'
                               ? 'badge-success'
                               : 'bg-slate-100 dark:bg-surface-inset-dark text-slate-500 border-slate-300 dark:border-slate-800'
@@ -219,27 +219,27 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
                         <td className="py-3 px-4 text-center">
                           <div className="flex items-center justify-center space-x-1.5">
                             {u.role === 'developer' && user?.role !== 'developer' ? (
-                              <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-sm border border-purple-500/20">
+                              <span className="text-xs font-mono text-purple-600 dark:text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-sm border border-purple-500/20">
                                 Developer Locked
                               </span>
                             ) : (
                               <>
                                 <button
                                   onClick={() => handleOpenEditUser(u)}
-                                  className="btn-edit px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1"
+                                  className="btn-secondary btn-sm font-medium"
                                   title="Edit User Login & Reset Password"
                                 >
-                                  <Edit className="w-3.5 h-3.5" />
+                                  <Edit className="w-4 h-4" />
                                   <span>Edit / Reset</span>
                                 </button>
 
                                 {!isAdminId1 && u.role !== 'developer' && (
                                   <button
                                     onClick={() => handleDeleteUser(u)}
-                                    className="btn-delete p-1.5 rounded-lg transition-colors"
+                                    className="btn-danger p-1.5"
                                     title="Delete Account"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
                                 )}
                               </>
@@ -270,7 +270,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
               placeholder="e.g. cashier2"
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-input w-full font-mono"
             />
           </div>
 
@@ -282,7 +282,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               value={newFullName}
               onChange={(e) => setNewFullName(e.target.value)}
               placeholder="e.g. Muhammad Ali"
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-input w-full"
             />
           </div>
 
@@ -294,7 +294,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-input w-full font-mono"
             />
           </div>
 
@@ -303,7 +303,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-select w-full"
             >
               {roles
                 .filter(r => {
@@ -326,13 +326,13 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
             <button
               type="button"
               onClick={() => setIsAddUserModalOpen(false)}
-              className="btn-cancel px-4 py-2 rounded-xl font-medium"
+              className="btn-secondary font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-primary text-white"
             >
               Create Account
             </button>
@@ -355,7 +355,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               required
               value={editUsername}
               onChange={(e) => setEditUsername(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-input w-full font-mono"
             />
           </div>
 
@@ -366,7 +366,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               required
               value={editFullName}
               onChange={(e) => setEditFullName(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-input w-full"
             />
           </div>
 
@@ -376,7 +376,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               value={editRole}
               onChange={(e) => setEditRole(e.target.value)}
               disabled={editingUser?.id === 1}
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+              className="field-select w-full disabled:opacity-50"
             >
               {roles.map(r => (
                 <option key={r.id} value={r.name}>
@@ -392,7 +392,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               value={editStatus}
               onChange={(e) => setEditStatus(e.target.value as any)}
               disabled={editingUser?.id === 1}
-              className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+              className="field-select w-full disabled:opacity-50"
             >
               <option value="active">Active (Access Allowed)</option>
               <option value="inactive">Inactive (Access Suspended)</option>
@@ -401,10 +401,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
 
           <div className="p-3 bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 dark:border-amber-800/60 rounded-xl space-y-1.5">
             <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-300 font-bold">
-              <Key className="w-3.5 h-3.5" />
+              <Key className="w-4 h-4" />
               <span>Reset Password (Optional)</span>
             </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               Leave this blank if you do not wish to change this staff member's password.
             </p>
             <input
@@ -412,7 +412,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
               value={editPassword}
               onChange={(e) => setEditPassword(e.target.value)}
               placeholder="Enter new password to overwrite"
-              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-input field-sm w-full font-mono"
             />
           </div>
 
@@ -420,13 +420,13 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, roles, settings, onCh
             <button
               type="button"
               onClick={() => setEditingUser(null)}
-              className="btn-cancel px-4 py-2 rounded-xl font-medium"
+              className="btn-secondary font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-primary text-white"
             >
               Save Changes
             </button>

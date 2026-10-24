@@ -364,6 +364,8 @@ export interface DeveloperSettingsPayload {
   store_address: string;
   developer_invoice_footer: string;
   developer_email?: string;
+  /** Developer profile keys (shared/developerProfile.ts) */
+  [key: string]: string | undefined;
 }
 
 export interface ElectronAPI {

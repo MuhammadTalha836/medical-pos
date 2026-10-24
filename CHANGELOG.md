@@ -4,6 +4,15 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 
 ## [Unreleased] — 2026-10-24
 
+### Added
+- App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
+- Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
+
+### Changed (design system, phase A)
+- Larger type everywhere (nothing under 12px; body text 15px), 40px inputs/selects/buttons with one shared style (`field-input`, `field-select`, `field-textarea`, `btn-primary`/`btn-secondary`/`btn-danger`/`btn-print`, `btn-sm`, `field-sm`), bigger icons, no all-caps labels, flat buttons without gradients.
+- Plain sidebar names (New Sale, Sales & Returns, Customer Khata, Dashboard, Shifts, Medicines, Purchases, Reports, Backup & Recovery, Settings, Developer) with a high-contrast active item.
+- Receipts no longer print sample phone/license/address text when the store has not filled them in.
+
 ### Clean-up (refactor, no feature change)
 - `server/api.ts` (4,358 lines) split into `server/app.ts`, `server/routes/*` (17 routers) and `server/http/*` helpers; routes, status codes and responses are unchanged (all suites pass).
 - One source for permission matrices, invoice rules and settings defaults in `shared/` (they were copied 3–5 times and had drifted apart).

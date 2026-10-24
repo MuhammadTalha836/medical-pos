@@ -145,7 +145,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
 
               <button
                 onClick={handleOpenAddRole}
-                className="btn-save flex items-center space-x-1.5 px-4 py-2 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                className="btn-primary text-white"
               >
                 <Plus className="w-4 h-4" />
                 <span>Create New Staff Role</span>
@@ -160,7 +160,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                 return (
                   <div
                     key={r.id}
-                    className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs flex flex-col justify-between"
+                    className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs flex flex-col justify-between"
                   >
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -172,7 +172,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                           )}
                           <h3 className="font-bold text-slate-900 dark:text-white text-base">{r.display_name}</h3>
                         </div>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                        <span className={`text-2xs font-bold px-2 py-0.5 rounded-full border ${
                           isSys
                             ? 'badge-warning'
                             : 'badge-info'
@@ -181,7 +181,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                         </span>
                       </div>
 
-                      <div className="text-[11px] font-mono text-slate-400">
+                      <div className="text-xs font-mono text-slate-400">
                         Identifier: <span className="text-teal-600 dark:text-teal-400 font-bold">{r.name}</span>
                       </div>
 
@@ -200,9 +200,9 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                     <div className="pt-2 flex items-center space-x-2">
                       <button
                         onClick={() => handleOpenEditRole(r)}
-                        className="btn-edit flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-colors flex items-center justify-center space-x-1.5"
+                        className="btn-secondary flex-1"
                       >
-                        <Shield className="w-3.5 h-3.5" />
+                        <Shield className="w-4 h-4" />
                         <span>Configure Permissions</span>
                       </button>
 
@@ -211,9 +211,9 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                           onClick={() => handleDeleteRole(r)}
                           disabled={(r.user_count || 0) > 0}
                           title={(r.user_count || 0) > 0 ? 'Cannot delete role with assigned users' : 'Delete Role'}
-                          className="btn-delete p-2 rounded-xl transition-colors disabled:opacity-40"
+                          className="btn-danger p-2 disabled:opacity-40"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       )}
                     </div>
@@ -242,7 +242,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                 value={newRoleName}
                 onChange={(e) => setNewRoleName(e.target.value)}
                 placeholder="e.g. junior_cashier or stock_manager"
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                className="field-input w-full font-mono"
               />
             </div>
 
@@ -256,7 +256,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                 value={newRoleDisplayName}
                 onChange={(e) => setNewRoleDisplayName(e.target.value)}
                 placeholder="e.g. Junior Cashier"
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                className="field-input w-full font-bold"
               />
             </div>
 
@@ -269,7 +269,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                 value={newRoleDescription}
                 onChange={(e) => setNewRoleDescription(e.target.value)}
                 placeholder="Brief summary of duties and responsibilities"
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                className="field-input w-full"
               />
             </div>
           </div>
@@ -284,13 +284,13 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
             <button
               type="button"
               onClick={() => setIsAddRoleModalOpen(false)}
-              className="btn-cancel px-4 py-2 rounded-xl font-medium"
+              className="btn-secondary font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-primary text-white"
             >
               Save Custom Role
             </button>
@@ -316,7 +316,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                 required
                 value={editRoleDisplayName}
                 onChange={(e) => setEditRoleDisplayName(e.target.value)}
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                className="field-input w-full font-bold"
               />
             </div>
 
@@ -328,7 +328,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                 type="text"
                 disabled
                 value={editingRole?.name || ''}
-                className="w-full bg-slate-100 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-500 font-mono"
+                className="field-input w-full font-mono"
               />
             </div>
 
@@ -341,7 +341,7 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
                 value={editRoleDescription}
                 onChange={(e) => setEditRoleDescription(e.target.value)}
                 placeholder="Brief summary of duties and responsibilities"
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                className="field-input w-full"
               />
             </div>
           </div>
@@ -357,13 +357,13 @@ export const RolesTab: React.FC<RolesTabProps> = ({ roles, onChanged, notify }) 
             <button
               type="button"
               onClick={() => setEditingRole(null)}
-              className="btn-cancel px-4 py-2 rounded-xl font-medium"
+              className="btn-secondary font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-save px-5 py-2 text-white font-bold rounded-xl shadow-md transition-all"
+              className="btn-primary text-white"
             >
               Save Permissions
             </button>

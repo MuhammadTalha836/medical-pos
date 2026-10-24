@@ -104,6 +104,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
     - **Demo / Full license**: signed `license_*` settings; Developer Settings → License extends the demo, starts a new one or activates Full. When a demo ends, Admin/Cashier cannot sign in (the login screen shows a notice) and signed-in staff are signed out; the Developer still can. Clock rollback and database edits cannot extend it. The header shows a countdown badge.
     - **Server sessions**: login returns a bearer token held only by the API process; every `/api` route (except status, setup, login, license status and the public store identity) needs it. Identity always comes from the session, never from headers or request bodies.
     - See `docs/DEVELOPER_RECOVERY.md` for a lost phone, key rotation and expired demos.
+    - **Developer profile & advertising**: Developer → Developer Profile holds the developer's name, company, phone, WhatsApp, email, website and message, plus a checkbox matrix choosing which details appear on the login screen, the sidebar, the sale receipt (snapshotted per sale) and the Support window (Header → Support). Store staff cannot edit or hide them.
 ---
 
 ## 2. Tech Stack & Dependencies
@@ -178,6 +179,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 │   └── main.tsx                # React mount; applies the saved theme first
 ├── index.html                  # HTML entry (no external resources)
 ├── electron.vite.config.ts     # Desktop build (bakes in the developer key)
+├── build/icon.png, icon.svg     # App icon (installer, exe, window, taskbar)
 ├── electron-builder.yml        # Installer config (appId never changes)
 └── tsconfig.json               # Strict, noUnusedLocals/Parameters on
 ```
@@ -227,6 +229,7 @@ When modifying or extending this project, you **MUST** follow these strict rules
 - Avoid using `any` unless dynamically handling raw SQLite query results before mapping to domain interfaces.
 
 ### 4. UI/UX & Design Philosophy
+- **Design system**: shared control and button classes in `src/index.css` (`field-*`, `btn-*`), 40px controls, a 12/13/15px type scale, sentence-case labels and flat colour used only for meaning (teal = action, rose = danger, amber = attention). See CLAUDE.md → Conventions.
 - **Theme**: Medical-grade dark interface using the tailored `pharmacy` Teal/Emerald palette (`#14b8a6`, `#0d9488`) combined with high-contrast `slate-900` / `slate-950` backgrounds, and a calibrated soft light mode for daylight counters.
 - **POS Ergonomics**: Pharmacy sales staff work under high transaction volume. Keep inputs autofocus-ready, provide visual stock warnings (Green = in stock, Amber = low stock, Red = out of stock), and preserve keyboard shortcuts (`F2`-`F10`, `Esc`).
 - **Invoice & Print Integrity**:

@@ -8,6 +8,7 @@ import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../../shared/invoic
 import { WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { LicensePanel } from '../components/developer/LicensePanel';
 import { AdminPermissionsPanel } from '../components/developer/AdminPermissionsPanel';
+import { DeveloperProfilePanel } from '../components/developer/DeveloperProfilePanel';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -29,7 +30,8 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarClock,
-  ListChecks
+  ListChecks,
+  Megaphone
 } from 'lucide-react';
 
 // Minimal sale used to preview how the developer footer wraps on the narrowest (58mm) roll
@@ -67,9 +69,13 @@ const FOOTER_PREVIEW_INVOICE: SaleInvoice = {
   ]
 };
 
-export const DeveloperSettingsPage: React.FC = () => {
+interface DeveloperSettingsPageProps {
+  onRefreshSettings?: () => void;
+}
+
+export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ onRefreshSettings }) => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'license' | 'policies' | 'permissions' | 'store' | 'backups' | 'passwords' | 'audit'>('license');
+  const [activeTab, setActiveTab] = useState<'license' | 'profile' | 'policies' | 'permissions' | 'store' | 'backups' | 'passwords' | 'audit'>('license');
 
   // Developer settings state
   const [settings, setSettings] = useState<DeveloperSettingsPayload>({
@@ -81,8 +87,8 @@ export const DeveloperSettingsPage: React.FC = () => {
     allow_admin_create_admin: 'false',
     allow_admin_edit_store_identity: 'false',
     allow_admin_hide_store_identity: 'false',
-    store_name: 'PharmaCare Pharmacy',
-    store_address: 'Main Boulevard, Healthcare City',
+    store_name: '',
+    store_address: '',
     developer_invoice_footer: DEFAULT_DEVELOPER_FOOTER,
     developer_email: ''
   });
@@ -219,7 +225,7 @@ export const DeveloperSettingsPage: React.FC = () => {
   if (!user || user.role !== 'developer') {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4">
           <ShieldAlert className="w-8 h-8 text-rose-500" />
         </div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">Developer Access Restricted</h2>
@@ -237,12 +243,12 @@ export const DeveloperSettingsPage: React.FC = () => {
   );
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+            <span className="px-2.5 py-0.5 rounded-full text-2xs font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
               Developer Console
             </span>
             <span className="text-xs text-slate-400 font-mono">Authenticator secured</span>
@@ -264,7 +270,7 @@ export const DeveloperSettingsPage: React.FC = () => {
             }}
             className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            <RefreshCw className="w-4 h-4" />
             <span>Sync Live Data</span>
           </button>
         </div>
@@ -282,6 +288,18 @@ export const DeveloperSettingsPage: React.FC = () => {
         >
           <CalendarClock className="w-4 h-4" />
           <span>License</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'profile'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Megaphone className="w-4 h-4" />
+          <span>Developer Profile</span>
         </button>
 
         <button
@@ -355,7 +373,7 @@ export const DeveloperSettingsPage: React.FC = () => {
           <FileText className="w-4 h-4" />
           <span>Security Audit Trail</span>
           {totalLogs > 0 && (
-            <span className="ml-1 px-1.5 py-0.2 bg-purple-500/20 text-purple-300 rounded-full text-[10px]">
+            <span className="ml-1 px-1.5 py-0.2 bg-purple-500/20 text-purple-300 rounded-full text-2xs">
               {totalLogs}
             </span>
           )}
@@ -364,13 +382,13 @@ export const DeveloperSettingsPage: React.FC = () => {
 
       {/* Global Alerts */}
       {saveSuccessMsg && (
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 animate-fadeIn">
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{saveSuccessMsg}</span>
         </div>
       )}
       {saveErrorMsg && (
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-rose-600 dark:text-rose-400 animate-fadeIn">
+        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center space-x-2 text-xs font-semibold text-rose-600 dark:text-rose-400">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{saveErrorMsg}</span>
         </div>
@@ -378,12 +396,14 @@ export const DeveloperSettingsPage: React.FC = () => {
 
       {activeTab === 'license' && <LicensePanel onChanged={() => fetchAuditLogs(1)} />}
 
+      {activeTab === 'profile' && <DeveloperProfilePanel onSaved={onRefreshSettings} />}
+
       {activeTab === 'permissions' && <AdminPermissionsPanel />}
 
       {/* TAB 1: RBAC POLICIES */}
       {activeTab === 'policies' && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-xs">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6 shadow-xs">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <ShieldCheck className="w-5 h-5 text-purple-500" />
@@ -401,12 +421,12 @@ export const DeveloperSettingsPage: React.FC = () => {
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Create Cashier Accounts</span>
                     {settings.allow_admin_create_cashier === 'true' ? (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-rose-500/10 text-rose-500">Restricted</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-rose-500/10 text-rose-500">Restricted</span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     When enabled, store administrators can create, update, and manage cashier user accounts. When disabled, only the Developer can register new cashiers.
                   </p>
                 </div>
@@ -427,12 +447,12 @@ export const DeveloperSettingsPage: React.FC = () => {
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Create Administrator Accounts</span>
                     {settings.allow_admin_create_admin === 'true' ? (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-amber-500/10 text-amber-500">Disabled (Recommended)</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-amber-500/10 text-amber-500">Disabled (Recommended)</span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Controls whether an existing administrator can spawn secondary administrator accounts. Keep disabled to prevent unauthorized privilege escalation.
                   </p>
                 </div>
@@ -453,12 +473,12 @@ export const DeveloperSettingsPage: React.FC = () => {
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Edit Store Name & Address</span>
                     {settings.allow_admin_edit_store_identity === 'true' ? (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     When disabled, Store Name and Address are protected against changes by store staff to guarantee brand integrity and licensed store identity.
                   </p>
                 </div>
@@ -479,12 +499,12 @@ export const DeveloperSettingsPage: React.FC = () => {
                   <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                     <span>Allow Administrator to Hide Store Name & Address on Receipts</span>
                     {settings.allow_admin_hide_store_identity === 'true' ? (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded-sm text-[10px] font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     When disabled, the Store Name and Address always print on 58 mm and 80 mm receipts, and the visibility switches in Invoice Settings are locked for administrators.
                   </p>
                 </div>
@@ -517,7 +537,7 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* TAB 2: PROTECTED STORE IDENTITY & DEVELOPER FOOTER */}
       {activeTab === 'store' && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-xs">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6 shadow-xs">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <Building className="w-5 h-5 text-purple-500" />
@@ -538,7 +558,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   required
                   value={settings.store_name}
                   onChange={(e) => setSettings(prev => ({ ...prev, store_name: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                  className="field-input w-full font-bold"
                 />
               </div>
 
@@ -550,7 +570,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   type="email"
                   readOnly
                   value={settings.developer_email || ''}
-                  className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-500 dark:text-slate-400 font-mono cursor-not-allowed focus:outline-hidden"
+                  className="field-input w-full font-mono cursor-not-allowed"
                 />
               </div>
 
@@ -563,13 +583,13 @@ export const DeveloperSettingsPage: React.FC = () => {
                   required
                   value={settings.store_address}
                   onChange={(e) => setSettings(prev => ({ ...prev, store_address: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                  className="field-input w-full"
                 />
               </div>
 
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1.5">
-                  <Lock className="w-3.5 h-3.5 text-purple-500" />
+                  <Lock className="w-4 h-4 text-purple-500" />
                   <span>Developer Invoice Footer Text (Mandatory Attribution)</span>
                 </label>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
@@ -580,9 +600,9 @@ export const DeveloperSettingsPage: React.FC = () => {
                       maxLength={FOOTER_MAX_LENGTH}
                       value={settings.developer_invoice_footer}
                       onChange={(e) => setSettings(prev => ({ ...prev, developer_invoice_footer: e.target.value }))}
-                      className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                      className="field-textarea w-full font-mono"
                     />
-                    <div className="flex justify-between gap-2 mt-1 text-[10px] text-slate-400">
+                    <div className="flex justify-between gap-2 mt-1 text-2xs text-slate-400">
                       <span>
                         Prints on every 58 mm and 80 mm receipt and cannot be removed by store administrators. Long lines wrap automatically; each sale keeps the footer it was printed with.
                       </span>
@@ -594,7 +614,7 @@ export const DeveloperSettingsPage: React.FC = () => {
 
                   {/* Live 58mm wrap preview */}
                   <div className="bg-slate-100 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col items-center max-h-[360px] overflow-y-auto">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2 self-start">58 mm wrap preview</span>
+                    <span className="text-2xs font-bold text-slate-500 mb-2 self-start">58 mm wrap preview</span>
                     <UnifiedInvoice
                       invoice={FOOTER_PREVIEW_INVOICE}
                       settings={{
@@ -628,7 +648,7 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* TAB 3: BACKUP RETENTION & SCHEDULING */}
       {activeTab === 'backups' && (
         <form onSubmit={handleSaveSettings} className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-xs">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6 shadow-xs">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <Database className="w-5 h-5 text-purple-500" />
@@ -652,9 +672,9 @@ export const DeveloperSettingsPage: React.FC = () => {
                   required
                   value={settings.backup_retention_limit}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_retention_limit: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                  className="field-input w-full font-mono font-bold"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">1–365 scheduled, manual &amp; shift-close backups. Pre-restore safety snapshots are kept separately (newest 3).</span>
+                <span className="text-2xs text-slate-400 mt-1 block">1–365 scheduled, manual &amp; shift-close backups. Pre-restore safety snapshots are kept separately (newest 3).</span>
               </div>
 
               <div>
@@ -664,14 +684,14 @@ export const DeveloperSettingsPage: React.FC = () => {
                 <select
                   value={settings.backup_frequency}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_frequency: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                  className="field-select w-full"
                 >
                   <option value="off">Off (no automatic backups)</option>
                   <option value="twice_daily">Every 12 hours</option>
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
                 </select>
-                <span className="text-[10px] text-slate-400 mt-1 block">Shift-close backups also run unless this is Off.</span>
+                <span className="text-2xs text-slate-400 mt-1 block">Shift-close backups also run unless this is Off.</span>
               </div>
 
               <div>
@@ -682,13 +702,13 @@ export const DeveloperSettingsPage: React.FC = () => {
                   value={settings.backup_weekly_day || '0'}
                   disabled={settings.backup_frequency !== 'weekly'}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_weekly_day: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+                  className="field-select w-full disabled:opacity-50"
                 >
                   {WEEKDAY_LABELS.map((label, idx) => (
                     <option key={label} value={String(idx)}>{label}</option>
                   ))}
                 </select>
-                <span className="text-[10px] text-slate-400 mt-1 block">Used only for Weekly backups.</span>
+                <span className="text-2xs text-slate-400 mt-1 block">Used only for Weekly backups.</span>
               </div>
 
               <div>
@@ -699,13 +719,13 @@ export const DeveloperSettingsPage: React.FC = () => {
                   type="time"
                   value={settings.backup_scheduled_time || '23:00'}
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_scheduled_time: e.target.value }))}
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                  className="field-input w-full font-mono"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">24-hour format. Administrators may adjust only this time.</span>
+                <span className="text-2xs text-slate-400 mt-1 block">24-hour format. Administrators may adjust only this time.</span>
               </div>
             </div>
 
-            <p className="text-[11px] text-purple-500 dark:text-purple-300 font-medium">
+            <p className="text-xs text-purple-500 dark:text-purple-300 font-medium">
               {describeBackupSchedule(
                 (['off', 'twice_daily', 'daily', 'weekly'].includes(settings.backup_frequency) ? settings.backup_frequency : 'daily') as BackupFrequency,
                 settings.backup_scheduled_time || '23:00',
@@ -730,7 +750,7 @@ export const DeveloperSettingsPage: React.FC = () => {
       {/* TAB 4: STAFF PASSWORD RESET */}
       {activeTab === 'passwords' && (
         <div className="space-y-6">
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 shadow-xs">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-4 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
@@ -743,13 +763,13 @@ export const DeveloperSettingsPage: React.FC = () => {
               </div>
 
               <div className="w-full sm:w-64 relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Filter staff accounts..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                  className="field-input w-full pl-9 pr-3"
                 />
               </div>
             </div>
@@ -757,7 +777,7 @@ export const DeveloperSettingsPage: React.FC = () => {
             <div className="overflow-x-auto pt-2">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-2xs">
                     <th className="py-2.5 px-3">Username</th>
                     <th className="py-2.5 px-3">Full Name</th>
                     <th className="py-2.5 px-3">Role</th>
@@ -788,7 +808,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                           {u.full_name}
                         </td>
                         <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          <span className={`px-2 py-0.5 rounded-full text-2xs font-bold ${
                             u.role === 'developer'
                               ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                               : u.role === 'admin'
@@ -799,7 +819,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-3">
-                          <span className={`inline-flex items-center space-x-1 text-[11px] font-semibold ${
+                          <span className={`inline-flex items-center space-x-1 text-xs font-semibold ${
                             u.status === 'active' ? 'text-emerald-500' : 'text-rose-500'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
@@ -816,7 +836,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                             }}
                             className="inline-flex items-center space-x-1 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold rounded-lg transition"
                           >
-                            <KeyRound className="w-3.5 h-3.5" />
+                            <KeyRound className="w-4 h-4" />
                             <span>Reset Password</span>
                           </button>
                         </td>
@@ -834,17 +854,17 @@ export const DeveloperSettingsPage: React.FC = () => {
       {activeTab === 'audit' && (
         <div className="space-y-4">
           {/* Audit Filters Bar */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
               <div className="flex items-center space-x-1 text-xs text-slate-500">
-                <Filter className="w-3.5 h-3.5 text-purple-500" />
+                <Filter className="w-4 h-4 text-purple-500" />
                 <span>Filters:</span>
               </div>
 
               <select
                 value={filterModule}
                 onChange={(e) => setFilterModule(e.target.value)}
-                className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden"
+                className="field-select field-sm"
               >
                 <option value="">All Modules</option>
                 <option value="AUTH">AUTH</option>
@@ -858,7 +878,7 @@ export const DeveloperSettingsPage: React.FC = () => {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden"
+                className="field-select field-sm"
               >
                 <option value="">All Statuses</option>
                 <option value="SUCCESS">SUCCESS</option>
@@ -872,7 +892,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   onChange={(e) => setFilterUser(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && fetchAuditLogs(1)}
                   placeholder="Filter by user..."
-                  className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden w-36"
+                  className="field-input field-sm w-36"
                 />
               </div>
 
@@ -880,7 +900,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                 onClick={() => fetchAuditLogs(1)}
                 className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1"
               >
-                <Search className="w-3 h-3" />
+                <Search className="w-4 h-4" />
                 <span>Filter</span>
               </button>
             </div>
@@ -891,11 +911,11 @@ export const DeveloperSettingsPage: React.FC = () => {
           </div>
 
           {/* Audit Logs Table */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-surface-inset-dark/50 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-surface-inset-dark/50 text-slate-500 dark:text-slate-400 text-2xs">
                     <th className="py-3 px-3">Timestamp</th>
                     <th className="py-3 px-3">Status</th>
                     <th className="py-3 px-3">Action</th>
@@ -921,11 +941,11 @@ export const DeveloperSettingsPage: React.FC = () => {
                   ) : (
                     auditLogs.map(log => (
                       <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-                        <td className="py-2.5 px-3 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">
+                        <td className="py-2.5 px-3 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
                           {new Date(log.created_at).toLocaleString()}
                         </td>
                         <td className="py-2.5 px-3 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`px-2 py-0.5 rounded text-2xs font-bold ${
                             log.status === 'SUCCESS'
                               ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                               : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
@@ -945,7 +965,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                         <td className="py-2.5 px-3 whitespace-nowrap text-slate-500 dark:text-slate-400">
                           {log.affected_user || '-'}
                         </td>
-                        <td className="py-2.5 px-3 text-[11px] text-slate-600 dark:text-slate-300 max-w-xs truncate" title={log.details || ''}>
+                        <td className="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate" title={log.details || ''}>
                           {log.details || '-'}
                         </td>
                       </tr>
@@ -1013,7 +1033,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new strong password..."
-                className="w-full bg-slate-50 dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-purple-500"
+                className="field-input w-full font-mono"
               />
               <button
                 type="button"
@@ -1027,14 +1047,14 @@ export const DeveloperSettingsPage: React.FC = () => {
 
           {resetErrorMsg && (
             <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-500 text-xs font-semibold flex items-center space-x-1.5">
-              <AlertTriangle className="w-3.5 h-3.5" />
+              <AlertTriangle className="w-4 h-4" />
               <span>{resetErrorMsg}</span>
             </div>
           )}
 
           {resetSuccessMsg && (
             <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-500 text-xs font-semibold flex items-center space-x-1.5">
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-4 h-4" />
               <span>{resetSuccessMsg}</span>
             </div>
           )}
@@ -1053,7 +1073,7 @@ export const DeveloperSettingsPage: React.FC = () => {
               disabled={resettingPassword}
               className="flex items-center space-x-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition shadow-sm disabled:opacity-50"
             >
-              <KeyRound className="w-3.5 h-3.5" />
+              <KeyRound className="w-4 h-4" />
               <span>{resettingPassword ? 'Updating...' : 'Confirm Reset'}</span>
             </button>
           </div>

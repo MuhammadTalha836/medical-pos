@@ -121,7 +121,9 @@ async function runPhase5Tests() {
       assert((await request('/license/status')).status === 200, '/license/status is public');
       const settings = await request('/settings');
       assert(settings.status === 200, '/settings is public');
-      assert(Object.keys(settings.body).every(k => ['store_name', 'store_address', 'store_phone', 'currency_symbol'].includes(k)), `Only store identity before login, got ${Object.keys(settings.body).join(',')}`);
+      // Store identity plus the developer details chosen for the login screen
+      const allowed = ['store_name', 'store_address', 'store_phone', 'currency_symbol', 'developer_info_login', 'developer_name', 'developer_phone'];
+      assert(Object.keys(settings.body).every(k => allowed.includes(k)), `Only store identity before login, got ${Object.keys(settings.body).join(',')}`);
     });
 
     await test('Sessions: logout, password reset and disabling an account end sessions', async () => {

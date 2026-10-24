@@ -61,34 +61,34 @@ export const BackupHealthCard: React.FC = () => {
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">Backup Health</h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               {describeBackupSchedule(status.frequency, status.scheduled_time, status.weekly_day)}
             </p>
           </div>
         </div>
-        <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full border text-[11px] font-bold ${health.cls}`}>
-          <HealthIcon className="w-3.5 h-3.5" />
+        <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full border text-xs font-bold ${health.cls}`}>
+          <HealthIcon className="w-4 h-4" />
           <span>{health.label}</span>
         </span>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
         <div>
-          <span className="block text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">Last successful backup</span>
+          <span className="block text-2xs font-semibold text-slate-500 dark:text-slate-400">Last successful backup</span>
           <span className="font-semibold text-slate-900 dark:text-white">{formatDateTime(status.last_success_at)}</span>
         </div>
         <div>
-          <span className="block text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">Next scheduled run</span>
+          <span className="block text-2xs font-semibold text-slate-500 dark:text-slate-400">Next scheduled run</span>
           <span className="font-semibold text-slate-900 dark:text-white">
             {status.enabled ? formatDateTime(status.next_run_at) : 'Automatic backups off'}
           </span>
         </div>
         <div>
-          <span className="block text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">Frequency</span>
+          <span className="block text-2xs font-semibold text-slate-500 dark:text-slate-400">Frequency</span>
           <span className="font-semibold text-slate-900 dark:text-white">{BACKUP_FREQUENCY_LABELS[status.frequency]}</span>
         </div>
         <div>
-          <span className="block text-[10px] uppercase tracking-wider font-semibold text-slate-500 dark:text-slate-400">Verified backups kept</span>
+          <span className="block text-2xs font-semibold text-slate-500 dark:text-slate-400">Verified backups kept</span>
           <span className="font-semibold font-mono text-slate-900 dark:text-white">
             {status.retained_count} / {status.retention_limit}
           </span>
@@ -96,8 +96,8 @@ export const BackupHealthCard: React.FC = () => {
       </div>
 
       {status.last_status === 'failed' && status.last_error && (
-        <div className="flex items-start space-x-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[11px] text-rose-700 dark:text-rose-300">
-          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <div className="flex items-start space-x-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
           <span className="wrap-anywhere">
             Last backup attempt failed{status.last_attempt_at ? ` at ${formatDateTime(status.last_attempt_at)}` : ''}: {status.last_error}. The previous good backup is kept and a retry runs automatically.
           </span>

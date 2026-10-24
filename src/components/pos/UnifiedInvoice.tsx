@@ -2,12 +2,12 @@ import React from 'react';
 import { SaleInvoice, SaleItem, SystemSettings, InvoiceTemplateType, InvoicePaperSize } from '../../types';
 import { Printer, Receipt } from 'lucide-react';
 import {
-  DEFAULT_DEVELOPER_FOOTER,
   TEMPLATE_LABELS,
   normalizePaperSize,
   normalizeTemplate
 } from '../../../shared/invoice';
 import { moneyFormatter } from '../../utils/format';
+import { composeInvoiceFooter } from '../../../shared/developerProfile';
 
 interface UnifiedInvoiceProps {
   invoice: SaleInvoice;
@@ -35,14 +35,16 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
 
   // Protected identity & developer footer: prefer the snapshot captured at sale time so reprints match the original
   const storeName = invoice.store_name_snapshot || settings?.store_name || 'PharmaCare Pro';
-  const storeAddress = invoice.store_address_snapshot || settings?.store_address || 'Suite #12-14, Health Plaza, Main Commercial Ave';
-  const developerFooter = invoice.invoice_footer_snapshot || settings?.developer_invoice_footer || DEFAULT_DEVELOPER_FOOTER;
+  const storeAddress = invoice.store_address_snapshot || settings?.store_address || '';
+  const developerFooter = invoice.invoice_footer_snapshot || composeInvoiceFooter(settings);
 
-  // Settings & Values
-  const storePhone = settings?.store_phone || '+92 300 9876543 / 051-4567890';
-  const drugLicenseNo = settings?.drug_license_no || 'DL-PHARM-2024-9981';
-  const taxNo = settings?.tax_no || 'NTN: 7392819-1';
-  const headerNote = settings?.receipt_header || 'Certified Pharmacist on Duty';
+  // Settings & Values (empty details are left off the receipt, never filled with sample text)
+  const storePhone = settings?.store_phone || '';
+  const licenseLine = [
+    settings?.drug_license_no && `DRUG LIC: ${settings.drug_license_no}`,
+    settings?.tax_no
+  ].filter(Boolean).join(' | ');
+  const headerNote = settings?.receipt_header || '';
   const footerNote = settings?.receipt_footer || 'Thank you for your visit!';
   const terms = settings?.receipt_terms || '1. Returns accepted within 3 days with original invoice.\n2. Refrigerated cold-chain medicines & loose items are non-returnable.';
   const returnPolicy = settings?.return_policy_text || 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.';
@@ -80,14 +82,14 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
       {isVisible('show_store_name') && (
         <div className={`font-extrabold ${fs.title} tracking-wide uppercase`}>{storeName}</div>
       )}
-      {isVisible('show_store_address') && (
+      {isVisible('show_store_address') && storeAddress && (
         <div className={`${fs.sm} mt-0.5`}>{storeAddress}</div>
       )}
-      {isVisible('show_store_phone') && (
+      {isVisible('show_store_phone') && storePhone && (
         <div className={fs.sm}>Tel: {storePhone}</div>
       )}
-      {template !== 'compact' && isVisible('show_store_license') && (
-        <div className={`${fs.xs} mt-1 font-bold`}>DRUG LIC: {drugLicenseNo} | {taxNo}</div>
+      {template !== 'compact' && isVisible('show_store_license') && licenseLine && (
+        <div className={`${fs.xs} mt-1 font-bold`}>{licenseLine}</div>
       )}
       {template !== 'compact' && headerNote && <div className={`${fs.xs} italic mt-0.5`}>{headerNote}</div>}
     </div>
@@ -290,7 +292,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
             <button
               type="button"
               onClick={handlePrint}
-              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-lg shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-[12px] rounded-lg shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print Invoice</span>
@@ -299,7 +301,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-lg transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[12px] rounded-lg transition-colors cursor-pointer"
               >
                 Close
               </button>

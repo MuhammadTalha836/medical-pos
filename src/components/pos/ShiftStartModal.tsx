@@ -60,7 +60,7 @@ export const ShiftStartModal: React.FC<ShiftStartModalProps> = ({
             <div className="font-bold text-slate-900 dark:text-white text-xs">
               Start Work Session for @{user?.username}
             </div>
-            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">
               Recording your start time unlocks POS counter sales. Please count physical cash in your drawer before opening.
             </p>
           </div>
@@ -88,11 +88,11 @@ export const ShiftStartModal: React.FC<ShiftStartModalProps> = ({
                 value={openingCash}
                 onChange={(e) => setOpeningCash(parseFloat(e.target.value) || 0)}
                 placeholder="5000"
-                className="w-full pl-9 pos-input font-mono font-bold text-base"
+                className="field-input w-full pl-9 font-mono font-bold"
                 autoFocus
               />
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">
+            <p className="text-2xs text-slate-400 mt-1">
               Physical cash already present in the cash drawer for change (Float).
             </p>
           </div>
@@ -106,7 +106,7 @@ export const ShiftStartModal: React.FC<ShiftStartModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Morning counter shift, drawer verified"
-              className="w-full pos-input"
+              className="field-input w-full"
             />
           </div>
         </div>
@@ -117,7 +117,7 @@ export const ShiftStartModal: React.FC<ShiftStartModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="btn-cancel"
+              className="btn-secondary"
             >
               Cancel
             </button>
@@ -125,7 +125,7 @@ export const ShiftStartModal: React.FC<ShiftStartModalProps> = ({
           <button
             type="submit"
             disabled={loading}
-            className="btn-save flex items-center space-x-1.5"
+            className="btn-primary"
           >
             <span>{loading ? 'Starting Shift...' : 'Start Shift & Open Register'}</span>
           </button>

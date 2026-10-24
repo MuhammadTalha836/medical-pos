@@ -29,7 +29,7 @@ export const AdminPermissionsPanel: React.FC = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-xs">
+    <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-5 shadow-xs">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
@@ -62,7 +62,7 @@ export const AdminPermissionsPanel: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {PERMISSION_GROUPS.map(group => (
             <div key={group.title} className="p-3 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl">
-              <span className="font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider text-[11px] block mb-2">{group.title}</span>
+              <span className="font-bold text-purple-600 dark:text-purple-400 text-xs block mb-2">{group.title}</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                 {group.items.map(item => (
                   <label

@@ -118,7 +118,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <Shield className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-slate-500 dark:text-slate-400 text-[10px] uppercase font-semibold">Assigned Role</div>
+              <div className="text-slate-500 dark:text-slate-400 text-2xs font-semibold">Assigned Role</div>
               <div className="font-bold text-slate-900 dark:text-white capitalize">{user.role_display || user.role}</div>
             </div>
           </div>
@@ -136,7 +136,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             required
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full pos-input"
+            className="field-input w-full"
           />
         </div>
 
@@ -149,19 +149,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full pos-input font-mono"
+            className="field-input w-full font-mono"
           />
         </div>
 
         {/* Password Reset Section */}
         <div className="p-3.5 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
           <div className="flex items-center space-x-1.5 text-slate-700 dark:text-slate-300 font-bold">
-            <KeyRound className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <KeyRound className="w-4 h-4 text-teal-600 dark:text-teal-400" />
             <span>Change Account Password (Optional)</span>
           </div>
 
           <div>
-            <label className="block text-slate-600 dark:text-slate-400 text-[11px] mb-1">
+            <label className="block text-slate-600 dark:text-slate-400 text-xs mb-1">
               Current Password (Required only if changing password)
             </label>
             <input
@@ -169,13 +169,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-xs"
+              className="field-input field-sm w-full font-mono"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-              <label className="block text-slate-600 dark:text-slate-400 text-[11px] mb-1">
+              <label className="block text-slate-600 dark:text-slate-400 text-xs mb-1">
                 New Password
               </label>
               <input
@@ -183,11 +183,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="New password"
-                className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-xs"
+                className="field-input field-sm w-full font-mono"
               />
             </div>
             <div>
-              <label className="block text-slate-600 dark:text-slate-400 text-[11px] mb-1">
+              <label className="block text-slate-600 dark:text-slate-400 text-xs mb-1">
                 Confirm New Password
               </label>
               <input
@@ -195,7 +195,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm password"
-                className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-xs"
+                className="field-input field-sm w-full font-mono"
               />
             </div>
           </div>
@@ -205,14 +205,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
           <button
             type="button"
             onClick={onClose}
-            className="btn-cancel"
+            className="btn-secondary"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="btn-save"
+            className="btn-primary"
           >
             {loading ? 'Saving...' : 'Update My Credentials'}
           </button>

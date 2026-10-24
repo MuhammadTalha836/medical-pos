@@ -40,8 +40,8 @@ interface SetupWizardModalProps {
 const STEPS = ['Developer', 'Store', 'Admin', 'Backups', 'Permissions', 'License', 'Review'] as const;
 
 const inputClass =
-  'w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white font-medium focus:border-teal-500 focus:outline-hidden';
-const labelClass = 'block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5';
+  'field-input w-full pl-9';
+const labelClass = 'field-label';
 
 export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCompleted }) => {
   const { setUser } = useAuthStore();
@@ -218,19 +218,19 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-fade-in select-none">
-      <div className="w-full max-w-2xl max-h-[95vh] bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl select-none">
+      <div className="w-full max-w-2xl max-h-[95vh] bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header Ribbon */}
         <div className="p-5 bg-linear-to-r from-teal-600 via-teal-700 to-emerald-700 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
+              <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
                 <ShieldCheck className="w-6 h-6 text-white" />
               </div>
               <div>
                 <div className="flex items-center space-x-2">
                   <h2 className="text-lg font-black tracking-tight">PharmaCare Pro</h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-400 text-emerald-950 uppercase tracking-wider">
+                  <span className="px-2 py-0.5 rounded-full text-2xs font-bold bg-emerald-400 text-emerald-950">
                     Installation Setup
                   </span>
                 </div>
@@ -246,7 +246,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
               {STEPS.map((label, i) => (
                 <div key={label} className="flex-1">
                   <div className={`h-1 rounded-full ${i <= step ? 'bg-white' : 'bg-white/25'}`} />
-                  <span className={`text-[10px] mt-1 block ${i === step ? 'text-white font-bold' : 'text-teal-100/70'}`}>{label}</span>
+                  <span className={`text-2xs mt-1 block ${i === step ? 'text-white font-bold' : 'text-teal-100/70'}`}>{label}</span>
                 </div>
               ))}
             </div>
@@ -256,7 +256,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
         {/* Content Body */}
         <div className="p-6 space-y-5 overflow-y-auto">
           {errorMsg && (
-            <div className="flex items-start space-x-2.5 p-3.5 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 rounded-2xl text-xs">
+            <div className="flex items-start space-x-2.5 p-3.5 bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 rounded-xl text-xs">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
               <span>{errorMsg}</span>
             </div>
@@ -264,7 +264,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
 
           {step === 0 && (
             <form onSubmit={handleUnlock} className="space-y-5">
-              <div className="p-3.5 bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800/80 rounded-2xl text-xs text-teal-900 dark:text-teal-200 flex items-start space-x-2.5">
+              <div className="p-3.5 bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800/80 rounded-xl text-xs text-teal-900 dark:text-teal-200 flex items-start space-x-2.5">
                 <KeyRound className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
                 <span>
                   This installation is locked. Enter the 6-digit code from the <strong>developer's authenticator app</strong> to start the setup.
@@ -273,7 +273,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
               </div>
 
               {!keyConfigured && (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-[11px] text-amber-800 dark:text-amber-300">
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-xs text-amber-800 dark:text-amber-300">
                   This installation is missing the developer key. Please contact the developer.
                 </div>
               )}
@@ -299,7 +299,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                     value={unlockCode}
                     onChange={(e) => setUnlockCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="123456"
-                    className="w-56 text-center text-2xl font-mono font-extrabold tracking-widest bg-slate-50 dark:bg-surface-inset-dark border-2 border-teal-500/60 rounded-2xl py-2.5 text-teal-700 dark:text-teal-300 focus:outline-hidden focus:ring-4 focus:ring-teal-500/20"
+                    className="field-input w-56 text-center text-2xl font-mono font-extrabold tracking-widest"
                   />
                 </div>
               </div>
@@ -307,7 +307,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
               <button
                 type="submit"
                 disabled={loading || unlockCode.length !== 6 || !keyConfigured}
-                className="w-full py-2.5 bg-linear-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/25 flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
+                className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
               >
                 <span>{loading ? 'Verifying...' : 'Unlock Setup'}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -387,12 +387,12 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                     </button>
                   )}
                 </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">Prefer a second drive or a USB/cloud-synced folder, not the system drive.</span>
+                <span className="text-2xs text-slate-400 mt-1 block">Prefer a second drive or a USB/cloud-synced folder, not the system drive.</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className={labelClass}>Frequency</label>
-                  <select value={backupFrequency} onChange={(e) => setBackupFrequency(e.target.value as BackupFrequency)} className={`${inputClass} pl-3`}>
+                  <select value={backupFrequency} onChange={(e) => setBackupFrequency(e.target.value as BackupFrequency)} className="field-select w-full">
                     {(Object.keys(BACKUP_FREQUENCY_LABELS) as BackupFrequency[]).map(f => (
                       <option key={f} value={f}>{BACKUP_FREQUENCY_LABELS[f]}</option>
                     ))}
@@ -408,13 +408,13 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                 {backupFrequency === 'weekly' && (
                   <div>
                     <label className={labelClass}>Day</label>
-                    <select value={backupWeekday} onChange={(e) => setBackupWeekday(Number(e.target.value))} className={`${inputClass} pl-3`}>
+                    <select value={backupWeekday} onChange={(e) => setBackupWeekday(Number(e.target.value))} className="field-select w-full">
                       {WEEKDAY_LABELS.map((d, i) => <option key={d} value={i}>{d}</option>)}
                     </select>
                   </div>
                 )}
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">{describeBackupSchedule(backupFrequency, backupTime, backupWeekday)}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{describeBackupSchedule(backupFrequency, backupTime, backupWeekday)}</p>
             </div>
           )}
 
@@ -423,7 +423,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
               <SectionTitle icon={<ListChecks className="w-4 h-4" />} title="Admin permissions" hint="What the store Admin may do. Only the Developer can change these later." />
               {PERMISSION_GROUPS.map(group => (
                 <div key={group.title} className="p-3 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl">
-                  <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block mb-2">{group.title}</span>
+                  <span className="font-bold text-teal-600 dark:text-teal-400 text-xs block mb-2">{group.title}</span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                     {group.items.map(item => (
                       <label key={item.key} onClick={() => togglePermission(item.key)} className="flex items-center space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5">
@@ -435,13 +435,13 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                 </div>
               ))}
               <div className="p-3 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl space-y-1">
-                <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block mb-1">Admin policies</span>
+                <span className="font-bold text-teal-600 dark:text-teal-400 text-xs block mb-1">Admin policies</span>
                 {ADMIN_POLICY_TOGGLES.map(toggle => (
                   <label key={toggle.key} onClick={() => setPolicies(prev => ({ ...prev, [toggle.key]: !prev[toggle.key] }))} className="flex items-start space-x-2 cursor-pointer p-1.5 rounded-lg hover:bg-teal-500/5">
                     {policies[toggle.key] ? <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" /> : <Square className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />}
                     <span className="text-xs">
                       <span className="text-slate-800 dark:text-slate-200 font-semibold block">{toggle.label}</span>
-                      <span className="text-[10px] text-slate-400">{toggle.hint}</span>
+                      <span className="text-2xs text-slate-400">{toggle.hint}</span>
                     </span>
                   </label>
                 ))}
@@ -458,13 +458,13 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                     key={mode}
                     type="button"
                     onClick={() => setLicenseMode(mode)}
-                    className={`p-4 rounded-2xl border-2 text-left transition-all ${licenseMode === mode ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${licenseMode === mode ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'}`}
                   >
                     <div className="flex items-center space-x-2 text-sm font-bold text-slate-900 dark:text-white">
                       {mode === 'demo' ? <CalendarClock className="w-4 h-4 text-amber-500" /> : <BadgeCheck className="w-4 h-4 text-emerald-500" />}
                       <span>{mode === 'demo' ? 'Demo' : 'Full Version'}</span>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       {mode === 'demo' ? 'Works for a fixed number of days, then locks.' : 'No time limit.'}
                     </p>
                   </button>
@@ -479,7 +479,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                     max={365}
                     value={demoDays}
                     onChange={(e) => setDemoDays(Math.floor(Number(e.target.value)))}
-                    className={`${inputClass} pl-3`}
+                    className="field-select w-full"
                   />
                 </div>
               )}
@@ -515,7 +515,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="flex-1 py-2.5 bg-linear-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/25 flex items-center justify-center space-x-2 transition-all"
+                  className="flex-1 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all"
                 >
                   <span>Next</span>
                   <ArrowRight className="w-4 h-4" />
@@ -525,7 +525,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                   type="button"
                   onClick={handleComplete}
                   disabled={loading}
-                  className="flex-1 py-2.5 bg-linear-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/25 flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>{loading ? 'Saving & Locking Setup...' : 'Complete & Lock Setup'}</span>
@@ -545,6 +545,6 @@ const SectionTitle: React.FC<{ icon: React.ReactNode; title: string; hint: strin
       <span className="text-teal-600 dark:text-teal-400">{icon}</span>
       <span>{title}</span>
     </div>
-    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{hint}</p>
+    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{hint}</p>
   </div>
 );

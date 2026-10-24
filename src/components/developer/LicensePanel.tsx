@@ -46,7 +46,7 @@ export const LicensePanel: React.FC<LicensePanelProps> = ({ onChanged }) => {
         : null;
 
   return (
-    <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6 shadow-xs">
+    <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-6 shadow-xs">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
@@ -65,20 +65,20 @@ export const LicensePanel: React.FC<LicensePanelProps> = ({ onChanged }) => {
       {status && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Mode</span>
+            <span className="text-2xs font-bold text-slate-400">Mode</span>
             <div className="text-lg font-black text-slate-900 dark:text-white flex items-center space-x-2">
               {status.mode === 'full' ? <BadgeCheck className="w-5 h-5 text-emerald-500" /> : <CalendarClock className="w-5 h-5 text-amber-500" />}
               <span>{status.mode === 'full' ? 'Full' : 'Demo'}</span>
             </div>
           </div>
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Days left</span>
+            <span className="text-2xs font-bold text-slate-400">Days left</span>
             <div className={`text-lg font-black ${status.expired ? 'text-rose-500' : 'text-slate-900 dark:text-white'}`}>
               {status.mode === 'full' ? 'Unlimited' : status.expired ? 'Ended' : status.daysLeft}
             </div>
           </div>
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Ends</span>
+            <span className="text-2xs font-bold text-slate-400">Ends</span>
             <div className="text-sm font-bold text-slate-900 dark:text-white">
               {status.expiresAt ? new Date(status.expiresAt).toLocaleString() : '—'}
             </div>
@@ -108,7 +108,7 @@ export const LicensePanel: React.FC<LicensePanelProps> = ({ onChanged }) => {
             max={365}
             value={days}
             onChange={(e) => setDays(Math.floor(Number(e.target.value)))}
-            className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:border-purple-500 focus:outline-hidden"
+            className="field-input w-full"
           />
         </div>
         <button

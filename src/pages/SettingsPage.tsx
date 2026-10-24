@@ -246,7 +246,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           <button
             onClick={handleSaveSettings}
             disabled={saving}
-            className="btn-save flex items-center space-x-1.5 px-5 py-2 text-xs"
+            className="btn-primary"
           >
             <Save className="w-4 h-4" />
             <span>{saving ? 'Saving...' : activeTab === 'invoice' ? 'Save Invoice Settings' : 'Save All Settings'}</span>
@@ -320,7 +320,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       {activeTab === 'store' && (
         <div className="space-y-6">
           {/* Visual Theme & Ergonomics Card */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs">
+          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
             <div className="flex items-center space-x-2">
               <Monitor className="w-5 h-5 text-teal-600 dark:text-teal-400" />
               <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Counter Ergonomics & Eye-Friendly Theme</h2>
@@ -345,7 +345,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-900 dark:text-white">Soft Light Mode</span>
                     {theme === 'light' && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">
+                      <span className="text-2xs font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">
                         Active
                       </span>
                     )}
@@ -371,7 +371,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-900 dark:text-white">Medical Dark Mode</span>
                     {theme === 'dark' && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-400 bg-teal-950/80 border border-teal-800 px-2 py-0.5 rounded-full">
+                      <span className="text-2xs font-bold text-teal-400 bg-teal-950/80 border border-teal-800 px-2 py-0.5 rounded-full">
                         Active
                       </span>
                     )}
@@ -386,7 +386,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
           <form onSubmit={handleSaveSettings} className="space-y-6">
             {/* Pharmacy Identity */}
-            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
               <div className="flex items-center space-x-2">
                 <Store className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Pharmacy Business Identity</h2>
@@ -397,8 +397,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                     <span>Pharmacy / Store Name</span>
                     {user?.role !== 'developer' && settings?.allow_admin_edit_store_identity !== 'true' && (
-                      <span className="text-[10px] text-amber-500 font-mono flex items-center">
-                        <Lock className="w-3 h-3 mr-0.5 inline" /> Protected
+                      <span className="text-2xs text-amber-500 font-mono flex items-center">
+                        <Lock className="w-4 h-4 mr-0.5 inline" /> Protected
                       </span>
                     )}
                   </label>
@@ -408,7 +408,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     disabled={user?.role !== 'developer' && settings?.allow_admin_edit_store_identity !== 'true'}
                     value={formData.store_name}
                     onChange={(e) => setFormData(prev => ({ ...prev, store_name: e.target.value }))}
-                    className={`w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-bold focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 ${
+                    className={`field-input w-full font-bold ${
                       user?.role !== 'developer' && settings?.allow_admin_edit_store_identity !== 'true' ? 'opacity-60 cursor-not-allowed' : ''
                     }`}
                   />
@@ -421,7 +421,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     required
                     value={formData.drug_license_no}
                     onChange={(e) => setFormData(prev => ({ ...prev, drug_license_no: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                    className="field-input w-full font-mono"
                   />
                 </div>
 
@@ -429,8 +429,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
                     <span>Store Address</span>
                     {user?.role !== 'developer' && settings?.allow_admin_edit_store_identity !== 'true' && (
-                      <span className="text-[10px] text-amber-500 font-mono flex items-center">
-                        <Lock className="w-3 h-3 mr-0.5 inline" /> Protected
+                      <span className="text-2xs text-amber-500 font-mono flex items-center">
+                        <Lock className="w-4 h-4 mr-0.5 inline" /> Protected
                       </span>
                     )}
                   </label>
@@ -439,7 +439,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     disabled={user?.role !== 'developer' && settings?.allow_admin_edit_store_identity !== 'true'}
                     value={formData.store_address}
                     onChange={(e) => setFormData(prev => ({ ...prev, store_address: e.target.value }))}
-                    className={`w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 ${
+                    className={`field-input w-full ${
                       user?.role !== 'developer' && settings?.allow_admin_edit_store_identity !== 'true' ? 'opacity-60 cursor-not-allowed' : ''
                     }`}
                   />
@@ -451,7 +451,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.store_phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, store_phone: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                    className="field-input w-full"
                   />
                 </div>
 
@@ -461,7 +461,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.tax_no}
                     onChange={(e) => setFormData(prev => ({ ...prev, tax_no: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                    className="field-input w-full font-mono"
                   />
                 </div>
 
@@ -471,14 +471,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.currency_symbol}
                     onChange={(e) => setFormData(prev => ({ ...prev, currency_symbol: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                    className="field-input w-full font-mono font-bold"
                   />
                 </div>
               </div>
             </div>
 
             {/* Thermal Receipt Layout Settings */}
-            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
               <div className="flex items-center space-x-2">
                 <Receipt className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Thermal Receipt Print Layout</h2>
@@ -491,7 +491,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.receipt_header}
                     onChange={(e) => setFormData(prev => ({ ...prev, receipt_header: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                    className="field-input w-full"
                   />
                 </div>
 
@@ -508,7 +508,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     rows={3}
                     value={formData.receipt_terms}
                     onChange={(e) => setFormData(prev => ({ ...prev, receipt_terms: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
+                    className="field-textarea w-full font-mono"
                   />
                 </div>
 
@@ -518,14 +518,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.receipt_footer}
                     onChange={(e) => setFormData(prev => ({ ...prev, receipt_footer: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                    className="field-input w-full"
                   />
                 </div>
               </div>
             </div>
 
             {/* Automated Backup Settings */}
-            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
               <div className="flex items-center space-x-2">
                 <Shield className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Automated Backup Settings</h2>
@@ -535,7 +535,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Automatic Backups</label>
                   <div className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-600 dark:text-slate-400 flex items-center">
-                    <Lock className="w-3 h-3 mr-1 text-amber-500" />
+                    <Lock className="w-4 h-4 mr-1 text-amber-500" />
                     Frequency is set by the Developer; choose the time of day under Backup & Recovery
                   </div>
                 </div>
@@ -546,14 +546,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     type="text"
                     value={formData.auto_backup_dir}
                     onChange={(e) => setFormData(prev => ({ ...prev, auto_backup_dir: e.target.value }))}
-                    className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                    className="field-input w-full font-mono"
                   />
                 </div>
               </div>
             </div>
 
             {/* Counter Sale & POS Discount Policy */}
-            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs">
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
               <div className="flex items-center space-x-2">
                 <Percent className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Counter Sale & POS Discount Policy</h2>
@@ -573,11 +573,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       required
                       value={formData.max_bill_discount_pct ?? '14'}
                       onChange={(e) => setFormData(prev => ({ ...prev, max_bill_discount_pct: e.target.value }))}
-                      className="w-32 bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                      className="field-input w-32 font-mono font-bold"
                     />
                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400">%</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed">
                     Sets the maximum overall bill discount percentage cashiers are permitted to apply at the POS counter. Any value typed above this limit (e.g. typing 15% when limit is 14%) will be automatically blocked and clamped.
                   </p>
                 </div>
@@ -591,7 +591,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       {activeTab === 'invoice' && (
         <div className="space-y-6">
           {/* Header Banner */}
-          <div className="bg-linear-to-r from-teal-900/40 via-slate-900 to-slate-900 border border-teal-800/40 rounded-2xl p-5 shadow-xs">
+          <div className="bg-linear-to-r from-teal-900/40 via-slate-900 to-slate-900 border border-teal-800/40 rounded-xl p-5 shadow-xs">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <div>
                 <div className="flex items-center space-x-2">
@@ -611,7 +611,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   onClick={handleSelectAllFields}
                   className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-800/50 text-xs font-semibold flex items-center space-x-1.5 cursor-pointer transition-colors"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Sparkles className="w-4 h-4" />
                   <span>Enable All Fields</span>
                 </button>
                 <button
@@ -619,7 +619,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   onClick={handleResetInvoiceDefaults}
                   className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-semibold flex items-center space-x-1.5 cursor-pointer transition-colors"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-4 h-4" />
                   <span>Reset Defaults</span>
                 </button>
               </div>
@@ -631,13 +631,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
             {/* Left Column: Controls & Configuration */}
             <form onSubmit={handleSaveSettings} className="xl:col-span-7 space-y-6">
               {/* Card 1: Thermal Template & Roll Width Selection */}
-              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4 shadow-xs">
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Receipt className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">Default Thermal Receipt Design</h3>
                   </div>
-                  <span className="text-[10px] uppercase font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800/60">
+                  <span className="text-2xs font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800/60">
                     Active: {TEMPLATE_LABELS[normalizeTemplate(formData.default_invoice_template)]} · {normalizePaperSize(formData.invoice_paper_size)}
                   </span>
                 </div>
@@ -666,15 +666,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                             </div>
                             {isSelected && (
                               <span className="p-1 bg-teal-600 text-white rounded-full">
-                                <Check className="w-3 h-3" />
+                                <Check className="w-4 h-4" />
                               </span>
                             )}
                           </div>
                           <div className="mt-2.5">
                             <span className="text-xs font-bold text-slate-900 dark:text-white block">{card.title}</span>
-                            <span className="text-[10px] text-teal-600 dark:text-teal-400 font-mono">58 mm / 80 mm Roll</span>
+                            <span className="text-2xs text-teal-600 dark:text-teal-400 font-mono">58 mm / 80 mm Roll</span>
                           </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                             {card.description}
                           </p>
                         </div>
@@ -710,14 +710,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
                     Receipts are thermal-only. Your selection is saved on this computer and used for every sale and reprint.
                   </p>
                 </div>
               </div>
 
               {/* Card 2: Field Visibility Checkboxes */}
-              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-5 shadow-xs">
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5 shadow-xs">
                 <div className="flex items-center space-x-2">
                   <Sliders className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Printable Field Visibility Controls</h3>
@@ -728,7 +728,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
                 {/* Section 1: Store & Invoice Information */}
                 <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                     1. Store & Invoice Information
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -764,7 +764,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                             </span>
                           </div>
                           {isLocked && (
-                            <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-sm text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                            <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-sm text-2xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                               <Lock className="w-2.5 h-2.5" />
                               <span>Protected</span>
                             </span>
@@ -777,7 +777,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
                 {/* Section 2: Cashier & Customer Information */}
                 <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                     2. Cashier & Customer Information
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -809,7 +809,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
                 {/* Section 3: Invoice Table Columns */}
                 <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                     3. Itemized Table Columns
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -845,7 +845,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
                 {/* Section 4: Financial Summary */}
                 <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                     4. Financial Totals & Summary
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -881,7 +881,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
                 {/* Section 5: Additional Information & Developer Info */}
                 <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
                     5. Regulatory Policies & Footer
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -916,12 +916,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                           <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
                           <span className="font-semibold text-slate-900 dark:text-white">Developer Footer (managed by Developer)</span>
                         </div>
-                        <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-sm text-[9px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                        <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded-sm text-2xs font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
                           <Lock className="w-2.5 h-2.5" />
                           <span>Mandatory</span>
                         </span>
                       </div>
-                      <p className="pl-6 text-[11px] text-slate-500 dark:text-slate-400 font-mono whitespace-pre-wrap wrap-anywhere">
+                      <p className="pl-6 text-xs text-slate-500 dark:text-slate-400 font-mono whitespace-pre-wrap wrap-anywhere">
                         {formData.developer_invoice_footer || DEFAULT_DEVELOPER_FOOTER}
                       </p>
                     </div>
@@ -930,7 +930,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               </div>
 
               {/* Card 3: Return & Exchange Policy Editor */}
-              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-3 shadow-xs">
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3 shadow-xs">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Return & Exchange Policy Text (Printed on Invoices)
                 </label>
@@ -939,7 +939,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   value={formData.return_policy_text || ''}
                   onChange={(e) => setFormData(prev => ({ ...prev, return_policy_text: e.target.value }))}
                   placeholder="Enter detailed pharmacy return and exchange instructions..."
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                  className="field-textarea w-full font-mono"
                 />
               </div>
 
@@ -948,7 +948,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 <button
                   type="submit"
                   disabled={saving}
-                  className="btn-save px-6 py-2.5 text-xs flex items-center space-x-2"
+                  className="btn-primary"
                 >
                   <Save className="w-4 h-4" />
                   <span>{saving ? 'Saving Settings...' : 'Save Invoice Configuration'}</span>
@@ -958,11 +958,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
 
             {/* Right Column: Live Interactive Preview */}
             <div className="xl:col-span-5 sticky top-6 space-y-4">
-              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div className="flex items-center space-x-2">
                     <Eye className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                    <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">
                       Live Print Preview
                     </span>
                   </div>
@@ -973,7 +973,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                         key={card.id}
                         type="button"
                         onClick={() => setPreviewTemplate(card.id)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-2xs font-bold transition-all cursor-pointer ${
                           previewTemplate === card.id
                             ? 'bg-teal-600 text-white'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
@@ -988,7 +988,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                         key={size}
                         type="button"
                         onClick={() => setPreviewPaperSize(size)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-2xs font-bold transition-all cursor-pointer ${
                           previewPaperSize === size
                             ? 'bg-teal-600 text-white'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
@@ -1000,7 +1000,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   </div>
                 </div>
 
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
                   {previewTemplate !== normalizeTemplate(formData.default_invoice_template) ||
                   previewPaperSize !== normalizePaperSize(formData.invoice_paper_size) ? (
                     <span className="text-amber-600 dark:text-amber-400 font-semibold">

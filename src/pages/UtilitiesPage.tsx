@@ -263,7 +263,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Clock className="w-3.5 h-3.5" />
+            <Clock className="w-4 h-4" />
             <span>Cashier Shifts</span>
           </button>
 
@@ -275,7 +275,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
+            <ShieldCheck className="w-4 h-4" />
             <span>Backup & Vault</span>
           </button>
 
@@ -287,7 +287,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" />
+            <BookOpen className="w-4 h-4" />
             <span>Emergency Recovery Guide</span>
           </button>
         </div>
@@ -337,10 +337,10 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <button
                     onClick={handleRestoreFromPicker}
                     disabled={loading}
-                    className="btn-secondary px-3 py-1.5 text-xs flex items-center space-x-1.5"
+                    className="btn-secondary btn-sm"
                     title="Select any .db file from your disk or external USB to restore"
                   >
-                    <Upload className="w-3.5 h-3.5 text-amber-500" />
+                    <Upload className="w-4 h-4 text-amber-500" />
                     <span>Restore from File...</span>
                   </button>
                 </div>
@@ -358,15 +358,15 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         value={customBackupDir}
                         onChange={(e) => setCustomBackupDir(e.target.value)}
                         placeholder="./backups"
-                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                        className="field-input flex-1 font-mono"
                       />
                       <button
                         type="button"
                         onClick={handleSelectPrimaryFolder}
-                        className="btn-secondary px-3 py-2 text-xs flex items-center space-x-1"
+                        className="btn-secondary"
                         title="Browse folder"
                       >
-                        <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
+                        <FolderOpen className="w-4 h-4 text-slate-500" />
                         <span>Browse...</span>
                       </button>
                     </div>
@@ -378,7 +378,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                       <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                         Secondary External Destination (USB Drive / Network Share)
                       </label>
-                      <span className="text-[10px] text-teal-600 dark:text-teal-400 font-semibold uppercase tracking-wider">
+                      <span className="text-2xs text-teal-600 dark:text-teal-400 font-semibold">
                         Recommended for Disaster Recovery
                       </span>
                     </div>
@@ -388,19 +388,19 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         value={secondaryBackupDir}
                         onChange={(e) => setSecondaryBackupDir(e.target.value)}
                         placeholder="e.g. E:\PharmacyBackups or /media/usb/backups"
-                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                        className="field-input flex-1 font-mono"
                       />
                       <button
                         type="button"
                         onClick={handleSelectSecondaryFolder}
-                        className="btn-secondary px-3 py-2 text-xs flex items-center space-x-1"
+                        className="btn-secondary"
                         title="Browse external USB drive or network folder"
                       >
-                        <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
+                        <FolderOpen className="w-4 h-4 text-slate-500" />
                         <span>Browse...</span>
                       </button>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Every backup is also copied here (use a USB drive or a second disk).
                     </p>
                   </div>
@@ -410,20 +410,20 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                     <div className="text-xs text-slate-700 dark:text-slate-300">
                       <span className="text-slate-500 dark:text-slate-400">Frequency: </span>
                       <strong>{backupStatus ? BACKUP_FREQUENCY_LABELS[backupStatus.frequency] : '...'}</strong>
-                      <span className="flex items-center text-[10px] text-slate-400 mt-0.5">
-                        <Lock className="w-3 h-3 mr-0.5" /> Set by Developer
+                      <span className="flex items-center text-2xs text-slate-400 mt-0.5">
+                        <Lock className="w-4 h-4 mr-0.5" /> Set by Developer
                       </span>
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <Clock className="w-4 h-4 text-slate-400" />
                       <span className="text-xs text-slate-500 dark:text-slate-400">Time of day:</span>
                       <input
                         type="time"
                         value={backupTime}
                         onChange={(e) => setBackupTime(e.target.value)}
                         disabled={!backupStatus || backupStatus.frequency === 'off'}
-                        className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-teal-500 disabled:opacity-50"
+                        className="field-input field-sm font-mono disabled:opacity-50"
                       />
                     </div>
 
@@ -432,15 +432,15 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         type="button"
                         onClick={handleSaveBackupSettings}
                         disabled={savingSettings}
-                        className="btn-secondary px-3 py-1.5 text-xs flex items-center space-x-1.5"
+                        className="btn-secondary btn-sm"
                       >
-                        <Save className="w-3.5 h-3.5 text-teal-500" />
+                        <Save className="w-4 h-4 text-teal-500" />
                         <span>{savingSettings ? 'Saving...' : 'Save Settings'}</span>
                       </button>
                     </div>
 
                     {backupStatus && (
-                      <div className="sm:col-span-3 text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
+                      <div className="sm:col-span-3 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap gap-x-4 gap-y-1">
                         <span>{describeBackupSchedule(backupStatus.frequency, backupStatus.scheduled_time, backupStatus.weekly_day)}</span>
                         {backupStatus.next_run_at && (
                           <span>Next run: <strong className="text-slate-700 dark:text-slate-300">{new Date(backupStatus.next_run_at).toLocaleString()}</strong></span>
@@ -453,7 +453,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
 
                 {/* Instant Backup Trigger Row */}
                 <div className="flex items-center justify-between pt-1">
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center space-x-2">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center space-x-2">
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span>Database ready • 100% Offline POS</span>
                   </div>
@@ -461,7 +461,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <button
                     onClick={handleCreateBackup}
                     disabled={loading}
-                    className="btn-primary px-5 py-2.5 text-xs flex items-center space-x-2 shadow-xs"
+                    className="btn-primary"
                   >
                     <Download className="w-4 h-4" />
                     <span>Create Snapshot Now</span>
@@ -472,17 +472,17 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
               {/* Backup History Table */}
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                     Available Backups & Integrity Hashes
                   </span>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-xs text-slate-400">
                     Showing latest snapshots on disk
                   </span>
                 </div>
 
                 <div className="table-container max-h-64 overflow-y-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800/90 backdrop-blur-xs text-slate-700 dark:text-slate-300 font-bold text-[10px] uppercase border-b border-slate-200 dark:border-slate-700">
+                    <thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800/90 backdrop-blur-xs text-slate-700 dark:text-slate-300 font-bold text-2xs border-b border-slate-200 dark:border-slate-700">
                       <tr>
                         <th className="py-2.5 px-3">Filename</th>
                         <th className="py-2.5 px-3">Type</th>
@@ -510,25 +510,25 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                             : { label: 'Manual', cls: 'bg-teal-500/10 text-teal-600 dark:text-teal-400' };
                           return (
                           <tr key={idx} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
-                            <td className="py-2.5 px-3 font-mono text-slate-900 dark:text-white text-[11px] truncate max-w-[190px]" title={file.path}>
+                            <td className="py-2.5 px-3 font-mono text-slate-900 dark:text-white text-xs truncate max-w-[190px]" title={file.path}>
                               {file.filename}
                             </td>
-                            <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 text-[10px]">
+                            <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 text-2xs">
                               <div className="flex flex-col items-start gap-1">
                                 <span className={`px-2 py-0.5 rounded-full font-semibold ${kind.cls}`}>{kind.label}</span>
                                 {record?.verified === 1 && record?.status === 'success' ? (
                                   <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 font-semibold">
-                                    <ShieldCheck className="w-3 h-3 mr-0.5" /> Verified
+                                    <ShieldCheck className="w-4 h-4 mr-0.5" /> Verified
                                   </span>
                                 ) : !record ? (
                                   <span className="text-slate-400">Untracked</span>
                                 ) : null}
                               </div>
                             </td>
-                            <td className="py-2.5 px-3 text-right font-mono text-slate-600 dark:text-slate-300 text-[11px]">
+                            <td className="py-2.5 px-3 text-right font-mono text-slate-600 dark:text-slate-300 text-xs">
                               {(file.sizeBytes / 1024).toFixed(1)} KB
                             </td>
-                            <td className="py-2.5 px-3 text-[11px] font-mono">
+                            <td className="py-2.5 px-3 text-xs font-mono">
                               {file.checksum ? (
                                 <div className="flex items-center space-x-1.5">
                                   <span className="text-slate-500 dark:text-slate-400 truncate max-w-[120px]" title={file.checksum}>
@@ -540,23 +540,23 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                                     title="Copy verification code"
                                   >
                                     {copiedHash === file.checksum ? (
-                                      <Check className="w-3 h-3 text-emerald-500" />
+                                      <Check className="w-4 h-4 text-emerald-500" />
                                     ) : (
-                                      <Copy className="w-3 h-3" />
+                                      <Copy className="w-4 h-4" />
                                     )}
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-slate-400 text-[10px]">Legacy</span>
+                                <span className="text-slate-400 text-2xs">Legacy</span>
                               )}
                             </td>
                             <td className="py-2.5 px-3 text-center">
                               <button
                                 onClick={() => handleRestoreBackup(file.path, file.filename)}
                                 disabled={loading}
-                                className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/60 rounded-lg text-[10px] font-semibold transition-colors inline-flex items-center space-x-1"
+                                className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700/60 rounded-lg text-2xs font-semibold transition-colors inline-flex items-center space-x-1"
                               >
-                                <Upload className="w-3 h-3" />
+                                <Upload className="w-4 h-4" />
                                 <span>Restore</span>
                               </button>
                             </td>
@@ -590,12 +590,12 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                     disabled={loading}
                     className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition-colors flex items-center justify-center space-x-2 shadow-xs"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     <span>Optimize Database</span>
                   </button>
                 </div>
 
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   Recommended once a month. Takes a few seconds; no data is changed.
                 </p>
               </div>
@@ -618,7 +618,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                     <select
                       value={stockZeroCompanyId}
                       onChange={(e) => setStockZeroCompanyId(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                      className="field-select w-full"
                     >
                       <option value="">ALL PRODUCTS (Entire Inventory)</option>
                       {companies.map(c => (
@@ -636,16 +636,16 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                       value={stockZeroConfirmText}
                       onChange={(e) => setStockZeroConfirmText(e.target.value)}
                       placeholder="RESET-ZERO-CONFIRM"
-                      className="w-full bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 rounded-xl px-3 py-2 text-xs font-mono text-rose-800 dark:text-rose-300 focus:outline-hidden focus:ring-1 focus:ring-rose-500"
+                      className="field-input w-full font-mono"
                     />
                   </div>
 
                   <button
                     onClick={handleExecuteStockZero}
                     disabled={stockZeroConfirmText !== 'RESET-ZERO-CONFIRM' || loading}
-                    className="w-full btn-danger py-2 text-xs flex items-center justify-center space-x-1.5"
+                    className="w-full btn-danger"
                   >
-                    <Lock className="w-3.5 h-3.5" />
+                    <Lock className="w-4 h-4" />
                     <span>Execute Stock Zero Reset</span>
                   </button>
                 </div>
@@ -711,7 +711,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
 
             {/* Pre-restore safety copy */}
             <div className="card-surface p-5 space-y-3">
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
+              <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
                 <span>Automatic Pre-Restore Safety Net</span>
               </h4>

@@ -91,8 +91,10 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - `/api/developer/settings` (developer only) manages:
   - store name/address;
   - `developer_invoice_footer`;
+  - the developer profile (`shared/developerProfile.ts`: contact fields plus one `developer_info_<placement>` field list per placement `login | sidebar | invoice | about`);
   - backup policy;
   - the `allow_admin_*` toggles.
+- Before sign-in, `GET /api/settings` returns only the store identity plus the developer details chosen for the login screen. A sale's `invoice_footer_snapshot` is `composeInvoiceFooter(settings)` (footer text + the receipt developer line).
 - `POST /api/settings` strips `DEVELOPER_ONLY_SETTING_KEYS` for non-developers. It also blocks store-identity edits or hiding unless the matching toggle is `'true'`.
 
 **Invoices are thermal-only.**
@@ -135,5 +137,7 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 
 - Keep the POS keyboard shortcuts working (`F2`–`F10`, `Esc`, `Ctrl+Enter`). `F9` saves and `F10` prints. Submission is guarded by `isSubmittingRef` and `e.repeat` checks against duplicate invoices.
 - The UI uses a teal/slate dark theme with Tailwind `dark:` variants, `lucide-react` icons, and system fonts only (nothing is downloaded at runtime).
+- Design system (`src/index.css`): type scale `text-2xs` 12px / `text-xs` 13px / `text-sm` 15px (nothing smaller outside receipts); controls use `field-input` / `field-select` / `field-textarea` (+ `field-sm` in tables) with `field-label` / `field-hint`; buttons use `btn-primary` / `btn-secondary` / `btn-danger` / `btn-print` (+ `btn-sm`). Don't restyle controls inline, and don't use all-caps labels or gradient buttons. The receipt components keep their own paper-tuned pixel sizes.
+- The app icon lives in `build/` (`icon.svg` is the source); `src/components/common/AppLogo.tsx` is the same mark in the UI.
 - User-visible text brands the app as "100% Offline POS" and never names the libraries/technology used (no "SQLite", "Electron", "TOTP", "bcrypt", "local", ...). Say "authenticator code", "backup", "database". Code, comments and developer docs may use the real names.
 - `docs/PROJECT_GUIDE.md` is the longer project guide, with module-by-module feature notes. Keep it updated when features change.

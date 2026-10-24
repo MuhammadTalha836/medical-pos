@@ -18,6 +18,7 @@ process.env.TEST_MODE = 'true';
 import './testEnv';
 import http from 'http';
 import { app } from '../api';
+import { DEVELOPER_PROFILE_SETTING_KEYS } from '../../shared/developerProfile';
 import { authHeaders, adminAuthHeaders, useFullTestLicense } from './testAuth';
 import { prisma } from '../database/prisma';
 import { hashPassword } from '../security/passwords';
@@ -75,7 +76,8 @@ const TOUCHED_SETTING_KEYS = [
   'developer_email',
   'setup_completed',
   'allow_admin_edit_store_identity',
-  'allow_admin_hide_store_identity'
+  'allow_admin_hide_store_identity',
+  ...DEVELOPER_PROFILE_SETTING_KEYS
 ];
 
 async function getRawSetting(key: string): Promise<string | undefined> {
@@ -360,6 +362,46 @@ async function runPhase3Tests() {
     });
 
     // -------------------------------------------------------------
+    // Developer profile (contact details shown in the app)
+    // -------------------------------------------------------------
+    await test('Developer profile: saved by the Developer and returned by GET /developer/settings', async () => {
+      const res = await putDeveloperSettings({
+        developer_name: 'Talha Tech',
+        developer_phone: '0300-1234567',
+        developer_contact_email: 'help@talha.example',
+        developer_info_login: 'phone,name',
+        developer_info_invoice: 'name,phone'
+      });
+      assert(res.status === 200, `Expected 200, got ${res.status} ${JSON.stringify(res.body)}`);
+      const fetched = await request('/developer/settings', { headers: devHeaders });
+      assert(fetched.body.developer_name === 'Talha Tech', 'developer_name not saved');
+      assert(fetched.body.developer_info_login === 'name,phone', `placement not normalized: ${fetched.body.developer_info_login}`);
+    });
+
+    await test('Developer profile: unknown placement field and over-long name are rejected with 400', async () => {
+      const unknown = await putDeveloperSettings({ developer_info_sidebar: 'name,password' });
+      assert(unknown.status === 400, `Expected 400 for unknown field, got ${unknown.status}`);
+      const long = await putDeveloperSettings({ developer_name: 'x'.repeat(61) });
+      assert(long.status === 400, `Expected 400 for long name, got ${long.status}`);
+    });
+
+    await test('Developer profile: Admin cannot change it through POST /settings', async () => {
+      const res = await postSettings(adminHeaders, { developer_name: 'Hacked', developer_info_invoice: '' });
+      assert(res.status === 200, `Expected 200 (keys stripped), got ${res.status}`);
+      const fetched = await request('/developer/settings', { headers: devHeaders });
+      assert(fetched.body.developer_name === 'Talha Tech', 'Admin overwrote developer_name');
+      assert(fetched.body.developer_info_invoice === 'name,phone', 'Admin overwrote a developer placement');
+    });
+
+    await test('Developer profile: login screen (no session) gets only the details chosen for it', async () => {
+      const res = await request('/settings', { headers: { Authorization: '' } });
+      assert(res.status === 200, `Expected 200, got ${res.status}`);
+      assert(res.body.developer_name === 'Talha Tech' && res.body.developer_phone === '0300-1234567', 'login details missing');
+      assert(res.body.developer_contact_email === undefined, 'email was exposed without a session');
+      assert(res.body.developer_info_invoice === undefined, 'other placements were exposed without a session');
+    });
+
+    // -------------------------------------------------------------
     // Sale snapshot of store identity & footer
     // -------------------------------------------------------------
     const product = await prisma.product.findFirst({ where: { status: 'active', stockBoxes: { gte: 2 } } });
@@ -392,11 +434,13 @@ async function runPhase3Tests() {
         const sale = await createSale();
         assert(sale.store_name_snapshot === 'Snapshot Pharmacy A', 'POST /sales did not return store_name_snapshot');
         assert(sale.store_address_snapshot === 'Address A', 'POST /sales did not return store_address_snapshot');
-        assert(sale.invoice_footer_snapshot === 'Footer A', 'POST /sales did not return invoice_footer_snapshot');
+        assert(sale.invoice_footer_snapshot === 'Footer A\nSoftware by Talha Tech • 0300-1234567', `unexpected footer snapshot: ${sale.invoice_footer_snapshot}`);
 
         const fetched = await request(`/sales/${sale.saleId}`);
         assert(fetched.body.store_name_snapshot === 'Snapshot Pharmacy A', 'GET /sales/:id missing store_name_snapshot');
-        assert(fetched.body.invoice_footer_snapshot === 'Footer A', 'GET /sales/:id missing invoice_footer_snapshot');
+        assert(fetched.body.invoice_footer_snapshot === sale.invoice_footer_snapshot, 'GET /sales/:id missing invoice_footer_snapshot');
+        // The rest of the snapshot tests use the plain footer
+        await putDeveloperSettings({ developer_info_invoice: '' });
       });
 
       await test('Snapshot: reprint of an old sale keeps its original identity after the Developer changes it', async () => {
@@ -406,7 +450,7 @@ async function runPhase3Tests() {
         const oldSale = await request(`/sales/${createdSaleIds[0]}`);
         assert(oldSale.body.store_name_snapshot === 'Snapshot Pharmacy A', 'old sale lost its original store name');
         assert(oldSale.body.store_address_snapshot === 'Address A', 'old sale lost its original address');
-        assert(oldSale.body.invoice_footer_snapshot === 'Footer A', 'old sale lost its original footer');
+        assert(oldSale.body.invoice_footer_snapshot === 'Footer A\nSoftware by Talha Tech • 0300-1234567', 'old sale lost its original footer');
 
         const newSale = await request(`/sales/${saleB.saleId}`);
         assert(newSale.body.store_name_snapshot === 'Snapshot Pharmacy B', 'new sale did not use the new store name');

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import path from 'path';
 import express from 'express';
 import type { Server } from 'http';
+import appIcon from '../build/icon.png?asset';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -56,6 +57,7 @@ function createWindow() {
     minHeight: 700,
     backgroundColor: '#0b1120',
     title: 'PharmaCare Pro – 100% Offline POS',
+    icon: appIcon,
     webPreferences: {
       preload: path.join(import.meta.dirname, '../preload/index.cjs'),
       nodeIntegration: false,

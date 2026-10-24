@@ -185,10 +185,10 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
       )}
 
       {/* Active Shift Card & Action Banner */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-3.5">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
               activeShift
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
@@ -216,17 +216,17 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
             {activeShift ? (
               <button
                 onClick={() => setClosingModalOpen(true)}
-                className="btn-cancel px-4 py-2 text-xs font-semibold flex items-center space-x-1.5 shadow-xs"
+                className="btn-secondary"
               >
-                <Lock className="w-3.5 h-3.5 text-amber-500" />
+                <Lock className="w-4 h-4 text-amber-500" />
                 <span>Reconcile Drawer & Close Shift</span>
               </button>
             ) : (
               <button
                 onClick={() => setStartModalOpen(true)}
-                className="btn-save px-4 py-2 text-xs font-semibold flex items-center space-x-1.5 shadow-xs"
+                className="btn-primary"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
                 <span>Start New Cashier Shift</span>
               </button>
             )}
@@ -235,7 +235,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
       </div>
 
       {/* Shifts Register Filters & Search */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-teal-600 dark:text-teal-400" />
@@ -246,20 +246,20 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
                 value={searchUser}
                 onChange={(e) => setSearchUser(e.target.value)}
                 placeholder="Search shift # or cashier..."
-                className="pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                className="field-input field-sm pl-8 pr-3"
               />
             </div>
 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-select field-sm"
             >
               <option value="all">All Statuses</option>
               <option value="open">Active / Open Only</option>
@@ -272,14 +272,14 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono"
+                className="field-input field-sm font-mono"
               />
               <span>To:</span>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono"
+                className="field-input field-sm font-mono"
               />
             </div>
 
@@ -291,7 +291,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                   setSearchUser('');
                   setStatusFilter('all');
                 }}
-                className="btn-cancel px-2.5 py-1.5 text-xs"
+                className="btn-secondary btn-sm"
               >
                 Reset
               </button>
@@ -302,7 +302,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
         {/* Shift Records Table */}
         <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 font-semibold text-2xs border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-2.5 px-3">Shift #</th>
                 <th className="py-2.5 px-3">Cashier</th>
@@ -350,7 +350,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                       <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300">
                         {shift.user_name}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                      <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-xs">
                         {new Date(shift.start_time).toLocaleString([], {
                           month: 'short',
                           day: 'numeric',
@@ -358,7 +358,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                           minute: '2-digit'
                         })}
                       </td>
-                      <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-[11px]">
+                      <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-xs">
                         {shift.end_time ? (
                           new Date(shift.end_time).toLocaleString([], {
                             month: 'short',
@@ -389,10 +389,10 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         {shift.status === 'open' ? (
-                          <span className="text-[10px] text-slate-400 italic">Pending</span>
+                          <span className="text-2xs text-slate-400 italic">Pending</span>
                         ) : (
                           <span
-                            className={`font-mono font-bold text-[10px] px-1.5 py-0.5 rounded ${
+                            className={`font-mono font-bold text-2xs px-1.5 py-0.5 rounded ${
                               diff === 0
                                 ? 'badge-success'
                                 : diff > 0
@@ -417,7 +417,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                             className="p-1 rounded-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
                             title="Print Thermal Shift Slip"
                           >
-                            <Printer className="w-3.5 h-3.5" />
+                            <Printer className="w-4 h-4" />
                           </button>
 
                           {/* Inspect Shift Details */}
@@ -426,7 +426,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                             className="p-1 rounded-sm bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 transition-colors"
                             title="View Shift Invoices & Breakdowns"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-4 h-4" />
                           </button>
 
                           {/* Admin Action: Correct Cash Count */}
@@ -440,7 +440,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                               className="p-1 rounded-sm bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 transition-colors"
                               title="Admin: Correct Drawer Cash Count"
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              <Edit3 className="w-4 h-4" />
                             </button>
                           )}
 
@@ -454,7 +454,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                               className="p-1 rounded-sm bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 transition-colors"
                               title="Admin: Emergency Reopen Shift"
                             >
-                              <Unlock className="w-3.5 h-3.5" />
+                              <Unlock className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -504,23 +504,23 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
             {/* Shift Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-surface-inset-dark p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
               <div>
-                <span className="text-[10px] text-slate-400 block">Cashier</span>
+                <span className="text-2xs text-slate-400 block">Cashier</span>
                 <span className="font-bold text-slate-900 dark:text-white">{inspectData.user_name}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Opening Float</span>
+                <span className="text-2xs text-slate-400 block">Opening Float</span>
                 <span className="font-mono font-bold text-slate-900 dark:text-white">
                   {money(inspectData.opening_cash)}
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Actual Deposited</span>
+                <span className="text-2xs text-slate-400 block">Actual Deposited</span>
                 <span className="font-mono font-bold text-teal-600 dark:text-teal-400">
                   {inspectData.closing_cash !== null ? `${money(inspectData.closing_cash)}` : 'In Progress'}
                 </span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block">Discrepancy</span>
+                <span className="text-2xs text-slate-400 block">Discrepancy</span>
                 <span className={`font-mono font-bold ${
                   (inspectData.cash_difference || 0) === 0 ? 'text-emerald-600' : 'text-rose-600'
                 }`}>
@@ -531,12 +531,12 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
 
             {/* Invoices List */}
             <div className="space-y-2">
-              <span className="font-bold text-slate-800 dark:text-slate-200 uppercase text-[10px] tracking-wider block">
+              <span className="font-bold text-slate-800 dark:text-slate-200 text-2xs block">
                 Sales Invoices Under This Shift ({inspectData.sales?.length || 0})
               </span>
               <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-[10px] uppercase">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-2xs">
                     <tr>
                       <th className="py-2 px-3">Invoice #</th>
                       <th className="py-2 px-3">Customer</th>
@@ -557,11 +557,11 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                         <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-[#162032]">
                           <td className="py-1.5 px-3 font-mono font-bold text-slate-900 dark:text-white">{sale.invoiceNo}</td>
                           <td className="py-1.5 px-3 text-slate-700 dark:text-slate-300">{sale.customerName}</td>
-                          <td className="py-1.5 px-3 text-slate-500 font-mono text-[11px]">
+                          <td className="py-1.5 px-3 text-slate-500 font-mono text-xs">
                             {new Date(sale.saleDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </td>
                           <td className="py-1.5 px-3">
-                            <span className="px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono uppercase">
+                            <span className="px-1.5 py-0.5 rounded-sm text-2xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
                               {sale.paymentType}
                             </span>
                           </td>
@@ -580,18 +580,18 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Returns */}
               <div className="space-y-1.5">
-                <span className="font-bold text-slate-800 dark:text-slate-200 uppercase text-[10px] tracking-wider block">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-2xs block">
                   Refunds / Returns ({inspectData.saleReturns?.length || 0})
                 </span>
-                <div className="max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-2 space-y-1.5 text-[11px]">
+                <div className="max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-2 space-y-1.5 text-xs">
                   {inspectData.saleReturns?.length === 0 ? (
-                    <div className="text-slate-400 py-2 text-center text-[10px]">No refunds during this shift.</div>
+                    <div className="text-slate-400 py-2 text-center text-2xs">No refunds during this shift.</div>
                   ) : (
                     inspectData.saleReturns?.map((ret: any) => (
                       <div key={ret.id} className="flex justify-between items-center bg-slate-50 dark:bg-surface-inset-dark p-1.5 rounded-lg">
                         <div>
                           <span className="font-bold font-mono text-slate-900 dark:text-white">{ret.returnNo}</span>
-                          <span className="text-slate-400 block text-[9px]">Inv: {ret.originalInvoiceNo}</span>
+                          <span className="text-slate-400 block text-2xs">Inv: {ret.originalInvoiceNo}</span>
                         </div>
                         <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
                           -{money(Number(ret.refundAmount))}
@@ -604,18 +604,18 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
 
               {/* Khata Recoveries */}
               <div className="space-y-1.5">
-                <span className="font-bold text-slate-800 dark:text-slate-200 uppercase text-[10px] tracking-wider block">
+                <span className="font-bold text-slate-800 dark:text-slate-200 text-2xs block">
                   Khata Cash Recoveries ({inspectData.customerPayments?.length || 0})
                 </span>
-                <div className="max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-2 space-y-1.5 text-[11px]">
+                <div className="max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded-xl p-2 space-y-1.5 text-xs">
                   {inspectData.customerPayments?.length === 0 ? (
-                    <div className="text-slate-400 py-2 text-center text-[10px]">No khata recoveries during this shift.</div>
+                    <div className="text-slate-400 py-2 text-center text-2xs">No khata recoveries during this shift.</div>
                   ) : (
                     inspectData.customerPayments?.map((p: any) => (
                       <div key={p.id} className="flex justify-between items-center bg-slate-50 dark:bg-surface-inset-dark p-1.5 rounded-lg">
                         <div>
                           <span className="font-bold text-slate-900 dark:text-white font-mono">{p.paymentMethod}</span>
-                          <span className="text-slate-400 block text-[9px]">{p.notes || 'Khata Recovery'}</span>
+                          <span className="text-slate-400 block text-2xs">{p.notes || 'Khata Recovery'}</span>
                         </div>
                         <span className="font-mono font-bold text-teal-600 dark:text-teal-400">
                           +{money(Number(p.amount))}
@@ -633,7 +633,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                   setInspectShiftId(null);
                   setInspectData(null);
                 }}
-                className="btn-cancel px-4 py-2"
+                className="btn-secondary"
               >
                 Close Inspector
               </button>
@@ -655,7 +655,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>Administrative Shift Reopen Override</span>
             </div>
-            <p className="text-[11px] leading-relaxed">
+            <p className="text-xs leading-relaxed">
               Reopening a closed shift unlocks the cash register for that shift. This action bypasses standard locking rules and will be permanently logged to the system audit trails.
             </p>
           </div>
@@ -670,7 +670,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               value={reopenReason}
               onChange={(e) => setReopenReason(e.target.value)}
               placeholder="State why this shift is being reopened (e.g. Inadvertent closure before last customer sale)..."
-              className="w-full pos-input"
+              className="field-textarea w-full"
             />
           </div>
 
@@ -679,16 +679,16 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               type="button"
               onClick={() => setReopenModalShift(null)}
               disabled={isSubmittingReopen}
-              className="btn-cancel"
+              className="btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmittingReopen}
-              className="btn-delete flex items-center space-x-1"
+              className="btn-danger"
             >
-              <Unlock className="w-3.5 h-3.5" />
+              <Unlock className="w-4 h-4" />
               <span>{isSubmittingReopen ? 'Reopening...' : 'Confirm Reopen Shift'}</span>
             </button>
           </div>
@@ -733,7 +733,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               required
               value={correctedCash}
               onChange={(e) => setCorrectedCash(parseFloat(e.target.value) || 0)}
-              className="w-full pos-input font-mono font-bold"
+              className="field-input w-full font-mono font-bold"
             />
           </div>
 
@@ -747,7 +747,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               value={correctReason}
               onChange={(e) => setCorrectReason(e.target.value)}
               placeholder="e.g. Recounted by manager; 500 bill was found under drawer"
-              className="w-full pos-input"
+              className="field-input w-full"
             />
           </div>
 
@@ -756,16 +756,16 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               type="button"
               onClick={() => setCorrectModalShift(null)}
               disabled={isSubmittingCorrect}
-              className="btn-cancel"
+              className="btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmittingCorrect}
-              className="btn-save flex items-center space-x-1"
+              className="btn-primary"
             >
-              <Edit3 className="w-3.5 h-3.5" />
+              <Edit3 className="w-4 h-4" />
               <span>{isSubmittingCorrect ? 'Saving...' : 'Apply Cash Adjustment'}</span>
             </button>
           </div>

@@ -250,16 +250,16 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
   const durationLabel = (minutes?: number | null) => (minutes ? formatDuration(minutes) : '\u2014');
 
   const getVarianceBadge = (diff: number | null | undefined, status: string) => {
-    if (status === 'open') return <span className="text-[10px] text-slate-400 italic">Pending</span>;
-    if (diff === null || diff === undefined) return <span className="text-[10px] text-slate-400">\u2014</span>;
-    if (Math.abs(diff) < 0.01) return <span className="badge-success font-mono text-[10px] font-bold">BALANCED</span>;
+    if (status === 'open') return <span className="text-2xs text-slate-400 italic">Pending</span>;
+    if (diff === null || diff === undefined) return <span className="text-2xs text-slate-400">\u2014</span>;
+    if (Math.abs(diff) < 0.01) return <span className="badge-success font-mono text-2xs font-bold">BALANCED</span>;
     if (diff > 0) return (
-      <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+      <span className="px-1.5 py-0.5 rounded-sm text-2xs font-mono font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
         +{diff.toFixed(2)} EXCESS
       </span>
     );
     return (
-      <span className="px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+      <span className="px-1.5 py-0.5 rounded-sm text-2xs font-mono font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
         {diff.toFixed(2)} SHORT
       </span>
     );
@@ -298,7 +298,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             disabled={loading}
             className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 dark:bg-[#111827] border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#162032] transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
           <button
@@ -306,7 +306,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             disabled={filteredShifts.length === 0}
             className="flex items-center space-x-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition-colors disabled:opacity-50"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-4 h-4" />
             <span>Export CSV</span>
           </button>
         </div>
@@ -343,7 +343,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             slate: 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'
           };
           return (
-            <div key={i} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex items-center space-x-3">
+            <div key={i} className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs flex items-center space-x-3">
               <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${colorMap[kpi.color]}`}>
                 <Icon className="w-5 h-5" />
               </div>
@@ -351,7 +351,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                 <div className={`text-2xl font-extrabold tabular-nums ${kpi.color === 'rose' && totalVariance > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
                   {kpi.value}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{kpi.label}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{kpi.label}</div>
               </div>
             </div>
           );
@@ -359,21 +359,21 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
-            <Filter className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <Filter className="w-4 h-4 text-teal-600 dark:text-teal-400" />
             <span>Filters</span>
           </div>
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
             <input
               id="shift-search"
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Shift # or cashier..."
-              className="pl-8 pr-3 py-1.5 w-48 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-input field-sm pl-8 pr-3 w-48"
             />
           </div>
           <div className="relative">
@@ -381,54 +381,54 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               id="shift-cashier-filter"
               value={cashierFilter}
               onChange={e => setCashierFilter(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-select field-sm"
             >
               <option value="all">All Cashiers</option>
               {cashiersList.map(c => (
                 <option key={c.id} value={String(c.id)}>{c.name} (ID #{c.id})</option>
               ))}
             </select>
-            <ChevronDown className="w-3 h-3 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
           </div>
           <div className="relative">
             <select
               id="shift-status-filter"
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="appearance-none pl-3 pr-7 py-1.5 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+              className="field-select field-sm"
             >
               <option value="all">All Statuses</option>
               <option value="open">Active Only</option>
               <option value="closed">Closed Only</option>
             </select>
-            <ChevronDown className="w-3 h-3 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
+            <ChevronDown className="w-4 h-4 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
           </div>
           <div className="flex items-center space-x-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <Calendar className="w-3.5 h-3.5" />
+            <Calendar className="w-4 h-4" />
             <span>From:</span>
             <input id="shift-date-from" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500" />
+              className="field-input field-sm font-mono" />
             <span>To:</span>
             <input id="shift-date-to" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500" />
+              className="field-input field-sm font-mono" />
           </div>
           {hasFilters && (
             <button onClick={clearFilters}
               className="flex items-center space-x-1 px-2.5 py-1.5 bg-slate-100 dark:bg-[#162032] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
-              <X className="w-3 h-3" /><span>Clear</span>
+              <X className="w-4 h-4" /><span>Clear</span>
             </button>
           )}
-          <span className="ml-auto text-[11px] text-slate-400 font-mono">
+          <span className="ml-auto text-xs text-slate-400 font-mono">
             {filteredShifts.length} of {shifts.length} shift{shifts.length !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
 
       {/* Shifts Table */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs min-w-[1100px]">
-            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 font-bold text-2xs border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-3">Shift #</th>
                 <th className="py-3 px-3">Cashier</th>
@@ -471,12 +471,12 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">{shift.shift_no}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="font-semibold text-slate-800 dark:text-slate-200">{shift.user_name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">ID #{shift.user_id}</div>
+                      <div className="text-2xs text-slate-400 font-mono">ID #{shift.user_id}</div>
                     </td>
-                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-[11px] whitespace-nowrap">
+                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-xs whitespace-nowrap">
                       {new Date(shift.start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap">
+                    <td className="py-2.5 px-3 font-mono text-xs whitespace-nowrap">
                       {shift.end_time ? (
                         <span className="text-slate-500 dark:text-slate-400">
                           {new Date(shift.end_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -526,19 +526,19 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                         <button id={`btn-inspect-shift-${shift.id}`} onClick={() => handleInspect(shift.id)}
                           className="p-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/60 dark:hover:bg-teal-900/60 text-teal-700 dark:text-teal-300 transition-colors"
                           title="View Shift Transactions">
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-4 h-4" />
                         </button>
                         <button id={`btn-print-shift-${shift.id}`} onClick={() => setPrintShift(shift)}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
                           title="Print Reconciliation Slip">
-                          <Printer className="w-3.5 h-3.5" />
+                          <Printer className="w-4 h-4" />
                         </button>
                         {hasPermission('can_manage_shifts') && shift.status === 'closed' && (
                           <button id={`btn-correct-shift-${shift.id}`}
                             onClick={() => { setCorrectShift(shift); setCorrectedCash(shift.closing_cash || 0); setCorrectReason(''); }}
                             className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 transition-colors"
                             title="Admin: Correct Drawer Cash Count">
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Edit3 className="w-4 h-4" />
                           </button>
                         )}
                         {hasPermission('can_manage_shifts') && shift.status === 'closed' && (
@@ -546,7 +546,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                             onClick={() => { setReopenShift(shift); setReopenReason(''); }}
                             className="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 transition-colors"
                             title="Admin: Emergency Reopen Shift">
-                            <Unlock className="w-3.5 h-3.5" />
+                            <Unlock className="w-4 h-4" />
                           </button>
                         )}
                         {hasPermission('can_manage_shifts') && shift.status === 'open' && (
@@ -554,7 +554,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                             onClick={() => { setForceCloseShift(shift); setForceCloseCash(0); setForceCloseReason(''); setForceCloseNotes(''); }}
                             className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 transition-colors"
                             title="Admin: Force-Close Active Shift">
-                            <ShieldAlert className="w-3.5 h-3.5" />
+                            <ShieldAlert className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -566,7 +566,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
           </table>
         </div>
         {filteredShifts.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-surface-inset-dark/40 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-surface-inset-dark/40 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>Showing <span className="font-bold text-slate-700 dark:text-slate-300">{filteredShifts.length}</span> shifts{hasFilters && <> (filtered)</>}</span>
             <span className="font-mono">Total Sales: <span className="font-bold text-teal-700 dark:text-teal-300">
               {money(filteredShifts.reduce((sum, s) => sum + (s.total_sales_amount || 0), 0))}
@@ -603,7 +603,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                 }
               ].map((kpi, i) => (
                 <div key={i}>
-                  <span className="text-[10px] text-slate-400 block mb-0.5">{kpi.label}</span>
+                  <span className="text-2xs text-slate-400 block mb-0.5">{kpi.label}</span>
                   <span className={`font-bold text-slate-900 dark:text-white ${kpi.mono ? 'font-mono' : ''}`}>{kpi.value}</span>
                 </div>
               ))}
@@ -620,9 +620,9 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                   className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all ${inspectTab === tab.id
                     ? 'bg-white dark:bg-[#1a2436] text-teal-700 dark:text-teal-400 shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
-                  <tab.Icon className="w-3.5 h-3.5" />
+                  <tab.Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
-                  <span className="px-1 py-0.5 rounded-sm text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono">{tab.count || 0}</span>
+                  <span className="px-1 py-0.5 rounded-sm text-2xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-mono">{tab.count || 0}</span>
                 </button>
               ))}
             </div>
@@ -630,7 +630,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
               {inspectTab === 'sales' && (
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-2xs sticky top-0">
                     <tr>
                       <th className="py-2 px-3">Invoice #</th><th className="py-2 px-3">Customer</th>
                       <th className="py-2 px-3">Time</th><th className="py-2 px-3">Payment</th>
@@ -639,13 +639,13 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {!inspectData.sales?.length ? (
-                      <tr><td colSpan={6} className="py-6 text-center text-slate-400 text-[11px]">No sales recorded in this shift.</td></tr>
+                      <tr><td colSpan={6} className="py-6 text-center text-slate-400 text-xs">No sales recorded in this shift.</td></tr>
                     ) : inspectData.sales.map((sale: any) => (
                       <tr key={sale.id} className="hover:bg-slate-50 dark:hover:bg-[#162032]">
                         <td className="py-1.5 px-3 font-mono font-bold text-slate-900 dark:text-white">{sale.invoice_no}</td>
                         <td className="py-1.5 px-3 text-slate-700 dark:text-slate-300">{sale.customer_name}</td>
-                        <td className="py-1.5 px-3 text-slate-500 font-mono text-[11px]">{new Date(sale.sale_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono uppercase">{sale.payment_type}</span></td>
+                        <td className="py-1.5 px-3 text-slate-500 font-mono text-xs">{new Date(sale.sale_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded-sm text-2xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">{sale.payment_type}</span></td>
                         <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{money(Number(sale.net_total))}</td>
                         <td className="py-1.5 px-3 text-center"><span className={sale.status === 'completed' ? 'badge-success' : sale.status === 'returned' ? 'badge-danger' : 'badge-warning'}>{sale.status?.toUpperCase()}</span></td>
                       </tr>
@@ -655,7 +655,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               )}
               {inspectTab === 'returns' && (
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-2xs sticky top-0">
                     <tr>
                       <th className="py-2 px-3">Return #</th><th className="py-2 px-3">Orig. Invoice</th>
                       <th className="py-2 px-3">Customer</th><th className="py-2 px-3">Reason</th>
@@ -664,7 +664,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {!inspectData.returns?.length ? (
-                      <tr><td colSpan={5} className="py-6 text-center text-slate-400 text-[11px]">No returns processed in this shift.</td></tr>
+                      <tr><td colSpan={5} className="py-6 text-center text-slate-400 text-xs">No returns processed in this shift.</td></tr>
                     ) : inspectData.returns.map((ret: any) => (
                       <tr key={ret.id} className="hover:bg-slate-50 dark:hover:bg-[#162032]">
                         <td className="py-1.5 px-3 font-mono font-bold text-slate-900 dark:text-white">{ret.return_no}</td>
@@ -679,7 +679,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               )}
               {inspectTab === 'payments' && (
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-[10px] uppercase sticky top-0">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-2xs sticky top-0">
                     <tr>
                       <th className="py-2 px-3">Method</th><th className="py-2 px-3">Notes</th>
                       <th className="py-2 px-3">Time</th><th className="py-2 px-3 text-right">Amount</th>
@@ -687,12 +687,12 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                     {!inspectData.payments?.length ? (
-                      <tr><td colSpan={4} className="py-6 text-center text-slate-400 text-[11px]">No khata payments collected in this shift.</td></tr>
+                      <tr><td colSpan={4} className="py-6 text-center text-slate-400 text-xs">No khata payments collected in this shift.</td></tr>
                     ) : inspectData.payments.map((p: any) => (
                       <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-[#162032]">
-                        <td className="py-1.5 px-3 font-mono font-bold text-slate-900 dark:text-white uppercase">{p.payment_method}</td>
+                        <td className="py-1.5 px-3 font-mono font-bold text-slate-900 dark:text-white">{p.payment_method}</td>
                         <td className="py-1.5 px-3 text-slate-500 italic">{p.notes || 'Khata Recovery'}</td>
-                        <td className="py-1.5 px-3 text-slate-500 font-mono text-[11px]">{new Date(p.payment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td className="py-1.5 px-3 text-slate-500 font-mono text-xs">{new Date(p.payment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="py-1.5 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">+{money(Number(p.amount))}</td>
                       </tr>
                     ))}
@@ -702,7 +702,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             </div>
 
             <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-800">
-              <button onClick={() => { setInspectShiftId(null); setInspectData(null); }} className="btn-cancel px-4 py-2">Close</button>
+              <button onClick={() => { setInspectShiftId(null); setInspectData(null); }} className="btn-secondary">Close</button>
             </div>
           </div>
         ) : null}
@@ -730,8 +730,8 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
           <div>
             <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Corrected Cash Count ({currency}) *</label>
             <input type="number" min="0" step="any" required value={correctedCash}
-              onChange={e => setCorrectedCash(parseFloat(e.target.value) || 0)} className="w-full pos-input font-mono font-bold" />
-            <div className="mt-1 text-[11px] text-slate-400">
+              onChange={e => setCorrectedCash(parseFloat(e.target.value) || 0)} className="field-input w-full font-mono font-bold" />
+            <div className="mt-1 text-xs text-slate-400">
               New variance: <span className={`font-mono font-bold ${(correctedCash - (correctShift?.expected_cash || 0)) === 0 ? 'text-emerald-600' : (correctedCash - (correctShift?.expected_cash || 0)) > 0 ? 'text-blue-600' : 'text-rose-600'}`}>
                 {(correctedCash - (correctShift?.expected_cash || 0)) >= 0 ? '+' : ''}{money((correctedCash - (correctShift?.expected_cash || 0)))}
               </span>
@@ -740,12 +740,12 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
           <div>
             <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Audit Justification *</label>
             <input type="text" required value={correctReason} onChange={e => setCorrectReason(e.target.value)}
-              placeholder="e.g. Recounted by manager; 500 bill found under drawer" className="w-full pos-input" />
+              placeholder="e.g. Recounted by manager; 500 bill found under drawer" className="field-input w-full" />
           </div>
           <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <button type="button" onClick={() => setCorrectShift(null)} disabled={submittingCorrect} className="btn-cancel">Cancel</button>
-            <button type="submit" disabled={submittingCorrect} className="btn-save flex items-center space-x-1.5">
-              <Edit3 className="w-3.5 h-3.5" /><span>{submittingCorrect ? 'Saving...' : 'Apply Correction'}</span>
+            <button type="button" onClick={() => setCorrectShift(null)} disabled={submittingCorrect} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={submittingCorrect} className="btn-primary">
+              <Edit3 className="w-4 h-4" /><span>{submittingCorrect ? 'Saving...' : 'Apply Correction'}</span>
             </button>
           </div>
         </form>
@@ -757,17 +757,17 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
         <form onSubmit={handleAdminReopen} className="space-y-4 text-xs">
           <div className="p-3 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900/60 rounded-xl text-indigo-800 dark:text-indigo-300 space-y-1">
             <div className="flex items-center space-x-1.5 font-bold"><Unlock className="w-4 h-4 shrink-0" /><span>Administrative Reopen Override</span></div>
-            <p className="text-[11px] leading-relaxed">Reopening unlocks the cash register for that cashier. Permanently logged to audit trail.</p>
+            <p className="text-xs leading-relaxed">Reopening unlocks the cash register for that cashier. Permanently logged to audit trail.</p>
           </div>
           <div>
             <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Mandatory Reason *</label>
             <textarea required rows={3} value={reopenReason} onChange={e => setReopenReason(e.target.value)}
-              placeholder="State why this shift is being reopened..." className="w-full pos-input" />
+              placeholder="State why this shift is being reopened..." className="field-textarea w-full" />
           </div>
           <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <button type="button" onClick={() => setReopenShift(null)} disabled={submittingReopen} className="btn-cancel">Cancel</button>
-            <button type="submit" disabled={submittingReopen} className="btn-save flex items-center space-x-1.5">
-              <Unlock className="w-3.5 h-3.5" /><span>{submittingReopen ? 'Reopening...' : 'Confirm Reopen'}</span>
+            <button type="button" onClick={() => setReopenShift(null)} disabled={submittingReopen} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={submittingReopen} className="btn-primary">
+              <Unlock className="w-4 h-4" /><span>{submittingReopen ? 'Reopening...' : 'Confirm Reopen'}</span>
             </button>
           </div>
         </form>
@@ -779,7 +779,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
         <form onSubmit={handleAdminForceClose} className="space-y-4 text-xs">
           <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 rounded-xl text-rose-800 dark:text-rose-300 space-y-1">
             <div className="flex items-center space-x-1.5 font-bold"><ShieldAlert className="w-4 h-4 shrink-0" /><span>Admin Force-Close Override</span></div>
-            <p className="text-[11px] leading-relaxed">
+            <p className="text-xs leading-relaxed">
               Immediately closes and locks the active shift for <strong>{forceCloseShift?.user_name}</strong>. Use only when cashier is unavailable. Permanently audited.
             </p>
           </div>
@@ -792,22 +792,22 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Physical Cash Count ({currency}) *</label>
             <input type="number" min="0" step="any" required value={forceCloseCash}
               onChange={e => setForceCloseCash(parseFloat(e.target.value) || 0)}
-              className="w-full pos-input font-mono font-bold" placeholder="Enter actual cash in drawer" />
+              className="field-input w-full font-mono font-bold" placeholder="Enter actual cash in drawer" />
           </div>
           <div>
             <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Admin Reason *</label>
             <textarea required rows={2} value={forceCloseReason} onChange={e => setForceCloseReason(e.target.value)}
-              placeholder="e.g. Cashier left without closing; manager force-closing at end of day..." className="w-full pos-input" />
+              placeholder="e.g. Cashier left without closing; manager force-closing at end of day..." className="field-textarea w-full" />
           </div>
           <div>
             <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Additional Notes (optional)</label>
             <input type="text" value={forceCloseNotes} onChange={e => setForceCloseNotes(e.target.value)}
-              placeholder="Any additional context..." className="w-full pos-input" />
+              placeholder="Any additional context..." className="field-input w-full" />
           </div>
           <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-            <button type="button" onClick={() => setForceCloseShift(null)} disabled={submittingForceClose} className="btn-cancel">Cancel</button>
-            <button type="submit" disabled={submittingForceClose} className="btn-delete flex items-center space-x-1.5">
-              <ShieldAlert className="w-3.5 h-3.5" /><span>{submittingForceClose ? 'Force-Closing...' : 'Confirm Force-Close'}</span>
+            <button type="button" onClick={() => setForceCloseShift(null)} disabled={submittingForceClose} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={submittingForceClose} className="btn-danger">
+              <ShieldAlert className="w-4 h-4" /><span>{submittingForceClose ? 'Force-Closing...' : 'Confirm Force-Close'}</span>
             </button>
           </div>
         </form>

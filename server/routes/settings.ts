@@ -6,6 +6,7 @@ import { LICENSE_SETTING_KEYS } from '../security/license';
 import { parseBody, settingsSchema } from '../validation/schemas';
 import { DEFAULT_DEVELOPER_FOOTER, isValidPaperSize, isValidTemplate, normalizePaperSize, normalizeTemplate } from '../../shared/invoice';
 import { DEFAULT_INVOICE_SETTINGS, DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
+import { DEVELOPER_INFO_PLACEMENTS, DEVELOPER_PROFILE_FIELDS, DEVELOPER_PROFILE_SETTING_KEYS, developerInfoFor } from '../../shared/developerProfile';
 import { getActingUser, hasRolePermission, sendError } from '../http/context';
 
 // System settings
@@ -47,8 +48,21 @@ router.get('/api/settings', async (req: Request, res: Response) => {
     delete settings.developer_email;
     for (const key of INTERNAL_SETTING_KEYS) delete settings[key];
 
+    for (const key of DEVELOPER_PROFILE_SETTING_KEYS) {
+      settings[key] ??= DEFAULT_SETTINGS[key];
+    }
+
     if (!(await getActingUser(req))) {
-      return res.json(Object.fromEntries(PUBLIC_SETTING_KEYS.filter(key => settings[key] !== undefined).map(key => [key, settings[key]])));
+      const publicSettings: Record<string, string> = Object.fromEntries(
+        PUBLIC_SETTING_KEYS.filter(key => settings[key] !== undefined).map(key => [key, settings[key]])
+      );
+      // The login screen shows only the developer details chosen for it
+      const loginPlacement = DEVELOPER_INFO_PLACEMENTS.find(p => p.key === 'login')!;
+      publicSettings[loginPlacement.setting] = settings[loginPlacement.setting];
+      for (const item of developerInfoFor(settings, 'login')) {
+        publicSettings[DEVELOPER_PROFILE_FIELDS.find(f => f.key === item.key)!.setting] = item.value;
+      }
+      return res.json(publicSettings);
     }
     res.json(settings);
   } catch (error: unknown) {
@@ -60,6 +74,7 @@ router.get('/api/settings', async (req: Request, res: Response) => {
 const DEVELOPER_ONLY_SETTING_KEYS = [
   'developer_invoice_footer',
   'show_developer_info',
+  ...DEVELOPER_PROFILE_SETTING_KEYS,
   'allow_admin_create_cashier',
   'allow_admin_create_admin',
   'allow_admin_edit_store_identity',

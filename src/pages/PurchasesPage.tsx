@@ -190,7 +190,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             }
             setIsNewPurchaseModalOpen(true);
           }}
-          className="btn-save flex items-center space-x-2 text-xs font-bold px-4 py-2"
+          className="btn-primary"
         >
           <Plus className="w-4 h-4" />
           <span>New Purchase Inward</span>
@@ -205,10 +205,10 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       )}
 
       {/* Purchases Invoices Table */}
-      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs flex flex-col">
+      <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 font-semibold text-xs border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Purchase Inv #</th>
                 <th className="py-3 px-4">Supplier Bill #</th>
@@ -254,7 +254,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-bold text-slate-900 dark:text-white">{pur.company_name}</div>
-                      {pur.company_code && <div className="text-[10px] text-teal-600 dark:text-teal-400 font-mono">[{pur.company_code}]</div>}
+                      {pur.company_code && <div className="text-2xs text-teal-600 dark:text-teal-400 font-mono">[{pur.company_code}]</div>}
                     </td>
                     <td className="py-3 px-4 text-slate-600 dark:text-slate-300 font-mono">
                       {pur.purchase_date}
@@ -278,7 +278,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                         onClick={() => setViewInvoice(pur)}
                         className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center space-x-1"
                       >
-                        <Eye className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                        <Eye className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                         <span>Voucher</span>
                       </button>
                     </td>
@@ -306,7 +306,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 required
                 value={selectedCompanyId}
                 onChange={(e) => handleSelectCompanyInModal(e.target.value)}
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="field-select field-sm w-full"
               >
                 {companies.map(c => (
                   <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
@@ -321,7 +321,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 value={supplierInvoiceNo}
                 onChange={(e) => setSupplierInvoiceNo(e.target.value)}
                 placeholder="e.g. DC-98421"
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="field-input field-sm w-full font-mono"
               />
             </div>
 
@@ -332,7 +332,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 required
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="field-input field-sm w-full font-mono"
               />
             </div>
 
@@ -341,7 +341,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
               <select
                 value={paymentStatus}
                 onChange={(e) => setPaymentStatus(e.target.value as any)}
-                className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                className="field-select field-sm w-full"
               >
                 <option value="Paid">Paid</option>
                 <option value="Pending">Pending / Credit</option>
@@ -352,14 +352,14 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
 
           {/* Add Line Item Box */}
           <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl space-y-3">
-            <span className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider block">Add Medicine Line Item</span>
+            <span className="text-xs font-bold text-teal-700 dark:text-teal-400 block">Add Medicine Line Item</span>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="col-span-2">
-                <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Medicine</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-0.5">Medicine</label>
                 <select
                   value={lineProductId}
                   onChange={(e) => handleSelectProductInModal(e.target.value)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="field-select field-sm w-full"
                 >
                   <option value="">Select Medicine</option>
                   {products.map(p => (
@@ -369,69 +369,69 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Batch #</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-0.5">Batch #</label>
                 <input
                   type="text"
                   value={lineBatchNo}
                   onChange={(e) => setLineBatchNo(e.target.value.toUpperCase())}
                   placeholder="e.g. B-998"
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="field-input field-sm w-full font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Expiry Date</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-0.5">Expiry Date</label>
                 <input
                   type="date"
                   value={lineExpiry}
                   onChange={(e) => setLineExpiry(e.target.value)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="field-input field-sm w-full font-mono"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 items-end">
               <div>
-                <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Box Quantity</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-0.5">Box Quantity</label>
                 <input
                   type="number"
                   min="1"
                   value={lineBoxes}
                   onChange={(e) => setLineBoxes(parseInt(e.target.value) || 1)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="field-input field-sm w-full font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Bonus Boxes (Free)</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-0.5">Bonus Boxes (Free)</label>
                 <input
                   type="number"
                   min="0"
                   value={lineBonus}
                   onChange={(e) => setLineBonus(parseInt(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="field-input field-sm w-full font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Box Cost (T-Price)</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-0.5">Box Cost (T-Price)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={lineCost}
                   onChange={(e) => setLineCost(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="field-input field-sm w-full font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-600 dark:text-slate-400 mb-0.5">Box Retail (MRP)</label>
+                <label className="block text-xs text-slate-600 dark:text-slate-400 mb-0.5">Box Retail (MRP)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={lineRetail}
                   onChange={(e) => setLineRetail(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-900 dark:text-white font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  className="field-input field-sm w-full font-mono font-bold"
                 />
               </div>
 
@@ -439,9 +439,9 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 <button
                   type="button"
                   onClick={handleAddLineItem}
-                  className="btn-save w-full py-1.5 text-xs flex items-center justify-center space-x-1"
+                  className="btn-primary btn-sm w-full"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-4 h-4" />
                   <span>Add Line</span>
                 </button>
               </div>
@@ -473,12 +473,12 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   draftItems.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#162032]/50">
                       <td className="py-2 px-3 font-medium text-slate-900 dark:text-white">{item.product_name}</td>
-                      <td className="py-2 px-3 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                      <td className="py-2 px-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                         {item.batch_no} (Exp: {item.expiry_date})
                       </td>
                       <td className="py-2 px-3 text-center font-mono">
                         <span className="font-bold text-slate-900 dark:text-white">{item.quantity_boxes}</span>
-                        {item.bonus_boxes > 0 && <span className="text-emerald-600 dark:text-emerald-400 text-[10px] ml-1">(+{item.bonus_boxes})</span>}
+                        {item.bonus_boxes > 0 && <span className="text-emerald-600 dark:text-emerald-400 text-2xs ml-1">(+{item.bonus_boxes})</span>}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{money(item.box_cost_price)}</td>
                       <td className="py-2 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">{money(item.box_retail_price)}</td>
@@ -489,7 +489,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                           onClick={() => handleRemoveDraftItem(idx)}
                           className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -517,14 +517,14 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             <button
               type="button"
               onClick={() => setIsNewPurchaseModalOpen(false)}
-              className="btn-cancel px-4 py-2 text-xs"
+              className="btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={draftItems.length === 0}
-              className="btn-save px-6 py-2 text-xs"
+              className="btn-primary"
             >
               Post Purchase & Update Stock
             </button>
@@ -546,7 +546,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                 <span>{viewInvoice.company_name}</span>
                 <span className="text-teal-600 dark:text-teal-400">{viewInvoice.invoice_no}</span>
               </div>
-              <div className="flex justify-between text-slate-500 dark:text-slate-400 text-[11px]">
+              <div className="flex justify-between text-slate-500 dark:text-slate-400 text-xs">
                 <span>Date: {viewInvoice.purchase_date}</span>
                 <span>Supplier Bill: {viewInvoice.supplier_invoice_no || '-'}</span>
               </div>
@@ -559,15 +559,15 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             <div className="flex justify-end space-x-2">
               <button
                 onClick={() => setViewInvoice(null)}
-                className="btn-cancel px-4 py-2"
+                className="btn-secondary"
               >
                 Close
               </button>
               <button
                 onClick={() => window.print()}
-                className="btn-print px-4 py-2 flex items-center space-x-1"
+                className="btn-print"
               >
-                <Printer className="w-3.5 h-3.5" />
+                <Printer className="w-4 h-4" />
                 <span>Print Voucher</span>
               </button>
             </div>

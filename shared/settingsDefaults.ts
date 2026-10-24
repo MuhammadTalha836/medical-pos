@@ -1,4 +1,5 @@
 import { DEFAULT_DEVELOPER_FOOTER } from './invoice';
+import { DEFAULT_DEVELOPER_PROFILE_SETTINGS } from './developerProfile';
 
 // Default system_settings values, shared by the seed, GET /api/settings and the Settings page.
 // Settings are stored as strings; booleans are 'true' / 'false'.
@@ -72,6 +73,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   backup_scheduled_time: '23:00',
   backup_weekly_day: '0',
   developer_invoice_footer: DEFAULT_DEVELOPER_FOOTER,
+  ...DEFAULT_DEVELOPER_PROFILE_SETTINGS,
   allow_admin_create_cashier: 'true',
   allow_admin_create_admin: 'false',
   allow_admin_edit_store_identity: 'false',

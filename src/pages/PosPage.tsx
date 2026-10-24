@@ -436,8 +436,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       {/* Shift Inactive Lock Overlay */}
       {!activeShift && (
         <div className="absolute inset-0 z-40 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111827] border border-amber-300/60 dark:border-amber-700/60 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center shadow-inner">
+          <div className="bg-white dark:bg-[#111827] border border-amber-300/60 dark:border-amber-700/60 rounded-xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center shadow-inner">
               <Lock className="w-7 h-7" />
             </div>
             <div className="space-y-1.5">
@@ -452,14 +452,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               <button
                 type="button"
                 onClick={() => setStartModalOpen(true)}
-                className="w-full btn-save py-2.5 text-xs font-bold flex items-center justify-center space-x-2 shadow-lg shadow-teal-500/20"
+                className="w-full btn-primary"
               >
                 <PlayCircle className="w-4 h-4" />
                 <span>Start Cashier Shift Now</span>
               </button>
             </div>
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 flex items-center justify-center space-x-1">
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 text-2xs text-slate-400 flex items-center justify-center space-x-1">
+              <ShieldAlert className="w-4 h-4 text-amber-500" />
               <span>Anti-Bypass Protection Active • All operations audited</span>
             </div>
           </div>
@@ -478,11 +478,11 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="font-bold text-slate-900 dark:text-white font-mono">{activeShift.shift_no}</span>
-                  <span className="text-[10px] text-teal-700 dark:text-teal-300 font-mono bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded-sm border border-teal-200 dark:border-teal-800">
+                  <span className="text-2xs text-teal-700 dark:text-teal-300 font-mono bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded-sm border border-teal-200 dark:border-teal-800">
                     On Duty: {elapsedFormatted}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                <div className="text-2xs text-slate-500 dark:text-slate-400">
                   Cashier: <strong className="text-slate-700 dark:text-slate-300">{activeShift.user_name}</strong> • Float: <strong className="font-mono">{money(activeShift.opening_cash)}</strong>
                 </div>
               </div>
@@ -490,7 +490,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
             <div className="flex items-center space-x-3">
               {activeSummary && (
-                <div className="text-right text-[11px] hidden sm:block">
+                <div className="text-right text-xs hidden sm:block">
                   <div className="text-slate-500 dark:text-slate-400">Drawer Cash:</div>
                   <div className="font-mono font-bold text-teal-600 dark:text-teal-400">
                     {money(activeSummary.expected_cash)}
@@ -500,10 +500,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               <button
                 type="button"
                 onClick={() => setClosingModalOpen(true)}
-                className="btn-cancel px-2.5 py-1 text-xs font-semibold flex items-center space-x-1"
+                className="btn-secondary btn-sm"
                 title="Reconcile Cash Drawer & Close Shift"
               >
-                <Lock className="w-3 h-3 text-amber-500" />
+                <Lock className="w-4 h-4 text-amber-500" />
                 <span>Close Shift</span>
               </button>
             </div>
@@ -523,7 +523,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               placeholder="Search by Barcode, P-Code (e.g. PAN-500), C-Code (GSK), or Medicine Name... [F3]"
               className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-hidden text-sm font-medium"
             />
-            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-sm border border-slate-300 dark:border-slate-700 mr-2 select-none shadow-2xs">F3</kbd>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-sm border border-slate-300 dark:border-slate-700 mr-2 select-none shadow-2xs">F3</kbd>
             {isSearching && (
               <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
             )}
@@ -548,10 +548,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <span className="font-bold text-sm text-slate-900 dark:text-white">{prod.name}</span>
-                        <span className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-surface-inset-dark text-teal-700 dark:text-teal-300 font-mono rounded-sm font-semibold border border-slate-200 dark:border-slate-700">{prod.c_code}</span>
-                        <span className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 font-mono rounded-sm border border-slate-200 dark:border-slate-700">{prod.p_code}</span>
+                        <span className="px-1.5 py-0.5 text-2xs bg-slate-100 dark:bg-surface-inset-dark text-teal-700 dark:text-teal-300 font-mono rounded-sm font-semibold border border-slate-200 dark:border-slate-700">{prod.c_code}</span>
+                        <span className="px-1.5 py-0.5 text-2xs bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 font-mono rounded-sm border border-slate-200 dark:border-slate-700">{prod.p_code}</span>
                         {prod.location_rack && (
-                          <span className="px-1.5 py-0.5 text-[10px] badge-warning">Loc: {prod.location_rack}</span>
+                          <span className="px-1.5 py-0.5 text-2xs badge-warning">Loc: {prod.location_rack}</span>
                         )}
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center space-x-3 mt-1">
@@ -567,8 +567,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
                     <div className="flex items-center space-x-2">
                       <div className="text-right pr-1">
-                        <div className="text-xs font-bold text-teal-700 dark:text-teal-400 font-mono">{money(prod.box_retail_price)}<span className="text-[10px] font-normal text-slate-400">/Bx</span></div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{money(prod.unit_retail_price)}<span className="text-[9px] font-normal text-slate-400">/Unit</span></div>
+                        <div className="text-xs font-bold text-teal-700 dark:text-teal-400 font-mono">{money(prod.box_retail_price)}<span className="text-2xs font-normal text-slate-400">/Bx</span></div>
+                        <div className="text-2xs text-slate-500 dark:text-slate-400 font-mono">{money(prod.unit_retail_price)}<span className="text-2xs font-normal text-slate-400">/Unit</span></div>
                       </div>
                       {(() => {
                         const canOpen = prod.allow_open_sale !== false && prod.allow_open_sale !== 0;
@@ -581,7 +581,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                                 handleSelectProduct(prod, false);
                               }}
                               title="Add Full Box/Strip to cart"
-                              className="px-2.5 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
+                              className="px-2.5 py-1 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold transition-all shadow-2xs cursor-pointer"
                             >
                               + Box
                             </button>
@@ -593,14 +593,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                                   handleSelectProduct(prod, true);
                                 }}
                                 title="Add Loose Unit to cart"
-                                className="px-2.5 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                className="px-2.5 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition-all shadow-2xs cursor-pointer"
                               >
                                 + Loose
                               </button>
                             ) : (
                               <span
                                 title="Open packaging sale prohibited. Must be sold in full packaging."
-                                className="px-2 py-1 text-[10px] font-semibold bg-slate-100 dark:bg-[#162032] text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-750 select-none"
+                                className="px-2 py-1 text-2xs font-semibold bg-slate-100 dark:bg-[#162032] text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-750 select-none"
                               >
                                 Full Pack Only
                               </span>
@@ -628,7 +628,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         <div className="flex-1 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-xs">
           <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 dark:bg-surface-inset-dark border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase font-semibold text-[11px] tracking-wider sticky top-0 z-10">
+              <thead className="bg-slate-100 dark:bg-surface-inset-dark border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold text-xs sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3 w-8">#</th>
                   <th className="py-2.5 px-3">Product Name</th>
@@ -673,11 +673,11 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                             <span>{item.product.name}</span>
                             {isOverStock && (
                               <span title="Quantity exceeds stock on hand" className="text-amber-500">
-                                <AlertTriangle className="w-3.5 h-3.5 inline" />
+                                <AlertTriangle className="w-4 h-4 inline" />
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center space-x-2 mt-0.5">
+                          <div className="text-2xs text-slate-500 dark:text-slate-400 flex items-center space-x-2 mt-0.5">
                             <span>{item.product.unit_type}</span>
                             {item.product.location_rack && (
                               <span className="text-amber-600 dark:text-amber-400 font-mono font-semibold">[{item.product.location_rack}]</span>
@@ -685,9 +685,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                           </div>
                         </td>
 
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                        <td className="py-2.5 px-3 font-mono text-xs text-slate-600 dark:text-slate-400">
                           <div className="font-semibold text-teal-700 dark:text-teal-400">{item.product.c_code}</div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-500">{item.product.p_code}</div>
+                          <div className="text-2xs text-slate-500 dark:text-slate-500">{item.product.p_code}</div>
                         </td>
 
                         {/* Dual Unit Sale Segmented Toggle */}
@@ -699,7 +699,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                                 <button
                                   type="button"
                                   onClick={() => item.is_loose && toggleLooseUnit(idx)}
-                                  className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                                  className={`px-2 py-0.5 text-2xs font-bold rounded transition-all cursor-pointer ${
                                     !item.is_loose
                                       ? 'bg-teal-600 text-white shadow-2xs'
                                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -718,7 +718,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                                     if (!item.is_loose) toggleLooseUnit(idx);
                                   }}
                                   title={canOpen ? "Switch to loose unit sale" : "Open sale prohibited for this medicine"}
-                                  className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all ${
+                                  className={`px-2 py-0.5 text-2xs font-bold rounded transition-all ${
                                     !canOpen
                                       ? 'opacity-30 cursor-not-allowed text-slate-400 line-through'
                                       : item.is_loose
@@ -740,20 +740,20 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                               onClick={() => updateQuantity(idx, item.quantity - 1)}
                               className="p-1 rounded-sm bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
                             >
-                              <Minus className="w-3 h-3" />
+                              <Minus className="w-4 h-4" />
                             </button>
                             <input
                               type="number"
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateQuantity(idx, parseFloat(e.target.value) || 1)}
-                              className="w-12 text-center bg-white dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-sm py-0.5 text-slate-900 dark:text-white font-mono text-xs focus:outline-hidden focus:border-teal-500"
+                              className="field-input field-sm w-12 text-center font-mono"
                             />
                             <button
                               onClick={() => updateQuantity(idx, item.quantity + 1)}
                               className="p-1 rounded-sm bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
                             >
-                              <Plus className="w-3 h-3" />
+                              <Plus className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
@@ -765,7 +765,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                             step="0.01"
                             value={item.unit_price}
                             onChange={(e) => updateUnitPrice(idx, parseFloat(e.target.value) || 0)}
-                            className="w-16 text-right bg-white dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-sm py-0.5 px-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-hidden focus:border-teal-500"
+                            className="field-input field-sm w-16 text-right font-mono"
                           />
                         </td>
 
@@ -778,7 +778,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                             step="1"
                             value={item.discount_pct}
                             onChange={(e) => updateDiscountPct(idx, parseFloat(e.target.value) || 0)}
-                            className="w-12 text-center bg-white dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-sm py-0.5 px-1 text-teal-700 dark:text-teal-300 font-mono text-xs focus:outline-hidden focus:border-teal-500 font-semibold"
+                            className="field-input field-sm w-12 text-center font-mono font-semibold"
                           />
                         </td>
 
@@ -817,9 +817,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                 className="flex items-center space-x-1.5 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors"
                 title="Discard cart and start a fresh invoice [F2]"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-4 h-4" />
                 <span>New Invoice</span>
-                <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded-sm border border-rose-200 dark:border-rose-800">F2</kbd>
+                <kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded-sm border border-rose-200 dark:border-rose-800">F2</kbd>
               </button>
             )}
           </div>
@@ -832,11 +832,11 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
             <span className="flex items-center space-x-1.5">
-              <User className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <User className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               <span>Customer Details</span>
-              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F4</kbd>
+              <kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F4</kbd>
             </span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400">Counter Sale</span>
+            <span className="text-2xs text-slate-500 dark:text-slate-400">Counter Sale</span>
           </div>
 
           <div className="space-y-2">
@@ -846,14 +846,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               value={customerName}
               onChange={(e) => setCustomer(null, e.target.value, customerPhone)}
               placeholder="Customer Name (e.g. Counter Customer) [F4]"
-              className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+              className="field-input field-sm w-full"
             />
             <input
               type="text"
               value={customerPhone}
               onChange={(e) => setCustomer(null, customerName, e.target.value)}
               placeholder="Contact Number (Optional)"
-              className="w-full bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+              className="field-input field-sm w-full"
             />
           </div>
         </div>
@@ -873,12 +873,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           {/* Overall Bill Discount */}
           <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <span className="text-xs text-slate-700 dark:text-slate-300 flex items-center space-x-1.5 font-medium">
-              <Percent className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <Percent className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               <span>Bill Disc:</span>
-              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F6</kbd>
+              <kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F6</kbd>
               {!canDiscount && (
                 <span title="Discount permission required">
-                  <Lock className="w-3 h-3 text-amber-500" />
+                  <Lock className="w-4 h-4 text-amber-500" />
                 </span>
               )}
             </span>
@@ -908,7 +908,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                 }`}
               />
               <span className="text-xs text-slate-500 dark:text-slate-400">%</span>
-              <span className="text-[10px] text-teal-700 dark:text-teal-300 font-bold bg-teal-50 dark:bg-teal-950/70 border border-teal-200 dark:border-teal-800 px-1.5 py-0.5 rounded-sm">
+              <span className="text-2xs text-teal-700 dark:text-teal-300 font-bold bg-teal-50 dark:bg-teal-950/70 border border-teal-200 dark:border-teal-800 px-1.5 py-0.5 rounded-sm">
                 Max {maxBillDiscount}%
               </span>
             </div>
@@ -923,8 +923,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
           {/* NET PAYABLE */}
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-col space-y-1">
-            <span className="text-xs uppercase font-extrabold tracking-wider text-slate-500 dark:text-slate-400">Net Payable Amount</span>
-            <div className="bg-linear-to-r from-teal-50 to-emerald-50 dark:from-teal-950/40 dark:to-emerald-950/30 p-3 rounded-xl border border-teal-200 dark:border-teal-800/60 flex items-baseline justify-between">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Net Payable Amount</span>
+            <div className="bg-teal-50 dark:from-teal-950/40 dark:to-emerald-950/30 p-3 rounded-xl border border-teal-200 dark:border-teal-800/60 flex items-baseline justify-between">
               <span className="text-xs font-bold text-teal-700 dark:text-teal-300">TOTAL</span>
               <div className="text-3xl font-extrabold font-mono text-teal-700 dark:text-teal-400 tracking-tight">
                 {money(totals.netTotal)}
@@ -943,14 +943,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                 onClick={() => setPaymentType(type)}
                 className={`py-2 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 border transition-all ${
                   paymentType === type
-                    ? 'bg-teal-600 text-white border-teal-500 shadow-md shadow-teal-500/20'
+                    ? 'bg-teal-600 text-white border-teal-500 shadow-md'
                     : 'bg-white dark:bg-surface-inset-dark border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#162032]'
                 }`}
               >
-                {type === 'Cash' && <Banknote className="w-3.5 h-3.5" />}
-                {type === 'Card' && <CreditCard className="w-3.5 h-3.5" />}
-                {type === 'Online' && <Smartphone className="w-3.5 h-3.5" />}
-                {type === 'Credit' && <User className="w-3.5 h-3.5" />}
+                {type === 'Cash' && <Banknote className="w-4 h-4" />}
+                {type === 'Card' && <CreditCard className="w-4 h-4" />}
+                {type === 'Online' && <Smartphone className="w-4 h-4" />}
+                {type === 'Credit' && <User className="w-4 h-4" />}
                 <span>{type}</span>
               </button>
             ))}
@@ -962,7 +962,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           <div className="flex justify-between items-center">
             <span className="text-xs text-slate-700 dark:text-slate-300 font-semibold flex items-center space-x-1.5">
               <span>Cash Received:</span>
-              <kbd className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F8</kbd>
+              <kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F8</kbd>
             </span>
             <input
               ref={tenderedInputRef}
@@ -970,7 +970,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               value={cashTendered || ''}
               onChange={(e) => setCashTendered(parseFloat(e.target.value) || 0)}
               placeholder={totals.netTotal.toString()}
-              className="w-28 text-right bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 rounded-lg py-1 px-2 text-slate-900 dark:text-white font-mono text-sm font-bold focus:outline-hidden focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+              className="field-input field-sm w-28 text-right font-mono font-bold"
             />
           </div>
 
@@ -985,7 +985,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                   key={idx}
                   onClick={() => setCashTendered(amt)}
                   title={isExact ? 'Exact Net Total' : `Tender ${currency} ${amt}`}
-                  className={`flex-1 py-1 px-1 text-[10px] font-mono font-semibold rounded border transition-all truncate ${
+                  className={`flex-1 py-1 px-1 text-2xs font-mono font-semibold rounded border transition-all truncate ${
                     isSelected
                       ? 'bg-teal-600 text-white border-teal-500 shadow-xs'
                       : isExact
@@ -1012,11 +1012,11 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           <button
             onClick={() => handleCompleteSale(true)}
             disabled={cart.length === 0 || loadingSale}
-            className="w-full py-3.5 bg-linear-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg shadow-teal-500/20 active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer"
+            className="w-full py-3.5 bg-teal-700 hover:bg-teal-800 disabled:opacity-50 text-white font-bold text-sm rounded-xl shadow-lg active:scale-[0.99] transition-all flex items-center justify-center space-x-2 cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             <span>{loadingSale ? 'Processing Sale...' : 'Save & Print Invoice'}</span>
-            <kbd className="ml-1 px-1.5 py-0.5 text-[10px] font-mono font-bold bg-teal-800/60 text-white rounded-sm border border-teal-400/30">F10</kbd>
+            <kbd className="ml-1 px-1.5 py-0.5 text-2xs font-mono font-bold bg-teal-800/60 text-white rounded-sm border border-teal-400/30">F10</kbd>
           </button>
 
           <button
@@ -1024,9 +1024,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             disabled={cart.length === 0 || loadingSale}
             className="w-full py-2 bg-slate-100 dark:bg-[#162032] hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <CheckCircle2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
             <span>Save Without Print</span>
-            <kbd className="ml-1 px-1.5 py-0.5 text-[9px] font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F9</kbd>
+            <kbd className="ml-1 px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F9</kbd>
           </button>
         </div>
       </div>
@@ -1035,22 +1035,22 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       {/* Persistent Keyboard Shortcuts Bottom Ribbon */}
       <div className="bg-slate-900 text-slate-300 dark:bg-[#070b12] border-t border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs select-none shadow-lg shrink-0 z-20">
         <div className="flex items-center space-x-3 overflow-x-auto py-0.5">
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F2</kbd><span className="text-[11px] font-medium text-slate-300">New Sale</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F3</kbd><span className="text-[11px] font-medium text-slate-300">Search</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F4</kbd><span className="text-[11px] font-medium text-slate-300">Customer</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F6</kbd><span className="text-[11px] font-medium text-slate-300">Discount</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F8</kbd><span className="text-[11px] font-medium text-slate-300">Payment</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-emerald-400 rounded-sm border border-slate-700 shadow-2xs">F9</kbd><span className="text-[11px] font-medium text-slate-300">Save</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-amber-400 rounded-sm border border-slate-700 shadow-2xs">F10</kbd><span className="text-[11px] font-medium text-slate-300">Print</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-slate-800 text-rose-400 rounded-sm border border-slate-700 shadow-2xs">Esc</kbd><span className="text-[11px] font-medium text-slate-300">Close / Cancel</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F2</kbd><span className="text-xs font-medium text-slate-300">New Sale</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F3</kbd><span className="text-xs font-medium text-slate-300">Search</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F4</kbd><span className="text-xs font-medium text-slate-300">Customer</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F6</kbd><span className="text-xs font-medium text-slate-300">Discount</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F8</kbd><span className="text-xs font-medium text-slate-300">Payment</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-emerald-400 rounded-sm border border-slate-700 shadow-2xs">F9</kbd><span className="text-xs font-medium text-slate-300">Save</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-amber-400 rounded-sm border border-slate-700 shadow-2xs">F10</kbd><span className="text-xs font-medium text-slate-300">Print</span></span>
+          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-rose-400 rounded-sm border border-slate-700 shadow-2xs">Esc</kbd><span className="text-xs font-medium text-slate-300">Close / Cancel</span></span>
         </div>
 
         <button
           type="button"
           onClick={() => setIsShortcutsModalOpen(true)}
-          className="text-teal-400 hover:text-teal-300 font-medium text-[11px] flex items-center space-x-1 transition-colors px-2 py-0.5 rounded-sm hover:bg-slate-800 cursor-pointer"
+          className="text-teal-400 hover:text-teal-300 font-medium text-xs flex items-center space-x-1 transition-colors px-2 py-0.5 rounded-sm hover:bg-slate-800 cursor-pointer"
         >
-          <Keyboard className="w-3.5 h-3.5" />
+          <Keyboard className="w-4 h-4" />
           <span>Shortcuts Guide</span>
         </button>
       </div>
@@ -1091,51 +1091,51 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">F2</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F2</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Start New Invoice</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Clears cart & customer, resets form, and focuses search input.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Clears cart & customer, resets form, and focuses search input.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">F3</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F3</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Focus Product Search</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Focuses search box and selects all text for instant barcode re-scan.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Focuses search box and selects all text for instant barcode re-scan.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">F4</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F4</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Focus Customer Field</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Directly jumps to customer name input for credit or counter tagging.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Directly jumps to customer name input for credit or counter tagging.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">F6</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F6</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Apply Bill Discount</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Focuses discount % input. Restricted to authorized cashiers/admins.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Focuses discount % input. Restricted to authorized cashiers/admins.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">F8</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F8</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Payment & Tender</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Jumps focus to cash received field to enter tendered cash.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Jumps focus to cash received field to enter tendered cash.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-emerald-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">F9</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-emerald-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F9</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Save Invoice</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Finalizes and saves invoice with anti-duplicate debounce protection.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Finalizes and saves invoice with anti-duplicate debounce protection.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-amber-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">F10</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-amber-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F10</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Print Receipt</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Saves & prints thermal receipt, or reprints receipt if already saved.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Saves & prints thermal receipt, or reprints receipt if already saved.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-              <span className="w-20"><kbd className="bg-slate-800 text-rose-400 font-bold px-2 py-0.5 rounded-sm font-mono text-[11px] border border-slate-700">Esc</kbd></span>
+              <span className="w-20"><kbd className="bg-slate-800 text-rose-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">Esc</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Cancel / Close</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-[11px]">Closes active dialog or clears search dropdown without clearing cart.</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Closes active dialog or clears search dropdown without clearing cart.</span>
             </div>
           </div>
 
@@ -1143,7 +1143,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             <button
               type="button"
               onClick={() => setIsShortcutsModalOpen(false)}
-              className="btn-cancel text-xs"
+              className="btn-secondary"
             >
               Close Guide
             </button>

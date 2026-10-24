@@ -176,20 +176,20 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             value={searchInvoice}
             onChange={(e) => setSearchInvoice(e.target.value)}
             placeholder="Search by Invoice # (e.g. INV-2026...)"
-            className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+            className="field-input w-full pl-10 pr-4"
           />
         </div>
 
         <div className="flex items-center space-x-2">
           <span className="text-xs text-slate-600 dark:text-slate-400 flex items-center space-x-1">
-            <Calendar className="w-3.5 h-3.5" />
+            <Calendar className="w-4 h-4" />
             <span>From:</span>
           </span>
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
+            className="field-input font-mono"
           />
         </div>
 
@@ -199,13 +199,13 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500 font-mono"
+            className="field-input font-mono"
           />
         </div>
 
         <button
           type="submit"
-          className="btn-primary px-4 py-2 text-xs"
+          className="btn-primary"
         >
           Filter Invoices
         </button>
@@ -219,7 +219,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
               setDateTo('');
               api.getSales().then(setSales);
             }}
-            className="btn-cancel px-3 py-2 text-xs"
+            className="btn-secondary"
           >
             Reset
           </button>
@@ -230,7 +230,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
       <div className="table-container">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 uppercase font-semibold text-[11px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+            <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 font-semibold text-xs border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="py-3 px-4">Invoice #</th>
                 <th className="py-3 px-4">Date & Time</th>
@@ -276,10 +276,10 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                     </td>
                     <td className="py-3 px-4 text-slate-900 dark:text-white font-medium">
                       <div>{sale.customer_name}</div>
-                      {sale.customer_phone && <div className="text-[10px] text-slate-500 dark:text-slate-400 font-normal">{sale.customer_phone}</div>}
+                      {sale.customer_phone && <div className="text-2xs text-slate-500 dark:text-slate-400 font-normal">{sale.customer_phone}</div>}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                      <span className={`px-2 py-0.5 rounded text-2xs font-semibold border ${
                         sale.payment_type === 'Online'
                           ? 'bg-purple-50 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
                           : sale.payment_type === 'Card'
@@ -309,10 +309,10 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                       <div className="flex items-center justify-center space-x-1.5">
                         <button
                           onClick={() => handleOpenReceipt(sale.id)}
-                          className="btn-print px-2.5 py-1 text-xs flex items-center space-x-1"
+                          className="btn-print btn-sm"
                           title="View / Print Receipt"
                         >
-                          <Eye className="w-3 h-3" />
+                          <Eye className="w-4 h-4" />
                           <span>Receipt</span>
                         </button>
 
@@ -322,7 +322,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                             className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-semibold border border-amber-300 dark:border-amber-700/60 transition-colors flex items-center space-x-1"
                             title="Return Items"
                           >
-                            <RotateCcw className="w-3 h-3" />
+                            <RotateCcw className="w-4 h-4" />
                             <span>Return</span>
                           </button>
                         )}
@@ -400,7 +400,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                               [prodId]: { ...prev[prodId], qty: val }
                             }));
                           }}
-                          className="w-16 text-center bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-lg py-1 text-slate-900 dark:text-white font-mono text-xs focus:outline-hidden focus:border-teal-500"
+                          className="field-input field-sm w-16 text-center font-mono"
                         />
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
@@ -419,14 +419,14 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
               type="text"
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
-              className="w-full bg-white dark:bg-[#111827] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+              className="field-input w-full"
             />
           </div>
 
           <div className="flex justify-end space-x-2 pt-2">
             <button
               onClick={() => setIsReturnModalOpen(false)}
-              className="btn-cancel px-4 py-2 text-xs"
+              className="btn-secondary"
             >
               Cancel
             </button>

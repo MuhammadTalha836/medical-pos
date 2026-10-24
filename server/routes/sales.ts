@@ -2,9 +2,9 @@ import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { parseBody, createSaleSchema } from '../validation/schemas';
-import { DEFAULT_DEVELOPER_FOOTER } from '../../shared/invoice';
 import { sessionIdentity, sendError } from '../http/context';
 import { formatSale } from '../http/formatters';
+import { DEVELOPER_PROFILE_SETTING_KEYS, composeInvoiceFooter } from '../../shared/developerProfile';
 
 // Counter sales (POS), sales history and returns
 const router = Router();
@@ -114,13 +114,13 @@ router.post('/api/sales', async (req: Request, res: Response) => {
 
         // Snapshot the protected store identity & developer footer so reprints match the original receipt
         const identityRows = await tx.systemSetting.findMany({
-          where: { key: { in: ['store_name', 'store_address', 'developer_invoice_footer'] } }
+          where: { key: { in: ['store_name', 'store_address', 'developer_invoice_footer', ...DEVELOPER_PROFILE_SETTING_KEYS] } }
         });
         const identity: Record<string, string> = {};
         for (const row of identityRows) identity[row.key] = row.value;
         const storeNameSnapshot = identity.store_name ?? null;
         const storeAddressSnapshot = identity.store_address ?? null;
-        const invoiceFooterSnapshot = identity.developer_invoice_footer || DEFAULT_DEVELOPER_FOOTER;
+        const invoiceFooterSnapshot = composeInvoiceFooter(identity);
 
         // 1. Insert Sale Master
         const sale = await tx.sale.create({

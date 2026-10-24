@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/apiService';
 import { useAuthStore } from '../../store/useAuthStore';
+import { AppLogo } from '../common/AppLogo';
+import { DeveloperCredit } from '../common/DeveloperCredit';
+import { SystemSettings } from '../../types';
 import {
   Lock,
   User,
-  Activity,
   AlertCircle,
   Eye,
   EyeOff,
@@ -18,10 +20,11 @@ import {
 
 interface LoginModalProps {
   isOpen: boolean;
+  settings?: SystemSettings | null;
   onSuccess?: () => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, settings, onSuccess }) => {
   const { setUser } = useAuthStore();
   const [authMode, setAuthMode] = useState<'staff' | 'developer'>('staff');
 
@@ -109,16 +112,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in select-none">
-      <div className="w-full max-w-md bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md select-none">
+      <div className="w-full max-w-md bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-6 sm:p-8 space-y-6">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-linear-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-teal-500/25">
-            <Activity className="w-8 h-8 text-white" />
-          </div>
+          <AppLogo className="w-14 h-14 drop-shadow-lg" />
           <div>
             <h1 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              PharmaCare<span className="text-teal-600 dark:text-teal-400">Pro</span>
+              PharmaCare Pro
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               Secure Sign-In • 100% Offline POS
@@ -127,7 +128,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
         </div>
 
         {/* Mode Switcher Tabs */}
-        <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+        <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={() => {
@@ -167,7 +168,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
 
         {/* Staff Login Form (replaced by a notice once the demo period has ended) */}
         {authMode === 'staff' && demoEnded ? (
-          <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-2xl text-amber-900 dark:text-amber-200 space-y-2">
+          <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-amber-900 dark:text-amber-200 space-y-2">
             <div className="flex items-center space-x-2 text-sm font-bold">
               <CalendarX2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               <span>Demo period has ended</span>
@@ -195,7 +196,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Your username"
                   autoComplete="username"
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                  className="field-input w-full pl-9 pr-3 font-medium"
                 />
               </div>
             </div>
@@ -214,7 +215,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-10 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                  className="field-input w-full pl-9 pr-10 font-mono"
                 />
                 <button
                   type="button"
@@ -229,7 +230,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-linear-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-teal-500/25 active:scale-98 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+              className="w-full py-2.5 bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
             >
               <span>{loading ? 'Authenticating...' : 'Sign In to Workspace'}</span>
               <ArrowRight className="w-4 h-4" />
@@ -239,7 +240,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
         ) : (
           /* Developer TOTP Login Form */
           <form onSubmit={handleDeveloperLogin} className="space-y-4">
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-[11px] text-amber-800 dark:text-amber-300 flex items-start space-x-2">
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start space-x-2">
               <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <span>
                 Developer sign-in uses the 6-digit code from the developer's authenticator app. Staff accounts sign in with username and password.
@@ -260,7 +261,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                   value={developerEmail}
                   onChange={(e) => setDeveloperEmail(e.target.value)}
                   placeholder="developer@email.com"
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-xs text-slate-900 dark:text-white font-medium focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                  className="field-input w-full pl-9 pr-3 font-medium"
                 />
               </div>
             </div>
@@ -283,10 +284,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="123456"
-                  className="w-full bg-slate-50 dark:bg-surface-inset-dark border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2.5 text-sm font-mono font-extrabold tracking-widest text-slate-900 dark:text-teal-300 focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-all"
+                  className="field-input w-full pl-9 pr-3 font-mono font-extrabold tracking-widest"
                 />
               </div>
-              <span className="text-[10px] text-slate-400 mt-1 block">
+              <span className="text-2xs text-slate-400 mt-1 block">
                 Generated offline on your mobile device.
               </span>
             </div>
@@ -294,7 +295,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
             <button
               type="submit"
               disabled={loading || totpCode.length !== 6}
-              className="w-full py-2.5 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-amber-500/25 active:scale-98 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+              className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
             >
               <span>{loading ? 'Verifying code...' : 'Verify & Enter as Developer'}</span>
               <ArrowRight className="w-4 h-4" />
@@ -302,10 +303,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
           </form>
         )}
 
-        <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+        <div className="flex items-center justify-center space-x-1.5 text-xs text-slate-400">
+          <ShieldCheck className="w-4 h-4 text-emerald-500" />
           <span>PharmaCare Pro • 100% Offline POS</span>
         </div>
+        <DeveloperCredit settings={settings} placement="login" />
       </div>
     </div>
   );

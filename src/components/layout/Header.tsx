@@ -3,31 +3,36 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useShiftStore } from '../../store/useShiftStore';
 import { ProfileModal } from '../auth/ProfileModal';
+import { AppLogo } from '../common/AppLogo';
 import { api } from '../../services/apiService';
-import { LicenseStatus } from '../../types';
+import { LicenseStatus, SystemSettings } from '../../types';
+import { SupportModal } from './SupportModal';
+import { developerInfoFor } from '../../../shared/developerProfile';
 import {
-  Activity,
   Clock,
-  ShieldCheck,
   Database,
   Calendar,
   UserCheck,
   Sun,
   Moon,
   LogOut,
+  LifeBuoy,
 } from 'lucide-react';
 import { useShiftElapsed } from '../../hooks/useShiftElapsed';
 
 interface HeaderProps {
+  settings: SystemSettings | null;
   onQuickBackup?: () => void;
   onOpenClosing?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) => {
+export const Header: React.FC<HeaderProps> = ({ settings, onQuickBackup, onOpenClosing }) => {
   const { user, hasPermission, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const { activeShift, setStartModalOpen, setClosingModalOpen } = useShiftStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const hasSupportInfo = developerInfoFor(settings, 'about').length > 0;
   const [time, setTime] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [license, setLicense] = useState<LicenseStatus | null>(null);
@@ -63,13 +68,11 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
       {/* Brand & Status */}
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-md shadow-teal-500/20">
-            <Activity className="w-5 h-5 text-white" />
-          </div>
+          <AppLogo className="w-10 h-10" />
           <div>
             <div className="flex items-center space-x-2">
               <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">
-                PharmaCare<span className="text-teal-600 dark:text-teal-400">Pro</span>
+                PharmaCare Pro
               </span>
               <span className="badge-info">
                 POS v1.0
@@ -87,13 +90,6 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
           </div>
         </div>
 
-        <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden md:block"></div>
-
-        {/* Offline Badge */}
-        <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full badge-success">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span>100% Offline POS</span>
-        </div>
       </div>
 
       {/* Clock, Theme Toggle & Action Controls */}
@@ -101,12 +97,12 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
         {/* Date & Time */}
         <div className="hidden lg:flex items-center space-x-3 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-xs">
           <div className="flex items-center space-x-1.5">
-            <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-400" />
+            <Calendar className="w-4 h-4 text-slate-400 dark:text-slate-400" />
             <span>{date}</span>
           </div>
           <div className="h-3 w-px bg-slate-200 dark:bg-slate-700"></div>
           <div className="flex items-center space-x-1.5 font-mono font-medium text-teal-700 dark:text-teal-300">
-            <Clock className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            <Clock className="w-4 h-4 text-teal-600 dark:text-teal-400" />
             <span>{time}</span>
           </div>
         </div>
@@ -115,30 +111,42 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
         <button
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Switch to Eye-Friendly Light Mode' : 'Switch to Night-Shift Dark Mode'}
-          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium transition-colors"
+          className="btn-secondary btn-sm"
         >
           {theme === 'dark' ? (
             <>
-              <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
-              <span className="hidden sm:inline text-xs font-semibold">Light Mode</span>
+              <Sun className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline">Light</span>
             </>
           ) : (
             <>
               <Moon className="w-4 h-4 text-teal-600" />
-              <span className="hidden sm:inline text-xs font-semibold">Dark Mode</span>
+              <span className="hidden sm:inline">Dark</span>
             </>
           )}
         </button>
+
+        {/* Developer support contact (shown once the Developer fills it in) */}
+        {hasSupportInfo && (
+          <button
+            onClick={() => setIsSupportOpen(true)}
+            title="Software support contact"
+            className="btn-secondary btn-sm"
+          >
+            <LifeBuoy className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            <span className="hidden sm:inline">Support</span>
+          </button>
+        )}
 
         {/* Quick Backup button (Protected by permission) */}
         {onQuickBackup && hasPermission('can_backup') && (
           <button
             onClick={onQuickBackup}
             title="Instant Backup"
-            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors"
+            className="btn-secondary btn-sm"
           >
-            <Database className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            <span className="hidden sm:inline">Backup DB</span>
+            <Database className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+            <span className="hidden sm:inline">Backup</span>
           </button>
         )}
 
@@ -155,8 +163,8 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="font-mono">{activeShift.shift_no}</span>
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono">({elapsedFormatted})</span>
-              <span className="text-[10px] uppercase tracking-wider bg-emerald-200/60 dark:bg-emerald-800/60 px-1.5 py-0.5 rounded-sm font-bold ml-1">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-mono">({elapsedFormatted})</span>
+              <span className="text-2xs bg-emerald-200/60 dark:bg-emerald-800/60 px-1.5 py-0.5 rounded-sm font-bold ml-1">
                 Close Shift
               </span>
             </button>
@@ -168,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
             >
               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
               <span>Shift Inactive</span>
-              <span className="text-[10px] uppercase tracking-wider bg-amber-200/60 dark:bg-amber-800/60 px-1.5 py-0.5 rounded-sm font-bold ml-1">
+              <span className="text-2xs bg-amber-200/60 dark:bg-amber-800/60 px-1.5 py-0.5 rounded-sm font-bold ml-1">
                 Start Shift
               </span>
             </button>
@@ -189,7 +197,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
               <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight group-hover:text-teal-600 dark:group-hover:text-teal-400">
                 {user?.full_name || 'Pharmacist'}
               </div>
-              <div className="text-[10px] uppercase font-bold text-teal-600 dark:text-teal-400 tracking-wider">
+              <div className="text-2xs font-bold text-teal-600 dark:text-teal-400">
                 {user?.role_display || user?.role || 'Admin'}
               </div>
             </div>
@@ -201,7 +209,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
             title="Sign Out / Switch Shift"
             className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 dark:bg-[#162032] dark:hover:bg-rose-950/60 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition-colors"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -211,6 +219,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
       />
+      <SupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} settings={settings} />
     </header>
   );
 };

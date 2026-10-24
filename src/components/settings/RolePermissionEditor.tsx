@@ -29,7 +29,7 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({ titl
     onChange({ ...permissions, [key]: !permissions[key] });
   };
 
-  const presetButton = 'px-2.5 py-1 text-[11px] rounded-sm bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300';
+  const presetButton = 'btn-secondary btn-sm';
 
   return (
     <>
@@ -42,7 +42,7 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({ titl
           <button
             type="button"
             onClick={() => onChange({ ...DEFAULT_CASHIER_PERMISSIONS })}
-            className="px-2.5 py-1 text-[11px] rounded-sm bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30"
+            className="px-2.5 py-1 text-xs rounded-sm bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30"
           >
             Cashier Preset
           </button>
@@ -60,7 +60,7 @@ export const RolePermissionEditor: React.FC<RolePermissionEditorProps> = ({ titl
             key={group.title}
             className="p-3 bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl space-y-2"
           >
-            <span className="font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider text-[11px] block">
+            <span className="font-bold text-teal-600 dark:text-teal-400 text-xs block">
               {index + 1}. {group.title}
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

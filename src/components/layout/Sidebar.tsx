@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { SystemSettings } from '../../types';
+import { DeveloperCredit } from '../common/DeveloperCredit';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -21,38 +23,38 @@ export type TabType = 'dashboard' | 'pos' | 'sales' | 'shifts' | 'masters' | 'pu
 interface SidebarProps {
   currentTab: TabType;
   onSelectTab: (tab: TabType) => void;
+  settings: SystemSettings | null;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, settings }) => {
   const [collapsed, setCollapsed] = useState(false);
   const { user, hasModuleAccess } = useAuthStore();
 
   interface NavItem {
     id: TabType;
     label: string;
-    icon: any;
+    icon: React.ElementType;
     hotkey?: string;
-    badge?: string;
   }
 
   const cashierNavItems: NavItem[] = [
-    { id: 'pos', label: 'Counter Sale (POS)', icon: ShoppingCart, hotkey: 'F1', badge: 'Active' },
+    { id: 'pos', label: 'New Sale', icon: ShoppingCart, hotkey: 'F1' },
     { id: 'sales', label: 'Sales & Returns', icon: Receipt },
-    { id: 'khata', label: 'Customer Credit (Khata)', icon: CreditCard },
+    { id: 'khata', label: 'Customer Khata', icon: CreditCard },
   ];
 
   const adminNavItems: NavItem[] = [
-    { id: 'dashboard', label: 'Executive Dashboard', icon: LayoutDashboard },
-    { id: 'shifts', label: 'Shift Management', icon: Timer, badge: 'Admin' },
-    { id: 'masters', label: 'Medicines & Masters', icon: Package },
-    { id: 'purchases', label: 'Purchases & Stock', icon: Truck },
-    { id: 'reports', label: 'Reports & P&L', icon: BarChart3 },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'shifts', label: 'Shifts', icon: Timer },
+    { id: 'masters', label: 'Medicines', icon: Package },
+    { id: 'purchases', label: 'Purchases', icon: Truck },
+    { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'utilities', label: 'Backup & Recovery', icon: Database },
-    { id: 'settings', label: 'System Settings', icon: Settings },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   const developerNavItems: NavItem[] = [
-    { id: 'developer', label: 'Developer Console', icon: ShieldAlert, badge: 'Dev' },
+    { id: 'developer', label: 'Developer', icon: ShieldAlert },
   ];
 
   const visibleCashierItems = cashierNavItems.filter(item => hasModuleAccess(item.id));
@@ -68,40 +70,31 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         key={item.id}
         onClick={() => onSelectTab(item.id)}
         title={collapsed ? item.label : undefined}
-        className={`w-full flex items-center ${collapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2.5'} rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+        className={`w-full flex items-center ${collapsed ? 'justify-center px-2 h-11' : 'justify-between px-3 h-11'} rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
           isActive
             ? isDev
-              ? 'bg-purple-50 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 shadow-2xs'
-              : 'bg-teal-50 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800/80 shadow-2xs'
+              ? 'bg-purple-50 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300'
+              : 'bg-teal-700 text-white dark:bg-teal-600'
             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#111827]'
         }`}
       >
-        <div className="flex items-center space-x-2.5 truncate">
-          <Icon className={`w-4 h-4 shrink-0 ${
+        <div className="flex items-center gap-3 truncate">
+          <Icon className={`w-5 h-5 shrink-0 ${
             isActive
               ? isDev
                 ? 'text-purple-600 dark:text-purple-400'
-                : 'text-teal-600 dark:text-teal-400'
-              : 'text-slate-400 dark:text-slate-500'
+                : 'text-white'
+              : 'text-slate-500 dark:text-slate-400'
           }`} />
           {!collapsed && <span className="truncate">{item.label}</span>}
         </div>
         {!collapsed && item.hotkey && (
-          <span className={`px-1.5 py-0.5 text-[9px] font-mono rounded font-bold ${
+          <span className={`px-1.5 py-0.5 text-2xs font-mono rounded font-bold ${
             isActive
-              ? 'bg-teal-100 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200'
+              ? 'bg-white/20 text-white'
               : 'bg-slate-200 dark:bg-[#162032] text-slate-500 dark:text-slate-400'
           }`}>
             {item.hotkey}
-          </span>
-        )}
-        {!collapsed && item.badge && !item.hotkey && (
-          <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${
-            isDev
-              ? 'bg-purple-100 dark:bg-purple-900/60 text-purple-700 dark:text-purple-300'
-              : 'bg-slate-200 dark:bg-[#162032] text-slate-500 dark:text-slate-400'
-          }`}>
-            {item.badge}
           </span>
         )}
       </button>
@@ -109,11 +102,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
   };
 
   return (
-    <aside className={`${collapsed ? 'w-18' : 'w-64'} bg-slate-50/95 dark:bg-[#0a0e17]/95 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between select-none transition-all duration-200`}>
+    <aside className={`${collapsed ? 'w-18' : 'w-60'} bg-white dark:bg-[#0d131f] border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between select-none transition-all duration-200`}>
       <div className="py-3 px-2.5 space-y-3 overflow-y-auto">
         {/* Module Header / Toggle */}
-        <div className="flex items-center justify-between px-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-          {!collapsed && <span>Pharmacy Nav</span>}
+        <div className="flex items-center justify-between px-2 text-2xs font-semibold text-slate-400 dark:text-slate-500">
+          {!collapsed && <span>Menu</span>}
           <button
             onClick={() => setCollapsed(!collapsed)}
             title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
@@ -127,8 +120,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         {visibleCashierItems.length > 0 && (
           <div className="space-y-1">
             {!collapsed && (
-              <div className="px-2 pt-1 pb-1 text-[9px] font-black uppercase tracking-wider text-teal-700 dark:text-teal-400/80">
-                Daily Operations
+              <div className="px-2 pt-1 pb-1 text-2xs font-semibold text-teal-700 dark:text-teal-400/80">
+                Daily work
               </div>
             )}
             {visibleCashierItems.map(renderNavButton)}
@@ -139,8 +132,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         {visibleAdminItems.length > 0 && (
           <div className="space-y-1 pt-1 border-t border-slate-200/80 dark:border-slate-800/80">
             {!collapsed && (
-              <div className="px-2 pt-2 pb-1 text-[9px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Management & Admin
+              <div className="px-2 pt-2 pb-1 text-2xs font-semibold text-slate-500 dark:text-slate-400">
+                Management
               </div>
             )}
             {visibleAdminItems.map(renderNavButton)}
@@ -151,8 +144,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         {user?.role === 'developer' && (
           <div className="space-y-1 pt-1 border-t border-purple-500/20 dark:border-purple-500/20">
             {!collapsed && (
-              <div className="px-2 pt-2 pb-1 text-[9px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                Developer Master Control
+              <div className="px-2 pt-2 pb-1 text-2xs font-semibold text-purple-600 dark:text-purple-400">
+                Developer
               </div>
             )}
             {developerNavItems.map(renderNavButton)}
@@ -160,21 +153,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
         )}
       </div>
 
-      {/* System Status footer widget */}
-      {!collapsed && (
-        <div className="p-3.5 m-2.5 rounded-xl bg-slate-200/50 dark:bg-[#111827]/70 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
-          <div className="flex items-center justify-between font-semibold text-slate-800 dark:text-slate-300">
-            <span>System Status</span>
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          </div>
-          <div className="text-[11px] space-y-0.5 text-slate-500 dark:text-slate-400">
-            <div className="flex justify-between">
-              <span>Mode:</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">100% Offline POS</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Developer contact (chosen by the Developer) */}
+      {!collapsed && <DeveloperCredit settings={settings} placement="sidebar" />}
     </aside>
   );
 };

@@ -7,11 +7,36 @@ import { logSecurityAudit } from '../security/audit';
 import { getDeveloperEmail } from '../security/developerKey';
 import { revokeUserSessions } from '../security/sessions';
 import { parseBody, developerSettingsSchema } from '../validation/schemas';
-import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../../shared/invoice';
+import { FOOTER_MAX_LENGTH } from '../../shared/invoice';
+import { DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
+import {
+  DEVELOPER_INFO_PLACEMENTS,
+  DEVELOPER_PROFILE_FIELDS,
+  DEVELOPER_PROFILE_SETTING_KEYS,
+  isValidInfoFields,
+  parseInfoFields
+} from '../../shared/developerProfile';
 import { getActingUser, sendError } from '../http/context';
 
 // Developer-only settings, password resets
 const router = Router();
+
+// Settings the Developer edits on the Developer page (developer_email is read-only: it comes from the master key)
+const WRITABLE_DEVELOPER_SETTING_KEYS = [
+  'backup_retention_limit',
+  'backup_frequency',
+  'backup_scheduled_time',
+  'backup_weekly_day',
+  'allow_admin_create_cashier',
+  'allow_admin_create_admin',
+  'allow_admin_edit_store_identity',
+  'allow_admin_hide_store_identity',
+  'store_name',
+  'store_address',
+  'developer_invoice_footer',
+  ...DEVELOPER_PROFILE_SETTING_KEYS
+];
+const DEVELOPER_SETTING_KEYS = [...WRITABLE_DEVELOPER_SETTING_KEYS, 'developer_email'];
 
 router.get('/api/developer/settings', async (req: Request, res: Response) => {
   try {
@@ -20,41 +45,10 @@ router.get('/api/developer/settings', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Access denied: Developer role required' });
     }
 
-    const settingsRows = await prisma.systemSetting.findMany({
-      where: {
-        key: {
-          in: [
-            'backup_retention_limit',
-            'backup_frequency',
-            'backup_scheduled_time',
-            'backup_weekly_day',
-            'allow_admin_create_cashier',
-            'allow_admin_create_admin',
-            'allow_admin_edit_store_identity',
-            'allow_admin_hide_store_identity',
-            'store_name',
-            'store_address',
-            'developer_invoice_footer',
-            'developer_email'
-          ]
-        }
-      }
-    });
-
-    const devSettings: Record<string, string> = {
-      backup_retention_limit: '30',
-      backup_frequency: 'daily',
-      backup_scheduled_time: '23:00',
-      backup_weekly_day: '0',
-      allow_admin_create_cashier: 'true',
-      allow_admin_create_admin: 'false',
-      allow_admin_edit_store_identity: 'false',
-      allow_admin_hide_store_identity: 'false',
-      store_name: 'PharmaCare Pharmacy',
-      store_address: 'Main Boulevard, Healthcare City',
-      developer_invoice_footer: DEFAULT_DEVELOPER_FOOTER,
-      developer_email: ''
-    };
+    const settingsRows = await prisma.systemSetting.findMany({ where: { key: { in: DEVELOPER_SETTING_KEYS } } });
+    const devSettings: Record<string, string> = Object.fromEntries(
+      DEVELOPER_SETTING_KEYS.map(key => [key, DEFAULT_SETTINGS[key] ?? ''])
+    );
 
     for (const row of settingsRows) {
       devSettings[row.key] = row.value;
@@ -88,22 +82,8 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
 
     if (!parseBody(developerSettingsSchema, req.body, res)) return;
 
-    const allowedKeys = [
-      'backup_retention_limit',
-      'backup_frequency',
-      'backup_scheduled_time',
-      'backup_weekly_day',
-      'allow_admin_create_cashier',
-      'allow_admin_create_admin',
-      'allow_admin_edit_store_identity',
-      'allow_admin_hide_store_identity',
-      'store_name',
-      'store_address',
-      'developer_invoice_footer'
-    ];
-
     const updates: Record<string, string> = {};
-    for (const key of allowedKeys) {
+    for (const key of WRITABLE_DEVELOPER_SETTING_KEYS) {
       if (req.body[key] !== undefined) {
         updates[key] = String(req.body[key]);
       }
@@ -144,6 +124,21 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
       if (updates.developer_invoice_footer.length > FOOTER_MAX_LENGTH) {
         return res.status(400).json({ error: `Invoice footer cannot exceed ${FOOTER_MAX_LENGTH} characters` });
       }
+    }
+    // Developer contact details (advertising) and where each one is shown
+    for (const field of DEVELOPER_PROFILE_FIELDS) {
+      if (updates[field.setting] === undefined) continue;
+      updates[field.setting] = updates[field.setting].trim();
+      if (updates[field.setting].length > field.maxLength) {
+        return res.status(400).json({ error: `Developer ${field.label.toLowerCase()} cannot exceed ${field.maxLength} characters` });
+      }
+    }
+    for (const placement of DEVELOPER_INFO_PLACEMENTS) {
+      if (updates[placement.setting] === undefined) continue;
+      if (!isValidInfoFields(updates[placement.setting])) {
+        return res.status(400).json({ error: `Unknown developer detail selected for the ${placement.label.toLowerCase()}` });
+      }
+      updates[placement.setting] = parseInfoFields(updates[placement.setting]).join(',');
     }
     for (const key of ['allow_admin_create_cashier', 'allow_admin_create_admin', 'allow_admin_edit_store_identity', 'allow_admin_hide_store_identity']) {
       if (updates[key] !== undefined && updates[key] !== 'true' && updates[key] !== 'false') {

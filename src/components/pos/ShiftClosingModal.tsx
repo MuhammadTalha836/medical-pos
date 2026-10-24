@@ -111,7 +111,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
       ) : closedShiftResult ? (
         /* Post-Close Completion Card */
         <div className="space-y-4 text-xs">
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center space-x-3">
+          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold">
               <Lock className="w-5 h-5" />
             </div>
@@ -125,7 +125,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2 text-slate-600 dark:text-slate-400">
+          <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 text-slate-600 dark:text-slate-400">
             <div className="flex justify-between">
               <span>Shift Identifier:</span>
               <span className="font-bold font-mono text-slate-900 dark:text-white">{closedShiftResult.shift_no}</span>
@@ -149,7 +149,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
             <button
               onClick={handlePrintThermal}
-              className="btn-print py-2.5 flex items-center justify-center space-x-1.5"
+              className="btn-print"
             >
               <Printer className="w-4 h-4" />
               <span>Print Shift Slip</span>
@@ -160,7 +160,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                 onClose();
                 if (onStartNewShiftRequest) onStartNewShiftRequest();
               }}
-              className="btn-save py-2.5 flex items-center justify-center space-x-1.5"
+              className="btn-primary"
             >
               <Plus className="w-4 h-4" />
               <span>Start New Shift</span>
@@ -171,7 +171,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                 onClose();
                 logout();
               }}
-              className="btn-cancel py-2.5 flex items-center justify-center space-x-1.5"
+              className="btn-secondary"
             >
               <LogOut className="w-4 h-4" />
               <span>Sign Out User</span>
@@ -189,40 +189,40 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
           )}
 
           {/* Shift Time & Working Hours Header Card */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-teal-500/10 dark:bg-[#111827] border border-teal-500/20 dark:border-slate-800 p-3.5 rounded-2xl">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-teal-500/10 dark:bg-[#111827] border border-teal-500/20 dark:border-slate-800 p-3.5 rounded-xl">
             <div>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Started At</span>
+              <span className="text-2xs text-slate-500 dark:text-slate-400 block">Started At</span>
               <div className="font-bold text-slate-900 dark:text-white mt-0.5">
                 {activeShift?.start_time ? new Date(activeShift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
               </div>
-              <div className="text-[10px] text-slate-400">
+              <div className="text-2xs text-slate-400">
                 {activeShift?.start_time ? new Date(activeShift.start_time).toLocaleDateString() : ''}
               </div>
             </div>
 
             <div>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Closing Time</span>
+              <span className="text-2xs text-slate-500 dark:text-slate-400 block">Closing Time</span>
               <div className="font-bold text-slate-900 dark:text-white mt-0.5">
                 {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
-              <div className="text-[10px] text-slate-400">Current Session End</div>
+              <div className="text-2xs text-slate-400">Current Session End</div>
             </div>
 
             <div className="sm:border-l sm:border-slate-200 dark:sm:border-slate-800 sm:pl-3">
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Total Working Duration</span>
+              <span className="text-2xs text-slate-500 dark:text-slate-400 block">Total Working Duration</span>
               <div className="font-bold text-teal-600 dark:text-teal-400 text-sm mt-0.5 flex items-center space-x-1 font-mono">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock className="w-4 h-4" />
                 <span>{activeSummary?.duration_formatted || 'Calculating...'}</span>
               </div>
-              <div className="text-[10px] text-slate-400">Hours on duty</div>
+              <div className="text-2xs text-slate-400">Hours on duty</div>
             </div>
           </div>
 
           {/* Drawer Reconciliation Breakdown Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Left: System Drawer Calculations */}
-            <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block border-b border-slate-200 dark:border-slate-800 pb-1">
+            <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
+              <span className="text-2xs font-bold text-slate-500 dark:text-slate-400 block border-b border-slate-200 dark:border-slate-800 pb-1">
                 System Drawer Accounting
               </span>
 
@@ -261,14 +261,14 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                 </span>
               </div>
 
-              <div className="pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 flex justify-between">
+              <div className="pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 text-2xs text-slate-400 flex justify-between">
                 <span>Card / Digital Sales (Non-cash):</span>
                 <span className="font-mono">{money((activeSummary?.total_sales_card || 0))}</span>
               </div>
             </div>
 
             {/* Right: Cashier Count & Discrepancy Verification */}
-            <div className="space-y-3 bg-white dark:bg-[#111827] p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+            <div className="space-y-3 bg-white dark:bg-[#111827] p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
               <div>
                 <label className="block text-xs font-bold text-slate-900 dark:text-white mb-1">
                   Actual Physical Cash Count ({currency}) *
@@ -282,11 +282,11 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                     required
                     value={actualCash}
                     onChange={(e) => setActualCash(parseFloat(e.target.value) || 0)}
-                    className="w-full pl-9 pos-input font-mono font-bold text-base focus:ring-teal-500"
+                    className="field-input w-full pl-9 font-mono font-bold"
                     autoFocus
                   />
                 </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-2xs text-slate-500 dark:text-slate-400 mt-1">
                   Count physical bills and coins currently inside the drawer.
                 </p>
 
@@ -294,7 +294,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                 <div className="mt-3 p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold">
                   <span>Reconciliation Difference:</span>
                   <span
-                    className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
+                    className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
                       variance === 0
                         ? 'badge-success'
                         : variance > 0
@@ -320,13 +320,13 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g. Shift 1 closed normally. All cash handed over."
-                  className="w-full pos-input text-xs"
+                  className="field-input w-full"
                 />
               </div>
             </div>
           </div>
 
-          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start space-x-2 text-amber-800 dark:text-amber-300 text-[11px]">
+          <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start space-x-2 text-amber-800 dark:text-amber-300 text-xs">
             <Lock className="w-4 h-4 mt-0.5 shrink-0" />
             <span>
               <strong>Shift Locking Policy:</strong> Once closed, this shift will be locked permanently. You will not be able to invoice under this shift again. If you continue working, a new shift must be started.
@@ -338,7 +338,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="btn-cancel"
+              className="btn-secondary"
             >
               Cancel
             </button>
@@ -346,9 +346,9 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
               type="button"
               onClick={handleExecuteClose}
               disabled={loading}
-              className="btn-save flex items-center space-x-1.5"
+              className="btn-primary"
             >
-              <Lock className="w-3.5 h-3.5" />
+              <Lock className="w-4 h-4" />
               <span>{loading ? 'Reconciling & Locking...' : 'Lock & Close Cashier Shift'}</span>
             </button>
           </div>

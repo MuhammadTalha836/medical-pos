@@ -107,13 +107,14 @@ export const App: React.FC = () => {
     <div className="h-screen w-screen flex flex-col bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 overflow-hidden font-sans transition-colors duration-200">
       {/* Top Application Header */}
       <Header
+        settings={settings}
         onQuickBackup={handleQuickBackup}
         onOpenClosing={() => setClosingModalOpen(true)}
       />
 
       {/* Quick Notification Toast */}
       {quickNotification && (
-        <div className="absolute top-18 right-6 z-50 flex items-center space-x-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-semibold shadow-2xl animate-bounce backdrop-blur-md">
+        <div className="absolute top-18 right-6 z-50 flex items-center space-x-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950/90 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs font-semibold shadow-2xl backdrop-blur-md">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           <span>{quickNotification}</span>
         </div>
@@ -121,7 +122,7 @@ export const App: React.FC = () => {
 
       {/* Main Workspace: Sidebar + Dynamic Module Page */}
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} />
+        <Sidebar currentTab={currentTab} onSelectTab={setCurrentTab} settings={settings} />
 
         <main className="flex-1 flex flex-col overflow-hidden bg-slate-50 dark:bg-[#0a0e17] relative transition-colors duration-200">
           {currentTab === 'dashboard' && (
@@ -155,7 +156,7 @@ export const App: React.FC = () => {
             <SettingsPage settings={settings} onRefreshSettings={loadSettings} />
           )}
           {currentTab === 'developer' && user?.role === 'developer' && (
-            <DeveloperSettingsPage />
+            <DeveloperSettingsPage onRefreshSettings={loadSettings} />
           )}
         </main>
       </div>
@@ -202,7 +203,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Persistent Authentication Modal (when setup is done but user is not signed in) */}
-      <LoginModal isOpen={isSetupCompleted !== false && (!isAuthenticated || !user)} />
+      <LoginModal isOpen={isSetupCompleted !== false && (!isAuthenticated || !user)} settings={settings} />
     </div>
   );
 };

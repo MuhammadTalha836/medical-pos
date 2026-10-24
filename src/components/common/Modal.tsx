@@ -29,9 +29,9 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-black/75 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-black/75 backdrop-blur-xs">
       <div
-        className={`w-full ${maxWidth} bg-white dark:bg-[#162032] border border-slate-200 dark:border-slate-700/80 rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transition-colors duration-150`}
+        className={`w-full ${maxWidth} bg-white dark:bg-[#162032] border border-slate-200 dark:border-slate-700/80 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden transition-colors duration-150`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}

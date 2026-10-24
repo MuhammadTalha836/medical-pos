@@ -1,12 +1,15 @@
+Pending:-
 multi invoice or order taking system
-update the design user ke hisb se fast and perfect - ani inputs, icon, select b simple lagye hai or chotye lagye hai ,system me fontsize
 backup type developer jab medical store par install kr raha ho tab backup type online/ offline or  both , online backup mean developer add the email jaha us email ke google drive me backup store ho ga 
 invoice without brower like press print without any chrome popup they print invoice from printer
+
+
+Complete:- 
+
 software me developer information jaha possiable ho sakti hai show krwao 
 developer apni information add kr de ga like name , number email, or developer ye b cheez select krye ga ke kon konsi jaga par keya keya show ho ga like name or number as tarah ta ke developer ki advertisment b ho jaye 
 
-
-
+update the design user ke hisb se fast and perfect - ani inputs, icon, select b simple lagye hai or chotye lagye hai ,system me fontsize
 developer can manage the demo period for pharmacy
 developer set the admin password 
 totp only for developer 

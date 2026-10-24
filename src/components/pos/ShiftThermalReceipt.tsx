@@ -52,14 +52,14 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
     <div className="flex flex-col items-center">
       {/* On-screen Preview Control Bar */}
       <div className="w-full flex justify-between items-center mb-4 no-print">
-        <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+        <div className="flex items-center space-x-1.5 text-[12px] font-bold text-slate-700 dark:text-slate-300">
           <CheckCircle className="w-4 h-4 text-emerald-500" />
           <span>Shift Summary Receipt ({is58 ? '58mm' : '80mm'} Thermal)</span>
         </div>
         <div className="flex space-x-2">
           <button
             onClick={handlePrint}
-            className="btn-print flex items-center space-x-1"
+            className="btn-print"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Print Slip</span>
@@ -67,7 +67,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
           {onClose && (
             <button
               onClick={onClose}
-              className="btn-cancel text-xs"
+              className="btn-cancel text-[12px]"
             >
               Close
             </button>
@@ -83,11 +83,11 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
       >
         {/* Pharmacy Header */}
         <div className="text-center pb-2 border-b border-black">
-          <div className="font-bold text-sm tracking-tight">{storeName}</div>
+          <div className="font-bold text-[14px] tracking-tight">{storeName}</div>
           <div className="text-[10px]">{storeAddress}</div>
           <div className="text-[10px]">Tel: {storePhone}</div>
           <div className="text-[10px]">Lic: {drugLicenseNo}</div>
-          <div className="font-bold text-xs mt-2 uppercase tracking-wider py-1 border-y border-dashed border-black">
+          <div className="font-bold text-[12px] mt-2 uppercase tracking-wider py-1 border-y border-dashed border-black">
             CASHIER SHIFT RECONCILIATION
           </div>
         </div>
@@ -139,11 +139,11 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
             <span>(-) Cash Returns:</span>
             <span>-{money(returns)}</span>
           </div>
-          <div className="flex justify-between font-bold pt-1 border-t border-black text-xs">
+          <div className="flex justify-between font-bold pt-1 border-t border-black text-[12px]">
             <span>EXPECTED CASH:</span>
             <span>{money(expected)}</span>
           </div>
-          <div className="flex justify-between font-bold text-xs">
+          <div className="flex justify-between font-bold text-[12px]">
             <span>ACTUAL COUNTED:</span>
             <span>{money(actual)}</span>
           </div>
