@@ -33,7 +33,7 @@ backups/pharmacy_backup_*
 .env.test.local
 .env.production.local
 # Developer master TOTP key (created by npm run developer:key)
-.env.developer
+.env.developer*
 
 # Logs & debugging
 *.log
