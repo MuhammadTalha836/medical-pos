@@ -473,16 +473,16 @@ async function runTestSuite() {
         body: JSON.stringify({
           company_id: testCompany.id,
           invoice_no: `SUPP-TEST-${Date.now().toString().slice(-6)}`,
-          purchase_date: new Date().toISOString(),
+          purchase_date: new Date().toISOString().slice(0, 10),
           payment_status: 'Paid',
           items: [
             {
               product_id: testProduct.id,
               batch_no: 'BATCH-TEST-01',
               expiry_date: '2028-12-31',
-              boxes: 5,
+              quantity_boxes: 5,
               bonus_boxes: 1, // 5 + 1 bonus = 6 total boxes added
-              box_trade_price: testProduct.box_trade_price || 100,
+              box_cost_price: testProduct.box_trade_price || 100,
               box_retail_price: testProduct.box_retail_price || 120,
               discount_pct: 0,
             },

@@ -8,15 +8,28 @@ import {
   Trash2,
   Eye,
   CheckCircle2,
-  Printer
+  Printer,
+  ClipboardList,
+  Wallet
 } from 'lucide-react';
-import { moneyFormatter } from '../utils/format';
+import { currencySymbol, moneyFormatter } from '../utils/format';
+import { useAuthStore } from '../store/useAuthStore';
+import { SuppliersTab } from '../components/suppliers/SuppliersTab';
+
+type PurchasesTabKey = 'purchases' | 'suppliers';
+type PaymentChoice = 'full' | 'credit' | 'part';
+
+const PAYMENT_BADGE: Record<string, string> = { Paid: 'badge-success', Partial: 'badge-warning', Pending: 'badge-danger' };
 
 interface PurchasesPageProps {
   settings?: SystemSettings | null;
 }
 
 export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
+  const { hasPermission } = useAuthStore();
+  const [tab, setTab] = useState<PurchasesTabKey>('purchases');
+  const [suppliersRefreshKey, setSuppliersRefreshKey] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [purchases, setPurchases] = useState<PurchaseInvoice[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -27,7 +40,8 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Pending' | 'Partial'>('Paid');
+  const [paymentChoice, setPaymentChoice] = useState<PaymentChoice>('full');
+  const [paidNow, setPaidNow] = useState('');
 
   // Items in current draft purchase
   const [draftItems, setDraftItems] = useState<Array<{
@@ -57,6 +71,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const money = moneyFormatter(settings);
+  const currency = currencySymbol(settings);
 
   const loadData = async () => {
     try {
@@ -142,17 +157,26 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
 
   const handleSavePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (draftItems.length === 0) {
       alert('Please add at least one line item to the purchase invoice.');
       return;
     }
+    const partAmount = Number(paidNow);
+    if (paymentChoice === 'part' && (!Number.isFinite(partAmount) || partAmount <= 0 || partAmount >= totalNetDraft)) {
+      alert(`For a part payment, enter an amount between 0 and ${money(totalNetDraft)}.`);
+      return;
+    }
 
     try {
+      setSaving(true);
       const payload = {
         company_id: Number(selectedCompanyId),
         supplier_invoice_no: supplierInvoiceNo || null,
         purchase_date: purchaseDate,
-        payment_status: paymentStatus,
+        // Paid in full or on credit; a part payment sends the amount (the server works out the status)
+        payment_status: paymentChoice === 'full' ? 'Paid' : paymentChoice === 'credit' ? 'Pending' : 'Partial',
+        ...(paymentChoice === 'part' ? { paid_amount: partAmount } : {}),
         total_gross: totalGrossDraft,
         discount_amount: totalDiscountDraft,
         tax_amount: 0,
@@ -165,12 +189,18 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
         setIsNewPurchaseModalOpen(false);
         setDraftItems([]);
         setSupplierInvoiceNo('');
-        setFeedback(`Purchase ${res.invoiceNo} saved! Stock and trade prices updated.`);
+        setPaymentChoice('full');
+        setPaidNow('');
+        const owed = res.netTotal - res.paidAmount;
+        setFeedback(`Purchase ${res.invoiceNo} saved. Stock and trade prices updated.${owed > 0.005 ? ` ${money(owed)} added to what you owe this supplier.` : ''}`);
         loadData();
+        setSuppliersRefreshKey(k => k + 1);
         setTimeout(() => setFeedback(null), 6000);
       }
     } catch (err: any) {
       alert('Failed to save purchase: ' + err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -183,18 +213,20 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Record incoming medicine deliveries, track batch expiries, and auto-update stock</p>
         </div>
 
-        <button
-          onClick={() => {
-            if (companies.length > 0) {
-              handleSelectCompanyInModal(String(companies[0].id));
-            }
-            setIsNewPurchaseModalOpen(true);
-          }}
-          className="btn-primary"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Purchase Inward</span>
-        </button>
+        {hasPermission('can_add_purchase') && (
+          <button
+            onClick={() => {
+              if (companies.length > 0) {
+                handleSelectCompanyInModal(String(companies[0].id));
+              }
+              setIsNewPurchaseModalOpen(true);
+            }}
+            className="btn-primary"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Purchase Inward</span>
+          </button>
+        )}
       </div>
 
       {feedback && (
@@ -204,7 +236,41 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
         </div>
       )}
 
+      <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800" role="tablist">
+        {([
+          { key: 'purchases', label: 'Purchases', icon: ClipboardList },
+          { key: 'suppliers', label: 'Suppliers (payables)', icon: Wallet }
+        ] as const).map(t => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
+              tab === t.key
+                ? 'border-teal-500 text-teal-700 dark:text-teal-400'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <t.icon className="w-4 h-4" />
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {tab === 'suppliers' && (
+        <SuppliersTab
+          settings={settings}
+          money={money}
+          currency={currency}
+          canPay={hasPermission('can_pay_supplier')}
+          refreshKey={suppliersRefreshKey}
+        />
+      )}
+
       {/* Purchases Invoices Table */}
+      {tab === 'purchases' && (
       <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs flex flex-col">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -269,9 +335,12 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                       {money(pur.net_total)}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className={pur.payment_status === 'Paid' ? 'badge-success' : 'badge-warning'}>
+                      <span className={PAYMENT_BADGE[pur.payment_status] ?? 'badge-warning'}>
                         {pur.payment_status}
                       </span>
+                      {(pur.amount_due ?? 0) > 0.005 && (
+                        <div className="text-2xs font-mono text-amber-600 dark:text-amber-400 mt-0.5">Due {money(pur.amount_due ?? 0)}</div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <button
@@ -289,6 +358,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           </table>
         </div>
       </div>
+      )}
 
       {/* New Purchase Modal */}
       <Modal
@@ -337,16 +407,29 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Payment Status</label>
+              <label htmlFor="purchase-payment" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Payment</label>
               <select
-                value={paymentStatus}
-                onChange={(e) => setPaymentStatus(e.target.value as any)}
+                id="purchase-payment"
+                value={paymentChoice}
+                onChange={(e) => setPaymentChoice(e.target.value as PaymentChoice)}
                 className="field-select field-sm w-full"
               >
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending / Credit</option>
-                <option value="Partial">Partial Payment</option>
+                <option value="full">Paid in full</option>
+                <option value="credit">On credit (pay later)</option>
+                <option value="part">Part paid now</option>
               </select>
+              {paymentChoice === 'part' && (
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={paidNow}
+                  onChange={(e) => setPaidNow(e.target.value)}
+                  placeholder={`Paid now (${currency})`}
+                  aria-label="Amount paid now"
+                  className="field-input field-sm w-full font-mono mt-1.5"
+                />
+              )}
             </div>
           </div>
 
@@ -523,10 +606,10 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             </button>
             <button
               type="submit"
-              disabled={draftItems.length === 0}
+              disabled={draftItems.length === 0 || saving}
               className="btn-primary"
             >
-              Post Purchase & Update Stock
+              {saving ? 'Saving…' : 'Post Purchase & Update Stock'}
             </button>
           </div>
         </form>

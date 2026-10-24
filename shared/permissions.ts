@@ -41,6 +41,7 @@ export const PERMISSION_GROUPS = [
     title: 'Purchases & Khata',
     items: [
       { key: 'can_add_purchase', label: 'Record Supplier Purchases' },
+      { key: 'can_pay_supplier', label: 'Pay Suppliers' },
       { key: 'can_add_customer', label: 'Register Khata Account' },
       { key: 'can_edit_customer', label: 'Edit Customer & Limits' },
       { key: 'can_delete_customer', label: 'Delete Khata Account' },

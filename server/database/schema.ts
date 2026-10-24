@@ -239,6 +239,20 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
   total_refund REAL NOT NULL
 );
 
+-- Payments to suppliers (distributors) against what the store owes them
+CREATE TABLE IF NOT EXISTS supplier_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id INTEGER NOT NULL REFERENCES companies(id),
+  amount REAL NOT NULL,
+  payment_method TEXT NOT NULL DEFAULT 'cash',
+  reference TEXT,
+  notes TEXT,
+  payment_date TEXT NOT NULL,
+  user_id INTEGER,
+  user_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 14. Daily Closings
 CREATE TABLE IF NOT EXISTS daily_closings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -337,6 +351,7 @@ CREATE INDEX IF NOT EXISTS idx_batches_expiry ON product_batches(expiry_date);
 CREATE INDEX IF NOT EXISTS idx_shifts_user_status ON cashier_shifts(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_shifts_shift_no ON cashier_shifts(shift_no);
 CREATE INDEX IF NOT EXISTS idx_shifts_start_time ON cashier_shifts(start_time);
+CREATE INDEX IF NOT EXISTS idx_supplier_payments_company ON supplier_payments(company_id);
 `;
 
 /**

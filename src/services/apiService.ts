@@ -20,7 +20,10 @@ import {
   LoginResponse,
   LicenseStatus,
   AuditLogEntry,
-  DeveloperSettingsPayload
+  DeveloperSettingsPayload,
+  SupplierSummary,
+  SupplierLedger,
+  SupplierPaymentMethod
 } from '../types';
 
 const API_BASE = '/api';
@@ -156,7 +159,13 @@ export const api = {
 
   // Purchases
   getPurchases: () => get<PurchaseInvoice[]>('/purchases'),
-  createPurchase: (data: unknown) => post<{ success: boolean; purchaseId: number; invoiceNo: string }>('/purchases', data),
+  createPurchase: (data: unknown) => post<{ success: boolean; purchaseId: number; invoiceNo: string; netTotal: number; paidAmount: number }>('/purchases', data),
+
+  // Suppliers (payables)
+  getSuppliers: () => get<SupplierSummary[]>('/suppliers'),
+  getSupplierLedger: (id: number) => get<SupplierLedger>(`/suppliers/${id}/ledger`),
+  paySupplier: (id: number, data: { amount: number; payment_method: SupplierPaymentMethod; payment_date: string; reference?: string; notes?: string }) =>
+    post<{ success: boolean; id: number; balance: number }>(`/suppliers/${id}/payments`, data),
 
   // Reports
   getAvailableStockReport: () => get<any[]>('/reports/stock/available'),

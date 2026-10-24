@@ -81,6 +81,8 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - Supplier purchase invoice recording with batch numbers, expiry dates, purchase cost, bonus boxes, and retail rates.
    - Automatic inventory increment (`boxes + bonus`) and real-time update of product master prices (T-Price, MRP, and Unit Prices).
    - Expiry tracking via `product_batches`.
+   - Lines are costed on the server (`createPurchaseSchema`): whole boxes, no negative prices, unknown medicines stop the purchase. Payment is Paid in full, On credit or Part paid now (`paid_amount`).
+   - **Suppliers (payables) tab (`src/components/suppliers/`)**: what the store owes each company (supplier), from `buildSupplierLedger` (`server/suppliers/ledgerMath.ts`). The balance is worked out every time from purchases, `supplier_payments` and purchase-return credits, never stored. **Pay** (`can_pay_supplier`) records cash/bank/cheque/online payments that settle the oldest bill first and cannot exceed what is owed. **Statement** lists unpaid bills and every entry with a running balance, printed on A4 by `printDocument`. Supplier payments are not part of a shift's drawer cash.
 
 9. **Reports & Financial Intelligence (`ReportsPage.tsx`)**:
    - Available Stock Valuation (evaluated at both T-Price cost and MRP retail).

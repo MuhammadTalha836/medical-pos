@@ -55,6 +55,7 @@ model Company {
   products        Product[]
   purchases       Purchase[]
   purchaseReturns PurchaseReturn[]
+  supplierPayments SupplierPayment[]
 
   @@map("companies")
 }
@@ -322,6 +323,24 @@ model PurchaseReturnItem {
   product          Product        @relation(fields: [productId], references: [id])
 
   @@map("purchase_return_items")
+}
+
+model SupplierPayment {
+  id            Int      @id @default(autoincrement())
+  companyId     Int      @map("company_id")
+  amount        Float
+  paymentMethod String   @default("cash") @map("payment_method")
+  reference     String?
+  notes         String?
+  paymentDate   String   @map("payment_date")
+  userId        Int?     @map("user_id")
+  userName      String?  @map("user_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  @@index([companyId], name: "idx_supplier_payments_company")
+  @@map("supplier_payments")
 }
 
 model DailyClosing {

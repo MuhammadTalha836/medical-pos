@@ -14,6 +14,14 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M1: supplier ledger, see docs/FEATURE_ROADMAP.md)
+- Purchases → **Suppliers (payables)** tab: what the store owes each distributor, total owed, a search box and an "only suppliers I owe" filter. **Pay** records a cash, bank, cheque or online payment (with a cheque or transaction number); it settles the oldest unpaid bill first and cannot be more than what is owed. **Statement** shows the unpaid bills and every purchase, payment and return with a running balance, and prints on A4.
+- New purchase: **Payment** is now Paid in full / On credit / Part paid now (with the amount). The purchase list shows each bill's real status (Paid, Partial, Pending) and the amount still due, including later payments.
+- New permission "Pay Suppliers" (`can_pay_supplier`): Admin yes, Cashier no. "New Purchase Inward" shows only with "Record Supplier Purchases".
+
+### Fixed (purchases)
+- Purchases are costed on the server: totals sent by the screen are ignored, quantities must be whole boxes (at least 1), prices cannot be negative, an unknown medicine stops the purchase instead of being skipped, and the purchase number uses the local date. The Post button cannot be pressed twice.
+
 ### Fixed (audit phase 1: money and security on the server)
 - Sales are priced by the server from the medicine record. Tampered rates, discounts or totals are refused or recalculated; the receipt shows the sale exactly as stored. Changing a rate or giving a discount needs the "Give Discounts" permission, and the bill discount stays within the store maximum.
 - A sale that needs more stock than is on the shelf is refused (before, stock silently dropped to 0). Cash less than the bill total is refused; leaving cash empty still means exact payment. Quantities must be whole numbers.

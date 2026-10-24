@@ -29,6 +29,7 @@ npm run test:phase5      # server sessions, Developer-only admin permissions, De
 npm run test:phase6      # khata customers: unique phone, credit sales need a saved customer, credit limit, credit returns
 npm run test:phase7      # online backup to Google Drive (Google faked by a fetch stub): mode, sign-in, encrypted upload, retry, restore
 npm run test:phase8      # server-side sale pricing, oversell/cash checks, returns, shift cash, khata payments, role escalation, login lockout
+npm run test:m1          # supplier ledger: purchases costed on the server, paid now, payments, statement (docs/FEATURE_ROADMAP.md)
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -106,6 +107,7 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - `src/components/pos/UnifiedInvoice.tsx` renders three designs (`classic` | `compact` | `detailed`) at `58mm` | `80mm`. `ThermalReceipt.tsx` is a thin wrapper around it.
 - The valid values and normalizers live in `shared/invoice.ts`; `server/invoice/invoiceSettings.ts` only holds the startup migration of legacy values. The server rejects anything else with 400.
 - Each sale stores `store_name_snapshot`, `store_address_snapshot` and `invoice_footer_snapshot`. Receipts prefer these snapshots over current settings, so reprints match the original.
+- Page-sized documents (statements) print with `printDocument` (`src/utils/printDocument.ts`, a hidden frame with plain A4 styles).
 - Printing goes through `src/utils/printReceipt.ts`. With "Print without dialog" on (per computer, `localStorage`), the receipt's HTML plus the app CSS is sent to the `print:thermal` IPC, which prints it silently from a hidden sandboxed window sized to the receipt. Otherwise `window.print()` runs, and `@media print` in `src/index.css` hides everything except `#thermal-receipt-printable`.
 
 **Sales and shifts.**
@@ -116,6 +118,13 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - Customers: a sale may carry `customer_id` (a saved khata customer; the sale then stores that customer's saved name/phone). A Credit sale **requires** one and is blocked past the customer's `credit_limit` (0 = no limit); returning a credit sale lowers the balance. Customers need a phone, unique by digits (`normalizePhone` in `shared/customers.ts`); a duplicate answers 409 with the existing customer. The POS picks customers with `CustomerPicker.tsx` (`GET /api/customers/search`). The Customers page (`src/pages/CustomersPage.tsx`, tab id `khata`) has a Customers tab and a Khata (Udhaar) tab; a customer can be deleted only with no invoices, payments or balance.
 - It generates `INV-YYYYMMDD-NNNN` inside `prisma.$transaction`, with a 5-attempt retry on `SQLITE_BUSY` / unique collisions.
 - Stock is tracked as boxes + loose units (`packing` units per box). Products can forbid loose ("open") sales and set a minimum sale quantity.
+
+**Suppliers (payables).** Companies are the suppliers.
+- The balance owed is never stored: `buildSupplierLedger` (`server/suppliers/ledgerMath.ts`) works it out from purchases (`paid_amount`; rows marked Paid count as fully paid), `supplier_payments` and purchase-return credits. Payments settle the oldest bill first.
+- `GET /api/purchases` shows each bill's derived status and `amount_due`.
+- Routes: `GET /api/suppliers`, `GET /api/suppliers/:id/ledger` and `POST /api/suppliers/:id/payments` (`can_pay_supplier`, checked inside the transaction).
+- `POST /api/purchases` validates with `createPurchaseSchema` and costs every line itself.
+- The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**
 - There is no router. `src/App.tsx` switches pages on `currentTab` (`TabType` in `components/layout/Sidebar.tsx`) and passes the shared `settings` object to the pages.

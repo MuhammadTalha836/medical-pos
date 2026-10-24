@@ -129,6 +129,33 @@ export const saleReturnSchema = z.looseObject({
   }), { error: 'No return items specified' }).min(1, { error: 'No return items specified' })
 });
 
+const money = (label: string) => z.coerce.number({ error: `${label} must be a number` }).min(0, { error: `${label} cannot be negative` });
+
+export const createPurchaseSchema = z.looseObject({
+  company_id: z.coerce.number({ error: 'Choose the supplier' }).int().positive({ error: 'Choose the supplier' }),
+  purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Purchase date must be a valid date' }).optional(),
+  discount_amount: money('Discount').optional(),
+  tax_amount: money('Tax').optional(),
+  paid_amount: money('Paid amount').optional(),
+  payment_status: z.enum(['Paid', 'Pending', 'Partial'], { error: 'Payment status must be Paid, Pending or Partial' }).optional(),
+  items: z.array(z.looseObject({
+    product_id: z.coerce.number({ error: 'Each line needs a medicine' }).int().positive({ error: 'Each line needs a medicine' }),
+    quantity_boxes: z.coerce.number({ error: 'Each line needs a quantity' }).int({ error: 'Quantities must be whole boxes' }).min(1, { error: 'Each line needs at least 1 box' }),
+    bonus_boxes: z.coerce.number().int({ error: 'Bonus must be whole boxes' }).min(0, { error: 'Bonus cannot be negative' }).optional(),
+    box_cost_price: money('Cost price'),
+    box_retail_price: money('Retail price'),
+    discount_pct: z.coerce.number().min(0, { error: 'Discount must be 0-100%' }).max(100, { error: 'Discount must be 0-100%' }).optional()
+  }), { error: 'Purchase must have items' }).min(1, { error: 'Purchase must have items' })
+});
+
+export const supplierPaymentSchema = z.looseObject({
+  amount: z.coerce.number({ error: 'Enter the amount paid' }).positive({ error: 'Enter the amount paid' }),
+  payment_method: z.enum(['cash', 'bank', 'cheque', 'online'], { error: 'Payment method must be cash, bank, cheque or online' }).optional(),
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Payment date must be a valid date' }).optional(),
+  reference: z.string().trim().max(60, { error: 'Reference cannot exceed 60 characters' }).nullish(),
+  notes: z.string().trim().max(200, { error: 'Notes cannot exceed 200 characters' }).nullish()
+});
+
 const customerPhone = z.string({ error: 'Customer phone number is required' }).trim()
   .refine(isValidPhone, { error: `Enter a valid phone number (${PHONE_MIN_DIGITS}-${PHONE_MAX_DIGITS} digits)` });
 

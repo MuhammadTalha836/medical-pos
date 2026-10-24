@@ -20,6 +20,7 @@ import reportRoutes from './routes/reports';
 import utilityRoutes from './routes/utilities';
 import shiftRoutes from './routes/shifts';
 import settingsRoutes from './routes/settings';
+import supplierRoutes from './routes/suppliers';
 
 // SQLite aggregations return BigInt; serialize them as plain numbers
 declare global {
@@ -86,7 +87,8 @@ app.use('/api', sessionGate);
 
 for (const routes of [
   dashboardRoutes, setupRoutes, authRoutes, userRoutes, developerRoutes, licenseRoutes, developerAdminRoutes, roleRoutes,
-  companyRoutes, customerRoutes, productRoutes, saleRoutes, purchaseRoutes, reportRoutes, utilityRoutes, shiftRoutes, settingsRoutes
+  companyRoutes, customerRoutes, productRoutes, saleRoutes, purchaseRoutes, reportRoutes, utilityRoutes, shiftRoutes, settingsRoutes,
+  supplierRoutes
 ]) {
   app.use(routes);
 }

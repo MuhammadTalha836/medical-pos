@@ -253,9 +253,55 @@ export interface PurchaseInvoice {
   net_total: number;
   payment_status: 'Paid' | 'Pending' | 'Partial';
   paid_amount?: number;
+  /** Still owed on this bill after payments and returns (purchase list only) */
+  amount_due?: number;
   notes?: string;
   created_at: string;
   items?: PurchaseItem[];
+}
+
+/** One supplier (company) with what the store owes it */
+export interface SupplierSummary {
+  id: number;
+  code: string;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  status: string;
+  total_purchased: number;
+  total_paid: number;
+  total_returned: number;
+  balance: number;
+  unpaid_bills: number;
+  last_purchase_date: string | null;
+}
+
+export type SupplierPaymentMethod = 'cash' | 'bank' | 'cheque' | 'online';
+
+export interface SupplierLedgerEntry {
+  date: string;
+  kind: 'purchase' | 'paid_with_purchase' | 'payment' | 'return';
+  reference: string;
+  details: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+export interface SupplierLedger {
+  supplier: { id: number; code: string; name: string; phone: string | null; address: string | null; contact_person: string | null };
+  totals: { purchased: number; paid: number; returned: number; balance: number };
+  dues: Array<{
+    id: number;
+    invoice_no: string;
+    supplier_invoice_no: string | null;
+    date: string;
+    net_total: number;
+    settled: number;
+    due: number;
+    status: 'Paid' | 'Partial' | 'Pending';
+  }>;
+  entries: SupplierLedgerEntry[];
 }
 
 
