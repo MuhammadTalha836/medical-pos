@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
-import { useAuthStore } from '../store/useAuthStore';
 import { BackupStatus, SystemSettings } from '../types';
 import { BACKUP_FREQUENCY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { ShiftHistoryHub } from '../components/shifts/ShiftHistoryHub';
@@ -20,9 +19,6 @@ import {
   Copy,
   Check,
   BookOpen,
-  CheckCircle,
-  FileCode,
-  Sliders,
   Save
 } from 'lucide-react';
 
@@ -32,7 +28,6 @@ interface UtilitiesPageProps {
 }
 
 export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefreshSettings }) => {
-  const { user } = useAuthStore();
   const [activeSubTab, setActiveSubTab] = useState<'shifts' | 'backups' | 'guide'>('shifts');
 
   // Backups state
@@ -91,7 +86,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
         setCustomBackupDir(selected);
       }
     } else {
-      alert('Directory selector is supported natively in the desktop Electron app. In browser mode, please enter the folder path directly.');
+      alert('Folder browsing is available in the desktop app. Please type the folder path instead.');
     }
   };
 
@@ -102,7 +97,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
         setSecondaryBackupDir(selected);
       }
     } else {
-      alert('Directory selector is supported natively in the desktop Electron app. In browser mode, please enter the folder path directly.');
+      alert('Folder browsing is available in the desktop app. Please type the folder path instead.');
     }
   };
 
@@ -142,7 +137,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
       if (res.success) {
         setMessage({
           type: 'success',
-          text: `Backup created: ${res.filename} (${(res.sizeBytes / 1024).toFixed(1)} KB). Integrity check and SHA-256 verified.${res.secondaryPath ? ' Synced to secondary drive.' : ''}${res.prunedCount ? ` ${res.prunedCount} old backup(s) removed by the retention limit.` : ''}`
+          text: `Backup created: ${res.filename} (${(res.sizeBytes / 1024).toFixed(1)} KB). Verified and ready to restore.${res.secondaryPath ? ' Synced to secondary drive.' : ''}${res.prunedCount ? ` ${res.prunedCount} old backup(s) removed by the retention limit.` : ''}`
         });
         loadData();
       }
@@ -218,9 +213,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
       setMessage(null);
       const res = await api.resetStockZero({
         company_id: stockZeroCompanyId ? Number(stockZeroCompanyId) : undefined,
-        confirmation_code: stockZeroConfirmText,
-        user_id: user?.id,
-        user_name: user?.full_name
+        confirmation_code: stockZeroConfirmText
       });
       if (res.success) {
         setStockZeroConfirmText('');
@@ -254,7 +247,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                 Shifts, Backups & Disaster Recovery
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Cashier register closing, multi-destination SQLite snapshots, SHA-256 verification, and hardware failure guides
+                Cashier shift closing, verified backups to two folders, and recovery steps
               </p>
             </div>
           </div>
@@ -334,10 +327,10 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                     </div>
                     <div>
                       <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
-                        Multi-Destination SQLite Vault & Instant Backup
+                        Backup Folders & Instant Backup
                       </h2>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Zero-downtime atomic database snapshot with SHA-256 integrity verification
+                        Backs up while you keep selling; every copy is checked before it is kept
                       </p>
                     </div>
                   </div>
@@ -357,7 +350,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   {/* Primary Location */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Primary Backup Folder (Local SSD / High-Speed)
+                      Primary Backup Folder
                     </label>
                     <div className="flex space-x-2">
                       <input
@@ -371,7 +364,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         type="button"
                         onClick={handleSelectPrimaryFolder}
                         className="btn-secondary px-3 py-2 text-xs flex items-center space-x-1"
-                        title="Browse local folder"
+                        title="Browse folder"
                       >
                         <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
                         <span>Browse...</span>
@@ -408,7 +401,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                       </button>
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                      Every backup created will automatically save a duplicate copy and its SHA-256 sidecar file here.
+                      Every backup is also copied here (use a USB drive or a second disk).
                     </p>
                   </div>
 
@@ -462,7 +455,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                 <div className="flex items-center justify-between pt-1">
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center space-x-2">
                     <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Database: <strong className="text-slate-800 dark:text-slate-200 font-mono">data/pharmacy.db</strong> (WAL Mode Active)</span>
+                    <span>Database ready • 100% Offline POS</span>
                   </div>
 
                   <button
@@ -494,7 +487,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                         <th className="py-2.5 px-3">Filename</th>
                         <th className="py-2.5 px-3">Type</th>
                         <th className="py-2.5 px-3 text-right">Size</th>
-                        <th className="py-2.5 px-3">SHA-256 Checksum</th>
+                        <th className="py-2.5 px-3">Verification Code</th>
                         <th className="py-2.5 px-3 text-center">Action</th>
                       </tr>
                     </thead>
@@ -544,7 +537,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                                   <button
                                     onClick={() => copyChecksum(file.checksum)}
                                     className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-sm transition-colors text-slate-500 hover:text-teal-600"
-                                    title="Copy SHA-256 Checksum"
+                                    title="Copy verification code"
                                   >
                                     {copiedHash === file.checksum ? (
                                       <Check className="w-3 h-3 text-emerald-500" />
@@ -586,43 +579,24 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Database Health & VACUUM</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Defragment tables and rebuild B-Trees</p>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Database Health</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Keep searches and reports fast</p>
                   </div>
                 </div>
 
                 <div className="card-surface p-4 space-y-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-300 space-y-2">
-                    <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
-                      <span>Engine:</span>
-                      <span className="font-mono text-teal-600 dark:text-teal-400 font-bold">better-sqlite3 v11</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
-                      <span>Journal Mode:</span>
-                      <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">WAL (Write-Ahead)</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1 border-b border-slate-200 dark:border-slate-800">
-                      <span>Referential Integrity:</span>
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">ENFORCED</span>
-                    </div>
-                    <div className="flex justify-between items-center py-1">
-                      <span>Busy Timeout:</span>
-                      <span className="font-mono text-slate-700 dark:text-slate-300">5000 ms</span>
-                    </div>
-                  </div>
-
                   <button
                     onClick={handleOptimizeDatabase}
                     disabled={loading}
                     className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-teal-700 dark:text-teal-300 font-bold text-xs rounded-xl border border-slate-300 dark:border-slate-700 transition-colors flex items-center justify-center space-x-2 shadow-xs"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-                    <span>Run VACUUM & Optimize</span>
+                    <span>Optimize Database</span>
                   </button>
                 </div>
 
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Recommended monthly to reclaim deleted invoice space and update query optimizer statistics.
+                  Recommended once a month. Takes a few seconds; no data is changed.
                 </p>
               </div>
 
@@ -691,10 +665,10 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                  PharmaCare Pro - Emergency Disaster Recovery & Reinstallation Manual
+                  Recovery Guide
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Standard Operating Procedures (SOP) for hardware failure, machine replacement, and database recovery
+                  What to do if the computer fails or is replaced
                 </p>
               </div>
             </div>
@@ -708,7 +682,7 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Hardware Replacement</h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  In case of total POS hardware failure (burned motherboard or drive crash), set up any replacement PC (Windows 10/11 or Linux). Install Node.js v18+ LTS, clone or extract the PharmaCare Pro folder, and run <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm font-mono text-teal-600 dark:text-teal-400">npm install</code>.
+                  If the counter computer fails, set up the replacement PC and ask the developer to install PharmaCare Pro on it. The developer unlocks the new installation with their authenticator code.
                 </p>
               </div>
 
@@ -719,47 +693,30 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Locate External Backup USB</h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Plug in the secondary backup USB flash drive configured on the previous machine. Navigate to the vault folder (e.g. <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm font-mono">E:\PharmacyBackups</code>) and locate the latest <code className="font-mono">.db</code> file and its matching <code className="font-mono">.sha256</code> hash file.
+                  Plug in the USB drive or second disk that held the secondary backup folder (e.g. <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm font-mono">E:\PharmacyBackups</code>) and find the newest backup file.
                 </p>
-              </div>
-
-              {/* Card 3 */}
-              <div className="card-surface p-4 space-y-2 border-l-4 border-teal-500">
-                <div className="flex items-center space-x-2">
-                  <span className="w-6 h-6 rounded-full bg-teal-500 text-white flex items-center justify-center text-xs font-bold">3</span>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Verify SHA-256 Checksum (Offline)</h3>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Confirm the backup has not suffered bit rot or corruption before restoring:
-                </p>
-                <div className="bg-slate-900 text-slate-200 p-2.5 rounded-lg font-mono text-[11px] space-y-1">
-                  <div className="text-slate-400"># Windows PowerShell:</div>
-                  <div className="text-teal-400">Get-FileHash -Algorithm SHA256 .\pharmacy_backup_xxx.db</div>
-                  <div className="text-slate-400 pt-1"># Linux / macOS:</div>
-                  <div className="text-teal-400">sha256sum -c pharmacy_backup_xxx.db.sha256</div>
-                </div>
               </div>
 
               {/* Card 4 */}
               <div className="card-surface p-4 space-y-2 border-l-4 border-teal-500">
                 <div className="flex items-center space-x-2">
-                  <span className="w-6 h-6 rounded-full bg-teal-500 text-white flex items-center justify-center text-xs font-bold">4</span>
+                  <span className="w-6 h-6 rounded-full bg-teal-500 text-white flex items-center justify-center text-xs font-bold">3</span>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">Restore & Resume Operations</h3>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Start PharmaCare Pro, open this <strong>Backup & Recovery</strong> tab, click <strong>"Restore from File..."</strong>, and select the verified backup. Alternatively, copy the backup file directly into <code className="bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded-sm font-mono">./data/pharmacy.db</code> while the app is stopped.
+                  Start PharmaCare Pro, open the <strong>Backup & Recovery</strong> tab, click <strong>"Restore from File..."</strong>, and select the backup. It is checked before anything is replaced.
                 </p>
               </div>
             </div>
 
-            {/* Offline Integrity Check Details */}
+            {/* Pre-restore safety copy */}
             <div className="card-surface p-5 space-y-3">
               <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
                 <span>Automatic Pre-Restore Safety Net</span>
               </h4>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                PharmaCare Pro automatically generates a safety rollback snapshot (<code className="font-mono text-teal-600 dark:text-teal-400">pharmacy_backup_pre_restore_[timestamp].db</code>) before replacing the database. If a user accidentally restores an older backup file, they can immediately undo the operation by restoring the pre-restore snapshot.
+                PharmaCare Pro saves a safety copy of the current data before every restore (listed as a "pre-restore" backup). If an older backup was restored by mistake, restore that safety copy to undo it.
               </p>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { api } from '../services/apiService';
 import { Product, SaleInvoice, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
-import { ThermalReceipt } from '../components/pos/ThermalReceipt';
+import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { useShiftStore } from '../store/useShiftStore';
 import {
   Search,
@@ -25,9 +25,9 @@ import {
   PlayCircle,
   ShieldAlert,
   Keyboard,
-  HelpCircle,
-  FileText
 } from 'lucide-react';
+import { currencySymbol, moneyFormatter } from '../utils/format';
+import { useShiftElapsed } from '../hooks/useShiftElapsed';
 
 interface PosPageProps {
   settings?: SystemSettings | null;
@@ -40,7 +40,7 @@ interface PosPageProps {
  * Tag 3: Next higher standard note (e.g. 500)
  * Tag 4: Next higher standard note (e.g. 1000)
  */
-export function getDynamicCashTags(netTotal: number): number[] {
+function getDynamicCashTags(netTotal: number): number[] {
   if (netTotal <= 0) return [0, 100, 500, 1000];
 
   const exact = Number(netTotal.toFixed(2));
@@ -94,7 +94,6 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     customerName,
     customerPhone,
     billDiscountPct,
-    billDiscountAmt,
     cashTendered,
     paymentType,
     notes,
@@ -107,10 +106,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     clearCart,
     setCustomer,
     setBillDiscountPct,
-    setBillDiscountAmt,
     setCashTendered,
     setPaymentType,
-    setNotes,
     getTotals
   } = usePosStore();
 
@@ -122,25 +119,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     setClosingModalOpen
   } = useShiftStore();
 
-  const [elapsedMinutes, setElapsedMinutes] = useState<number>(0);
-
-  useEffect(() => {
-    if (!activeShift?.start_time) {
-      setElapsedMinutes(0);
-      return;
-    }
-    const update = () => {
-      const diffMs = Math.max(0, Date.now() - new Date(activeShift.start_time).getTime());
-      setElapsedMinutes(Math.floor(diffMs / 60000));
-    };
-    update();
-    const interval = setInterval(update, 30000);
-    return () => clearInterval(interval);
-  }, [activeShift?.start_time]);
-
-  const elapsedHours = Math.floor(elapsedMinutes / 60);
-  const elapsedRemMinutes = elapsedMinutes % 60;
-  const elapsedFormatted = elapsedHours > 0 ? `${elapsedHours}h ${elapsedRemMinutes}m` : `${elapsedRemMinutes}m`;
+  const elapsedFormatted = useShiftElapsed(activeShift?.start_time);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Product[]>([]);
@@ -163,7 +142,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
   const canDiscount = hasPermission('can_discount');
   const totals = getTotals();
-  const currency = settings?.currency_symbol || 'Rs.';
+  const currency = currencySymbol(settings);
+  const money = moneyFormatter(settings);
 
   // Initial focus
   useEffect(() => {
@@ -503,7 +483,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                  Cashier: <strong className="text-slate-700 dark:text-slate-300">{activeShift.user_name}</strong> • Float: <strong className="font-mono">{currency} {activeShift.opening_cash.toFixed(2)}</strong>
+                  Cashier: <strong className="text-slate-700 dark:text-slate-300">{activeShift.user_name}</strong> • Float: <strong className="font-mono">{money(activeShift.opening_cash)}</strong>
                 </div>
               </div>
             </div>
@@ -513,7 +493,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                 <div className="text-right text-[11px] hidden sm:block">
                   <div className="text-slate-500 dark:text-slate-400">Drawer Cash:</div>
                   <div className="font-mono font-bold text-teal-600 dark:text-teal-400">
-                    {currency} {activeSummary.expected_cash.toFixed(2)}
+                    {money(activeSummary.expected_cash)}
                   </div>
                 </div>
               )}
@@ -587,8 +567,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
                     <div className="flex items-center space-x-2">
                       <div className="text-right pr-1">
-                        <div className="text-xs font-bold text-teal-700 dark:text-teal-400 font-mono">{currency} {prod.box_retail_price.toFixed(2)}<span className="text-[10px] font-normal text-slate-400">/Bx</span></div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{currency} {prod.unit_retail_price.toFixed(2)}<span className="text-[9px] font-normal text-slate-400">/Unit</span></div>
+                        <div className="text-xs font-bold text-teal-700 dark:text-teal-400 font-mono">{money(prod.box_retail_price)}<span className="text-[10px] font-normal text-slate-400">/Bx</span></div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">{money(prod.unit_retail_price)}<span className="text-[9px] font-normal text-slate-400">/Unit</span></div>
                       </div>
                       {(() => {
                         const canOpen = prod.allow_open_sale !== false && prod.allow_open_sale !== 0;
@@ -804,7 +784,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
                         {/* Net line amount */}
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                          {currency} {item.net_amount.toFixed(2)}
+                          {money(item.net_amount)}
                         </td>
 
                         {/* Remove item */}
@@ -882,12 +862,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
           <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
             <span>Gross Total:</span>
-            <span className="font-mono text-slate-900 dark:text-slate-200 font-semibold">{currency} {totals.grossTotal.toFixed(2)}</span>
+            <span className="font-mono text-slate-900 dark:text-slate-200 font-semibold">{money(totals.grossTotal)}</span>
           </div>
 
           <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
             <span>Item Discounts:</span>
-            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">-{currency} {totals.itemDiscounts.toFixed(2)}</span>
+            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">-{money(totals.itemDiscounts)}</span>
           </div>
 
           {/* Overall Bill Discount */}
@@ -937,7 +917,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           {totals.billDiscountAmt > 0 && (
             <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
               <span>Bill Discount Amt:</span>
-              <span className="font-mono font-bold">-{currency} {totals.billDiscountAmt.toFixed(2)}</span>
+              <span className="font-mono font-bold">-{money(totals.billDiscountAmt)}</span>
             </div>
           )}
 
@@ -947,7 +927,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             <div className="bg-linear-to-r from-teal-50 to-emerald-50 dark:from-teal-950/40 dark:to-emerald-950/30 p-3 rounded-xl border border-teal-200 dark:border-teal-800/60 flex items-baseline justify-between">
               <span className="text-xs font-bold text-teal-700 dark:text-teal-300">TOTAL</span>
               <div className="text-3xl font-extrabold font-mono text-teal-700 dark:text-teal-400 tracking-tight">
-                {currency} {totals.netTotal.toFixed(2)}
+                {money(totals.netTotal)}
               </div>
             </div>
           </div>
@@ -1022,7 +1002,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
             <span className="font-semibold text-slate-700 dark:text-slate-300">Change Due:</span>
             <span className="font-mono text-base font-bold text-amber-600 dark:text-amber-400">
-              {currency} {totals.changeDue.toFixed(2)}
+              {money(totals.changeDue)}
             </span>
           </div>
         </div>
@@ -1083,7 +1063,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         maxWidth="max-w-md"
       >
         {createdInvoice && (
-          <ThermalReceipt
+          <UnifiedInvoice
             invoice={createdInvoice}
             settings={settings}
             onClose={() => setIsReceiptModalOpen(false)}

@@ -14,10 +14,7 @@ import { hashPassword, verifyPassword } from '../security/passwords';
 import {
   generateTotpSecret,
   generateTotpCode,
-  verifyTotpCode,
-  encryptTotpSecret,
-  decryptTotpSecret,
-  base32Encode,
+  verifyTotpStep,
   base32Decode
 } from '../security/totp';
 
@@ -119,45 +116,22 @@ async function runPhase1Tests() {
     // ------------------------------------------------------------------------
     // 2. RFC 6238 TOTP Engine & Clock Drift Tolerance
     // ------------------------------------------------------------------------
-    await step('Verify RFC 6238 TOTP Generation, Clock Drift, and AES-256 Encryption', async () => {
+    await step('Verify RFC 6238 TOTP Generation and Clock Drift', async () => {
       const secret = generateTotpSecret();
       assert(typeof secret === 'string' && secret.length >= 16, 'Base32 secret generated');
-
-      // Base32 roundtrip
-      const testBuf = Buffer.from('PharmaCareTOTPTest');
-      const b32 = base32Encode(testBuf);
-      const decodedBuf = base32Decode(b32);
-      assert(decodedBuf.toString('utf8') === 'PharmaCareTOTPTest', 'Base32 roundtrip matches');
+      assert(base32Decode(secret).length === 20, 'Secret decodes to 160 bits');
 
       // Current TOTP code
       const currentCode = generateTotpCode(secret);
       assert(/^\d{6}$/.test(currentCode), 'Current TOTP code is 6 digits');
+      assert(verifyTotpStep(secret, currentCode, 1) !== null, 'Current code passes verification');
 
-      // Verify within current window
-      assert(verifyTotpCode(secret, currentCode, 1), 'Current code passes verification');
-
-      // Verify with 30s drift backward (1 step)
+      // One 30 s step of drift either way is accepted; four steps is not
       const nowSec = Math.floor(Date.now() / 1000);
-      const pastCode = generateTotpCode(secret, nowSec - 30);
-      assert(verifyTotpCode(secret, pastCode, 1), 'Past code within 30s window passes');
-
-      // Verify with 30s drift forward (1 step)
-      const futureCode = generateTotpCode(secret, nowSec + 30);
-      assert(verifyTotpCode(secret, futureCode, 1), 'Future code within 30s window passes');
-
-      // Reject expired code (+120s / 4 steps away)
-      const farFutureCode = generateTotpCode(secret, nowSec + 120);
-      assert(!verifyTotpCode(secret, farFutureCode, 1), 'Far future code (+120s) rejected');
-
-      // Reject invalid strings
-      assert(!verifyTotpCode(secret, '000000', 1) || verifyTotpCode(secret, '000000', 1) === (currentCode === '000000'), 'Random invalid code rejected');
-      assert(!verifyTotpCode(secret, 'abc', 1), 'Malformed code rejected');
-
-      // AES-256-GCM encryption & decryption at rest
-      const encrypted = encryptTotpSecret(secret);
-      assert(encrypted.includes(':') && encrypted !== secret, 'Secret is encrypted in iv:tag:cipher format');
-      const decrypted = decryptTotpSecret(encrypted);
-      assert(decrypted === secret, 'Decrypted secret matches original plaintext');
+      assert(verifyTotpStep(secret, generateTotpCode(secret, nowSec - 30), 1, nowSec) !== null, 'Past code within 30s window passes');
+      assert(verifyTotpStep(secret, generateTotpCode(secret, nowSec + 30), 1, nowSec) !== null, 'Future code within 30s window passes');
+      assert(verifyTotpStep(secret, generateTotpCode(secret, nowSec + 120), 1, nowSec) === null, 'Far future code (+120s) rejected');
+      assert(verifyTotpStep(secret, 'abc', 1) === null, 'Malformed code rejected');
     });
 
     // ------------------------------------------------------------------------

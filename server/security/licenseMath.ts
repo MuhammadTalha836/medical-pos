@@ -2,7 +2,7 @@ import crypto from 'crypto';
 
 // Pure license rules (no database), unit-tested in licenseMath.spec.ts. Storage lives in license.ts.
 
-export type LicenseMode = 'demo' | 'full';
+type LicenseMode = 'demo' | 'full';
 
 export interface LicenseRecord {
   mode: LicenseMode;
@@ -23,8 +23,7 @@ export interface LicenseState {
 }
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
-export const MAX_DEMO_DAYS = 365;
-export const CLOCK_ROLLBACK_TOLERANCE_MS = 10 * 60 * 1000;
+const CLOCK_ROLLBACK_TOLERANCE_MS = 10 * 60 * 1000;
 
 export function isLicenseMode(value: unknown): value is LicenseMode {
   return value === 'demo' || value === 'full';

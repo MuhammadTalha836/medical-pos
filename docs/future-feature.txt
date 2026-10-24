@@ -1,11 +1,30 @@
 multi invoice or order taking system
+update the design user ke hisb se fast and perfect
+backup type developer jab medical store par install kr raha ho tab backup type online/ offline or  both , online backup mean developer add the email jaha us email ke google drive me backup store ho ga 
+invoice without brower like press print without any chrome popup they print invoice from printer
+
+
+
 developer can manage the demo period for pharmacy
 developer set the admin password 
 totp only for developer 
 when developer install the exe in medical store system , to installation se pehlye wo 2fa maangye ga jo sirf developer ke  phone mobile authenticator me ho ga per developer wo code enter krye ga or install krnye ke baad , developer admin baannye ga or baki cheezye setup kr ke de ga jeyse ke backup path, automatic backup time , admin permissions, demo or free agar demo par hai to ketnye din baad baand ho jaye ga, 
-
+how to track customer crdits khata
 
 
 now update my all code , remove unsed code and weak code, remove all the extra code, deleet backup folder db beacuse now we are in development phase also refresh the database, remove all the extra or no need code from my folder instead of docs/* 
 remove antigravaty words or jo software me libaray use hoi hai unka naam na lihka aye kahi b ,local ko b remove krna hai just 100% offline pos lihka aye 
 optimize and reused the code , use me project base skill and make my project code optimize and scalable and perfect
+
+
+
+
+
+
+
+
+
+OU6F QSBM JJXE 4G2I IILS OKDD CYYD 26ZH
+
+new key 
+MU4F 6L3L EMEQ YEKP CRNS WBDN FE5V OBRL

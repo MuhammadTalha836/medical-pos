@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { app } from '../api';
-import { authHeaders, adminAuthHeaders, useFullTestLicense } from './testAuth';
+import { authHeaders, adminAuthHeaders, ensureTestAdmin, useFullTestLicense, TEST_ADMIN } from './testAuth';
 
 let BASE_URL = 'http://localhost:3001/api';
 let server: http.Server | null = null;
@@ -63,6 +63,7 @@ async function runTestSuite() {
     });
   });
   await useFullTestLicense();
+  await ensureTestAdmin();
   console.log(colors.bold(colors.cyan('\n======================================================')));
   console.log(colors.bold(colors.cyan('  PharmaCare Pro - Automated Functional Test Suite   ')));
   console.log(colors.bold(colors.cyan('======================================================\n')));
@@ -101,7 +102,7 @@ async function runTestSuite() {
     await step('Authenticate Cashier / Admin User', async () => {
       const authRes = await request('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+        body: JSON.stringify(TEST_ADMIN),
       });
       assert(authRes.user && authRes.user.id, 'User object with ID returned');
       assert(authRes.user.role === 'admin', 'Role is admin');

@@ -172,7 +172,7 @@ async function runPhase2Tests() {
       body: JSON.stringify({
         backup_retention_limit: '45',
         backup_frequency: 'twice_daily',
-        developer_invoice_footer: 'PharmaCare Pro • Antigravity Verified'
+        developer_invoice_footer: 'PharmaCare Pro • Verified'
       })
     });
     assert(res.status === 200, `Expected status 200, got ${res.status}`);

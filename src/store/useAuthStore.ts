@@ -1,42 +1,8 @@
 import { create } from 'zustand';
 import { User, RolePermissions } from '../types';
+import { DEFAULT_ADMIN_PERMISSIONS } from '../../shared/permissions';
 import { api, SESSION_ENDED_EVENT, SESSION_STORAGE_KEY } from '../services/apiService';
 
-const DEFAULT_ADMIN_PERMISSIONS: RolePermissions = {
-  dashboard: true,
-  pos: true,
-  sales: true,
-  khata: true,
-  masters: true,
-  purchases: true,
-  reports: true,
-  utilities: true,
-  settings: true,
-  shifts: true,
-  can_add_product: true,
-  can_edit_product: true,
-  can_delete_product: true,
-  can_add_company: true,
-  can_edit_company: true,
-  can_delete_company: true,
-  can_delete_invoice: true,
-  can_return_sale: true,
-  can_view_all_sales: true,
-  can_view_financial_kpis: true,
-  can_add_purchase: true,
-  can_add_customer: true,
-  can_receive_payment: true,
-  can_edit_customer: true,
-  can_delete_customer: true,
-  can_discount: true,
-  can_backup: true,
-  can_restore: true,
-  can_shift_close: true,
-  can_manage_shifts: true,
-  can_stock_zero: true,
-  can_manage_users: true,
-  can_manage_roles: true
-};
 
 interface AuthState {
   user: User | null;
@@ -127,7 +93,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     logout: () => {
       // Revoke the server session; the local session is cleared even if the server is unreachable
-      if (get().token) api.logout().catch(() => {});
+      if (get().token) api.logout().catch(() => { /* the local session is cleared either way */ });
       storeSession(null, null);
       set({ user: null, permissions: null, token: null, isAuthenticated: false });
     },

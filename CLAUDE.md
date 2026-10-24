@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-PharmaCare Pro: an offline-first pharmacy management and POS desktop app. It has a React 18 + Vite 6 + Tailwind 4 UI and an Express API backed by SQLite (Prisma 7 through `@prisma/adapter-better-sqlite3`, plus better-sqlite3 12). Electron 42 wraps both. Phased requirements are tracked in `docs/ralph_loop_prompt_for_antigravity.md` (Phases 1–4 done). `docs/IMPLEMENTATION_PLAN.md` is the owner's target plan; `docs/PROGRESS.md` is the audit of the code against it. Work its gaps one phase at a time, only with the owner's approval.
+PharmaCare Pro ("100% Offline POS"): an offline pharmacy management and POS desktop app. It has a React 18 + Vite 6 + Tailwind 4 UI and an Express API backed by SQLite (Prisma 7 through `@prisma/adapter-better-sqlite3`, plus better-sqlite3 12). Electron 42 wraps both. Phased requirements are tracked in `docs/PHASE_REQUIREMENTS.md` (Phases 1–4 done). `docs/IMPLEMENTATION_PLAN.md` is the owner's target plan; `docs/PROGRESS.md` is the audit of the code against it. Work its gaps one phase at a time, only with the owner's approval.
 
 ## Commands
 
@@ -34,17 +34,24 @@ npm run developer:key    # create .env.developer (developer master TOTP key) and
 ```
 
 Testing notes:
-- Two kinds of tests. `npm test` runs vitest unit specs next to the code (`server/**/*.spec.ts`, `src/**/*.spec.ts`); keep them free of DB imports (that is why the schedule math lives in `server/backup/schedule.ts`). The `test:*` suites are standalone `tsx` integration scripts that import `app` from `server/api.ts`.
+- Two kinds of tests. `npm test` runs vitest unit specs next to the code (`server/**/*.spec.ts`, `shared/**/*.spec.ts`, `src/**/*.spec.ts`); keep them free of DB imports (that is why the schedule math lives in `server/backup/schedule.ts`). The `test:*` suites are standalone `tsx` integration scripts that import `app` from `server/api.ts`.
 - Run a single integration suite directly: `npx tsx server/tests/phase3_test.ts`. There is no per-case filter.
-- Every suite imports `./testEnv` **first**. It copies `data/pharmacy.db` (+WAL) into an OS temp folder, sets `PHARMACARE_DATA_DIR`/`PHARMACARE_BACKUP_DIR` there, and installs a fixed test developer key, so suites never touch real data, backups or the real license. Keep that import first in new suites (ES modules run imports in order).
-- Suites always start an in-process server (sessions live in that process) and authenticate with `authHeaders(user)` / `adminAuthHeaders()` from `server/tests/testAuth.ts`, which mint session tokens directly. `useFullTestLicense()` signs a Full license on the temp copy. Pass `{ Authorization: '' }` to send a request with no session.
+- Every suite imports `./testEnv` **first**. It points `PHARMACARE_DATA_DIR`/`PHARMACARE_BACKUP_DIR` at an OS temp folder (a **fresh** database with the sample catalog, `PHARMACARE_SAMPLE_DATA=true`) and installs a fixed test developer key, so suites never touch real data, backups or the real license. Keep that import first in new suites (ES modules run imports in order).
+- Suites always start an in-process server (sessions live in that process) and authenticate with `authHeaders(user)` / `adminAuthHeaders()` from `server/tests/testAuth.ts`, which mint session tokens directly. Fixtures there: `ensureTestAdmin()` (`admin` / `admin123`, test DB only), `ensureTestDeveloper()`, and `useFullTestLicense()` (marks setup completed and signs a Full license). Pass `{ Authorization: '' }` to send a request with no session.
 - The backup scheduler does not start when `TEST_MODE` is set, so the suites exit on their own.
 - A running `npm run dev` (tsx watch) reloads on every edit and keeps using the real database and backups folder (it may run scheduled backups while you work).
-- The `prisma:error ... duplicate column name` lines at startup are expected. They come from the idempotent `ALTER TABLE` migrations.
+- `PHARMACARE_SAMPLE_DATA=true` (set in `.env` for development and by `testEnv.ts`) seeds a demo store, medicines and khata customers into an empty database (`server/database/sampleData.ts`). The packaged app never sets it, so a real install starts empty.
 
 ## Architecture
 
-**Single API file.** Every route lives in `server/api.ts`, a large Express app with section comments. Prisma models are camelCase. The client contract is snake_case, mapped by hand through helpers such as `formatSale` / `formatSaleItem`. Some list endpoints use `prisma.$queryRaw` with `SELECT *`, so they return the DB column names directly. Keep both paths in sync when you add columns.
+**Server layout.**
+- `server/api.ts` is the entry point (Prisma init, backup scheduler, `listen` when run directly) and re-exports `app` for Electron and the tests.
+- `server/app.ts` builds the Express app: JSON body parser, the session/license gate, `PUBLIC_API_ROUTES`, the routers and a JSON error handler. No CORS: the UI is always same-origin (Vite proxy in dev, served by the API when packaged).
+- `server/routes/*.ts`: one `Router` per area (`setup`, `auth`, `users`, `developer`, `license`, `developerAdmin`, `roles`, `companies`, `customers`, `products`, `sales`, `purchases`, `reports`, `utilities`, `shifts`, `settings`, `dashboard`). Routes keep their full `/api/...` paths.
+- `server/http/context.ts`: `getActingUser`, `sessionIdentity`, `hasRolePermission`, `requirePermission(req, res, key, message)`, `isSetupLocked`, and `sendError(res, error, status?)`. Always answer failures with `sendError`: our own `Error` messages pass through, while database/driver errors become a plain message (and are logged), so internals never reach the screen.
+- `server/http/formatters.ts`: `formatSale`, `sessionUserPayload` (Prisma camelCase → snake_case client contract). Some list endpoints use `prisma.$queryRaw` with `SELECT *`, so they return DB column names directly. Keep both paths in sync when you add columns.
+
+**Shared code (`shared/`).** Pure modules imported by both the server and the UI: `permissions.ts` (permission keys, labels, role defaults, `parsePermissions`), `invoice.ts` (thermal templates/paper sizes and normalizers), `settingsDefaults.ts` (default `system_settings`). Never duplicate these lists elsewhere.
 
 **Two DB access layers, one SQLite file.**
 - `server/database/paths.ts` decides the file: `PHARMACARE_DATA_DIR` or `./data`. Both layers use it; `DATABASE_URL` is only for the Prisma CLI (`prisma.config.ts`).
@@ -55,12 +62,14 @@ Testing notes:
 There is no migration tool. A schema change needs all of:
 - the model in `prisma/schema.prisma`;
 - the `CREATE TABLE` in `server/database/schema.ts`;
-- `try { ALTER TABLE ... } catch {}` lines in **both** `db.ts` and `prisma.ts` (`initPrisma`);
+- an entry in `COLUMN_MIGRATIONS` (same file) for a new column, which `db.ts` adds to older databases on startup (it checks `PRAGMA table_info` first);
 - `npm run prisma:generate`.
+
+`prisma.ts` imports `db.ts`, so the schema always exists before Prisma connects.
 
 Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPrisma`.
 
-**Settings are key/value strings.** The `system_settings` table holds booleans as `'true'` / `'false'`. `GET /api/settings` merges hard-coded defaults with the DB rows and also normalizes/forces some values. Defaults are duplicated in `seed.ts`, the `GET` handler and `SettingsPage.tsx`'s initial state.
+**Settings are key/value strings.** The `system_settings` table holds booleans as `'true'` / `'false'`. Defaults live once in `shared/settingsDefaults.ts` (used by `seed.ts`, `GET /api/settings` and `SettingsPage.tsx`). `GET /api/settings` merges them with the DB rows and also normalizes/forces some values.
 
 **Request validation.** zod schemas in `server/validation/schemas.ts`; handlers call `parseBody(schema, req.body, res)` at the point of their old checks, so status order (e.g. setup lock 403 before input 400) and error messages stay the same.
 
@@ -68,8 +77,8 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - **Sessions** (`server/security/sessions.ts`): logins return a random token, held only in the API process (a restart logs everyone out). The client stores `{ user, token }` in `localStorage` (`pharmacare_user_session`), and every call in `src/services/apiService.ts` goes through `apiFetch`, which sends `Authorization: Bearer`. A 401 `SESSION_REQUIRED` or 403 `LICENSE_EXPIRED` fires `SESSION_ENDED_EVENT`, which logs the UI out.
 - A middleware at the top of `api.ts` resolves the token into `res.locals.actor`. Every `/api` route needs a session except `PUBLIC_API_ROUTES`. `getActingUser(req)` returns that actor; **never read identity from headers or body fields** (old `user_id`/`admin_id` body fields are overwritten by `sessionIdentity(req)`).
 - Logout, password change/reset, disabling and deleting a user revoke sessions (`revokeUserSessions`).
-- Enforcement must be server-side; the UI only hides or locks controls. Only users, roles, shift admin actions, stock zero, settings, backups and developer routes check permissions so far; other routes only require a login (`docs/PROGRESS.md` 2.1). New or changed routes must call `hasRolePermission`.
-- Roles: `developer` (one account, signs in with the fixed developer email + a master-key TOTP code, never a password), `admin`, `cashier`, plus custom roles stored in the `roles` table with JSON `permissions`. Only the Developer bypasses the matrix (client and server). The `admin`/`developer` roles are changed only by the Developer (`/api/developer/admin-permissions`). Permission defaults live in `server/security/permissions.ts`, labels in `src/utils/permissions.ts`.
+- Enforcement must be server-side; the UI only hides or locks controls. Only users, roles, shift admin actions, stock zero, settings, backups and developer routes check permissions so far; other routes only require a login (`docs/PROGRESS.md` 2.1). New or changed routes must call `requirePermission` / `hasRolePermission`.
+- Roles: `developer` (one account, signs in with the fixed developer email + a master-key TOTP code, never a password), `admin`, `cashier`, plus custom roles stored in the `roles` table with JSON `permissions`. Only the Developer bypasses the matrix (client and server). The `admin`/`developer` roles are changed only by the Developer (`/api/developer/admin-permissions`). Permission keys, labels and defaults live in `shared/permissions.ts`; the role checkbox matrix is `src/components/settings/RolePermissionEditor.tsx`.
 - Security-relevant actions call `logSecurityAudit` (`server/security/audit.ts`), which redacts secrets.
 
 **Developer master key, setup wizard and license.**
@@ -88,7 +97,7 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 
 **Invoices are thermal-only.**
 - `src/components/pos/UnifiedInvoice.tsx` renders three designs (`classic` | `compact` | `detailed`) at `58mm` | `80mm`. `ThermalReceipt.tsx` is a thin wrapper around it.
-- The valid values and normalizers live in `server/invoice/invoiceSettings.ts`, mirrored client-side in `src/utils/invoice.ts`. The server rejects anything else with 400.
+- The valid values and normalizers live in `shared/invoice.ts`; `server/invoice/invoiceSettings.ts` only holds the startup migration of legacy values. The server rejects anything else with 400.
 - Each sale stores `store_name_snapshot`, `store_address_snapshot` and `invoice_footer_snapshot`. Receipts prefer these snapshots over current settings, so reprints match the original.
 - Printing uses `window.print()`. `@media print` in `src/index.css` hides everything except `#thermal-receipt-printable`.
 
@@ -100,7 +109,10 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 **Frontend.**
 - There is no router. `src/App.tsx` switches pages on `currentTab` (`TabType` in `components/layout/Sidebar.tsx`) and passes the shared `settings` object to the pages.
 - Global state uses zustand stores in `src/store/`.
-- Every API call goes through `src/services/apiService.ts` (`API_BASE` is `/api`).
+- Every API call goes through `src/services/apiService.ts` (`get`/`post`/`put`/`del` helpers over one `request`; `API_BASE` is `/api`).
+- Money and durations are formatted with `src/utils/format.ts` (`moneyFormatter(settings)`, `formatMoney`, `formatDuration`); the running shift timer is `src/hooks/useShiftElapsed.ts`.
+- `SettingsPage.tsx` keeps the Store and Invoice tabs; the Users and Roles tabs are `src/components/settings/UsersTab.tsx` / `RolesTab.tsx`.
+- `tsconfig.json` has `noUnusedLocals`/`noUnusedParameters` on, so `npm run lint` fails on dead imports and variables.
 - Shared types live in `src/types/index.ts`.
 
 **Backups** (`server/database/backup.ts`, `server/backup/scheduler.ts`):
@@ -122,5 +134,6 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 ## Conventions
 
 - Keep the POS keyboard shortcuts working (`F2`–`F10`, `Esc`, `Ctrl+Enter`). `F9` saves and `F10` prints. Submission is guarded by `isSubmittingRef` and `e.repeat` checks against duplicate invoices.
-- The UI uses a teal/slate dark theme with Tailwind `dark:` variants, and `lucide-react` icons.
-- `GEMINI.md` is the longer project guide, with module-by-module feature notes. Keep it updated when features change.
+- The UI uses a teal/slate dark theme with Tailwind `dark:` variants, `lucide-react` icons, and system fonts only (nothing is downloaded at runtime).
+- User-visible text brands the app as "100% Offline POS" and never names the libraries/technology used (no "SQLite", "Electron", "TOTP", "bcrypt", "local", ...). Say "authenticator code", "backup", "database". Code, comments and developer docs may use the real names.
+- `docs/PROJECT_GUIDE.md` is the longer project guide, with module-by-module feature notes. Keep it updated when features change.

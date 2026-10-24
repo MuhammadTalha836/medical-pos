@@ -2,19 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { useShiftStore } from '../../store/useShiftStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { CashierShift, ShiftSummary, SystemSettings } from '../../types';
+import { CashierShift, SystemSettings } from '../../types';
 import { ShiftThermalReceipt } from './ShiftThermalReceipt';
 import {
   Clock,
   Lock,
   Coins,
-  Receipt,
-  RotateCcw,
   LogOut,
   AlertTriangle,
   Printer,
   Plus
 } from 'lucide-react';
+import { formatDuration, formatMoney } from '../../utils/format';
 
 interface ShiftClosingModalProps {
   isOpen: boolean;
@@ -33,6 +32,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
   onShiftClosed,
   onStartNewShiftRequest
 }) => {
+  const money = (amount: number | null | undefined) => formatMoney(amount, currency);
   const { user, logout } = useAuthStore();
   const { activeShift, activeSummary, fetchShiftSummary, closeShift, loading } = useShiftStore();
 
@@ -120,7 +120,7 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                 Shift Successfully Reconciled & Locked
               </h3>
               <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-                Total Duration: <strong className="text-teal-600 dark:text-teal-400">{Math.floor((closedShiftResult.duration_minutes || 0) / 60)}h {(closedShiftResult.duration_minutes || 0) % 60}m</strong> • Variance: <strong className={closedShiftResult.cash_difference === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>{currency} {(closedShiftResult.cash_difference || 0).toFixed(2)}</strong>
+                Total Duration: <strong className="text-teal-600 dark:text-teal-400">{formatDuration(closedShiftResult.duration_minutes || 0)}</strong> • Variance: <strong className={closedShiftResult.cash_difference === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}>{money((closedShiftResult.cash_difference || 0))}</strong>
               </p>
             </div>
           </div>
@@ -136,12 +136,12 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
             </div>
             <div className="flex justify-between">
               <span>Opening Float:</span>
-              <span className="font-mono text-slate-900 dark:text-white">{currency} {closedShiftResult.opening_cash.toFixed(2)}</span>
+              <span className="font-mono text-slate-900 dark:text-white">{money(closedShiftResult.opening_cash)}</span>
             </div>
             <div className="flex justify-between">
               <span>Actual Cash Deposited:</span>
               <span className="font-bold font-mono text-teal-600 dark:text-teal-400 text-sm">
-                {currency} {(closedShiftResult.closing_cash || 0).toFixed(2)}
+                {money((closedShiftResult.closing_cash || 0))}
               </span>
             </div>
           </div>
@@ -229,41 +229,41 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-600 dark:text-slate-400">Opening Cash Float:</span>
                 <span className="font-mono font-semibold text-slate-900 dark:text-white">
-                  {currency} {(activeSummary?.opening_cash || activeShift?.opening_cash || 0).toFixed(2)}
+                  {money((activeSummary?.opening_cash || activeShift?.opening_cash || 0))}
                 </span>
               </div>
 
               <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400">
                 <span>(+) Cash Sales ({activeSummary?.invoices_count || 0} bills):</span>
                 <span className="font-mono font-semibold">
-                  +{currency} {(activeSummary?.total_sales_cash || 0).toFixed(2)}
+                  +{money((activeSummary?.total_sales_cash || 0))}
                 </span>
               </div>
 
               <div className="flex justify-between items-center text-xs text-teal-600 dark:text-teal-400">
                 <span>(+) Khata Cash Recoveries:</span>
                 <span className="font-mono font-semibold">
-                  +{currency} {(activeSummary?.total_customer_payments_cash || 0).toFixed(2)}
+                  +{money((activeSummary?.total_customer_payments_cash || 0))}
                 </span>
               </div>
 
               <div className="flex justify-between items-center text-xs text-rose-600 dark:text-rose-400">
                 <span>(-) Cash Returns ({activeSummary?.returns_count || 0} refunds):</span>
                 <span className="font-mono font-semibold">
-                  -{currency} {(activeSummary?.total_returns_cash || 0).toFixed(2)}
+                  -{money((activeSummary?.total_returns_cash || 0))}
                 </span>
               </div>
 
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <span className="font-bold text-slate-900 dark:text-white">Expected Cash in Drawer:</span>
                 <span className="font-mono font-bold text-sm text-teal-600 dark:text-teal-400">
-                  {currency} {expectedCash.toFixed(2)}
+                  {money(expectedCash)}
                 </span>
               </div>
 
               <div className="pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 flex justify-between">
                 <span>Card / Digital Sales (Non-cash):</span>
-                <span className="font-mono">{currency} {(activeSummary?.total_sales_card || 0).toFixed(2)}</span>
+                <span className="font-mono">{money((activeSummary?.total_sales_card || 0))}</span>
               </div>
             </div>
 
@@ -305,8 +305,8 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                     {variance === 0
                       ? 'Balanced (0.00)'
                       : variance > 0
-                      ? `Surplus: +${currency} ${variance.toFixed(2)}`
-                      : `Deficit: -${currency} ${Math.abs(variance).toFixed(2)}`}
+                      ? `Surplus: +${money(variance)}`
+                      : `Deficit: -${money(Math.abs(variance))}`}
                   </span>
                 </div>
               </div>

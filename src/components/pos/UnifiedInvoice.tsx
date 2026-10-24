@@ -6,7 +6,8 @@ import {
   TEMPLATE_LABELS,
   normalizePaperSize,
   normalizeTemplate
-} from '../../utils/invoice';
+} from '../../../shared/invoice';
+import { moneyFormatter } from '../../utils/format';
 
 interface UnifiedInvoiceProps {
   invoice: SaleInvoice;
@@ -33,7 +34,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
   const is58 = paperSize === '58mm';
 
   // Protected identity & developer footer: prefer the snapshot captured at sale time so reprints match the original
-  const storeName = invoice.store_name_snapshot || settings?.store_name || 'AL-SHIFA PHARMACY & HEALTHCARE';
+  const storeName = invoice.store_name_snapshot || settings?.store_name || 'PharmaCare Pro';
   const storeAddress = invoice.store_address_snapshot || settings?.store_address || 'Suite #12-14, Health Plaza, Main Commercial Ave';
   const developerFooter = invoice.invoice_footer_snapshot || settings?.developer_invoice_footer || DEFAULT_DEVELOPER_FOOTER;
 
@@ -45,7 +46,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
   const footerNote = settings?.receipt_footer || 'Thank you for your visit!';
   const terms = settings?.receipt_terms || '1. Returns accepted within 3 days with original invoice.\n2. Refrigerated cold-chain medicines & loose items are non-returnable.';
   const returnPolicy = settings?.return_policy_text || 'Unopened medicines in original packaging may be returned or exchanged within 3 days with this invoice. Heat-sensitive and loose units are non-returnable.';
-  const currency = settings?.currency_symbol || 'Rs.';
+  const money = moneyFormatter(settings);
 
   // Helper for field visibility (default is true unless strictly 'false')
   const isVisible = (key: string) => settings?.[key] !== 'false';
@@ -213,21 +214,21 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
       {template !== 'compact' && isVisible('show_summary_item_count') &&
         row('Total Items:', `${totalItemsCount} (${totalUnitsCount} units)`, 'text-gray-700')}
       {template !== 'compact' && isVisible('show_summary_gross') &&
-        row('Gross Total:', `${currency} ${invoice.total_gross.toFixed(2)}`)}
+        row('Gross Total:', `${money(invoice.total_gross)}`)}
       {template === 'classic' && isVisible('show_summary_discount') && totalDiscount > 0 &&
-        row('Total Discount:', `-${currency} ${totalDiscount.toFixed(2)}`, 'text-gray-700')}
+        row('Total Discount:', `-${money(totalDiscount)}`, 'text-gray-700')}
       {template === 'detailed' && isVisible('show_summary_discount') && invoice.total_item_discount > 0 &&
-        row('Line Item Discounts:', `-${currency} ${invoice.total_item_discount.toFixed(2)}`, 'text-gray-700')}
+        row('Line Item Discounts:', `-${money(invoice.total_item_discount)}`, 'text-gray-700')}
       {template === 'detailed' && isVisible('show_summary_discount') && invoice.bill_discount_amt > 0 &&
-        row(`Bill Discount (${invoice.bill_discount_pct}%):`, `-${currency} ${invoice.bill_discount_amt.toFixed(2)}`, 'text-gray-700')}
+        row(`Bill Discount (${invoice.bill_discount_pct}%):`, `-${money(invoice.bill_discount_amt)}`, 'text-gray-700')}
       {template === 'compact' && isVisible('show_summary_discount') && totalDiscount > 0 &&
-        row('Discount:', `-${currency} ${totalDiscount.toFixed(2)}`, 'text-gray-700')}
+        row('Discount:', `-${money(totalDiscount)}`, 'text-gray-700')}
       {isVisible('show_summary_net') &&
-        row('NET PAYABLE:', `${currency} ${invoice.net_total.toFixed(2)}`, `${fs.net} font-extrabold pt-1 border-t border-dotted border-black`)}
+        row('NET PAYABLE:', `${money(invoice.net_total)}`, `${fs.net} font-extrabold pt-1 border-t border-dotted border-black`)}
       {isVisible('show_summary_received') &&
-        row('Cash Tendered:', `${currency} ${invoice.cash_tendered.toFixed(2)}`, 'pt-0.5')}
+        row('Cash Tendered:', `${money(invoice.cash_tendered)}`, 'pt-0.5')}
       {isVisible('show_summary_change') &&
-        row('Change Due:', `${currency} ${invoice.change_due.toFixed(2)}`, 'font-bold text-gray-900')}
+        row('Change Due:', `${money(invoice.change_due)}`, 'font-bold text-gray-900')}
     </div>
   );
 

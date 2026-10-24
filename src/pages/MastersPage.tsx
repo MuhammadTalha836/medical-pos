@@ -11,10 +11,8 @@ import {
   Edit2,
   Trash2,
   CheckCircle2,
-  AlertTriangle,
-  Layers,
-  MapPin
 } from 'lucide-react';
+import { moneyFormatter } from '../utils/format';
 
 interface MastersPageProps {
   settings?: SystemSettings | null;
@@ -66,7 +64,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
   });
 
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const currency = settings?.currency_symbol || 'Rs.';
+  const money = moneyFormatter(settings);
 
   const loadData = async () => {
     try {
@@ -421,13 +419,13 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                             {prod.packing}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-slate-500 dark:text-slate-400">
-                            {currency} {prod.box_trade_price.toFixed(2)}
+                            {money(prod.box_trade_price)}
                           </td>
                           <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                            {currency} {prod.box_retail_price.toFixed(2)}
+                            {money(prod.box_retail_price)}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-amber-600 dark:text-amber-300 font-semibold">
-                            {currency} {prod.unit_retail_price.toFixed(2)}
+                            {money(prod.unit_retail_price)}
                           </td>
                           <td className="py-3 px-3 text-center font-mono text-slate-600 dark:text-slate-400">
                             {prod.location_rack || '-'}
@@ -739,7 +737,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                     • <strong>Full Pack:</strong> 1 Box contains <strong>{productForm.packing}</strong> individual {productForm.unit_type.toLowerCase()}. Selling 1 Box deducts 1 full box ({productForm.packing} units) from stock.
                   </p>
                   <p>
-                    • <strong>Loose Units:</strong> Cashiers can sell individual {productForm.unit_type.toLowerCase()} at <strong>{currency} {productForm.unit_retail_price.toFixed(2)}</strong> each. Loose sales deduct directly from loose stock (or auto-convert 1 whole box when loose stock is 0).
+                    • <strong>Loose Units:</strong> Cashiers can sell individual {productForm.unit_type.toLowerCase()} at <strong>{money(productForm.unit_retail_price)}</strong> each. Loose sales deduct directly from loose stock (or auto-convert 1 whole box when loose stock is 0).
                   </p>
                   <p>
                     • <strong>Minimum Sale Rule:</strong> Cashiers cannot sell less than <strong>{productForm.min_sale_qty}</strong> unit(s) per transaction.
@@ -751,7 +749,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                     • <strong>Complete Packaging Only:</strong> This medicine <em>cannot</em> be sold as individual loose units. Loose unit sales are strictly blocked at POS counter.
                   </p>
                   <p>
-                    • <strong>Stock Impact:</strong> Every sale deducts complete packs (1 pack = 1 box of {productForm.packing} units) at <strong>{currency} {productForm.box_retail_price.toFixed(2)}</strong>.
+                    • <strong>Stock Impact:</strong> Every sale deducts complete packs (1 pack = 1 box of {productForm.packing} units) at <strong>{money(productForm.box_retail_price)}</strong>.
                   </p>
                   <p>
                     • <strong>Minimum Sale Rule:</strong> Cashiers cannot sell less than <strong>{productForm.min_sale_qty}</strong> pack(s).

@@ -12,6 +12,7 @@ import {
   Building2,
   Printer
 } from 'lucide-react';
+import { moneyFormatter } from '../utils/format';
 
 interface ReportsPageProps {
   settings?: SystemSettings | null;
@@ -30,16 +31,14 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
   const [currentReport, setCurrentReport] = useState<ReportType>('available_stock');
   const [reportData, setReportData] = useState<any[]>([]);
   const [pnlSummary, setPnlSummary] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [expiryDays, setExpiryDays] = useState('60');
 
-  const currency = settings?.currency_symbol || 'Rs.';
+  const money = moneyFormatter(settings);
 
   const loadCurrentReport = async () => {
     try {
-      setLoading(true);
       if (currentReport === 'available_stock') {
         const data = await api.getAvailableStockReport();
         setReportData(data);
@@ -64,8 +63,6 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
       }
     } catch (err) {
       console.error('Failed to load report:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -207,13 +204,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
             <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
               <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Valuation at Cost (T-Price)</span>
               <div className="text-2xl font-bold font-mono text-teal-600 dark:text-teal-400 mt-1">
-                {currency} {reportData.reduce((s, i) => s + (i.total_cost_value || 0), 0).toFixed(2)}
+                {money(reportData.reduce((s, i) => s + (i.total_cost_value || 0), 0))}
               </div>
             </div>
             <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-xs">
               <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Valuation at Retail (MRP)</span>
               <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-                {currency} {reportData.reduce((s, i) => s + (i.total_retail_value || 0), 0).toFixed(2)}
+                {money(reportData.reduce((s, i) => s + (i.total_retail_value || 0), 0))}
               </div>
             </div>
           </div>
@@ -253,10 +250,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                       <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
                         {p.stock_boxes} Bx, {p.stock_loose} L
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">{currency} {p.box_trade_price.toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-200">{currency} {p.box_retail_price.toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-teal-600 dark:text-teal-400 font-bold">{currency} {p.total_cost_value.toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold">{currency} {p.total_retail_value.toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-500 dark:text-slate-400">{money(p.box_trade_price)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-200">{money(p.box_retail_price)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-teal-600 dark:text-teal-400 font-bold">{money(p.total_cost_value)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold">{money(p.total_retail_value)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -309,7 +306,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                       <td className="py-2.5 px-3 text-center font-mono text-amber-600 dark:text-amber-400 font-semibold">{b.location_rack || '-'}</td>
                       <td className="py-2.5 px-3 text-center font-mono text-slate-900 dark:text-white">{b.quantity_boxes} Boxes</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
-                        {currency} {Number(b.loss_valuation).toFixed(2)}
+                        {money(Number(b.loss_valuation))}
                       </td>
                     </tr>
                   ))
@@ -379,7 +376,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
           <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Net Sales Revenue</span>
             <div className="text-3xl font-extrabold font-mono text-slate-900 dark:text-white mt-2">
-              {currency} {Number(pnlSummary?.total_revenue || 0).toFixed(2)}
+              {money(Number(pnlSummary?.total_revenue || 0))}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">{pnlSummary?.total_invoices || 0} invoice(s)</div>
           </div>
@@ -387,7 +384,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
           <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Cost of Goods Sold (COGS)</span>
             <div className="text-3xl font-extrabold font-mono text-amber-600 dark:text-amber-400 mt-2">
-              {currency} {Number(pnlSummary?.total_cost_of_goods || 0).toFixed(2)}
+              {money(Number(pnlSummary?.total_cost_of_goods || 0))}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Based on purchase trade price</div>
           </div>
@@ -395,7 +392,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
           <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xs">
             <span className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Gross Profit</span>
             <div className="text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-400 mt-2">
-              {currency} {Number(pnlSummary?.gross_profit || 0).toFixed(2)}
+              {money(Number(pnlSummary?.gross_profit || 0))}
             </div>
             <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Revenue minus COGS & bill discounts</div>
           </div>
@@ -441,9 +438,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                     <td className="py-2.5 px-3 font-mono font-bold text-teal-600 dark:text-teal-400">{inv.invoice_no}</td>
                     <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{new Date(inv.sale_date).toLocaleDateString()}</td>
                     <td className="py-2.5 px-3 text-slate-900 dark:text-white font-medium">{inv.customer_name}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-900 dark:text-white">{currency} {Number(inv.sale_amount).toFixed(2)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-amber-600 dark:text-amber-400">{currency} {Number(inv.total_cost).toFixed(2)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{currency} {Number(inv.net_profit).toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-900 dark:text-white">{money(Number(inv.sale_amount))}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-amber-600 dark:text-amber-400">{money(Number(inv.total_cost))}</td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{money(Number(inv.net_profit))}</td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">{inv.profit_margin_pct}%</td>
                   </tr>
                 ))}
@@ -483,9 +480,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                     <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-300">{item.p_code}</td>
                     <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{item.product_name}</td>
                     <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">{item.total_quantity_sold}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-slate-900 dark:text-white">{currency} {Number(item.total_sales_amount).toFixed(2)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono text-amber-600 dark:text-amber-400">{currency} {Number(item.total_cost_amount).toFixed(2)}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{currency} {Number(item.gross_profit).toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-slate-900 dark:text-white">{money(Number(item.total_sales_amount))}</td>
+                    <td className="py-2.5 px-3 text-right font-mono text-amber-600 dark:text-amber-400">{money(Number(item.total_cost_amount))}</td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{money(Number(item.gross_profit))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -522,7 +519,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                     <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{c.company_name}</td>
                     <td className="py-2.5 px-3 text-center font-mono text-slate-600 dark:text-slate-300">{c.invoice_count}</td>
                     <td className="py-2.5 px-3 text-center font-mono text-slate-600 dark:text-slate-300">{c.total_units_sold}</td>
-                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{currency} {Number(c.total_revenue).toFixed(2)}</td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{money(Number(c.total_revenue))}</td>
                   </tr>
                 ))}
               </tbody>

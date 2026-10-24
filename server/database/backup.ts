@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { db, DB_PATH } from './db';
 
 // The Electron app points PHARMACARE_BACKUP_DIR at its per-user folder; dev and tests use ./backups
-export const DEFAULT_BACKUP_DIR = path.resolve(process.env.PHARMACARE_BACKUP_DIR || path.join(process.cwd(), 'backups'));
+const DEFAULT_BACKUP_DIR = path.resolve(process.env.PHARMACARE_BACKUP_DIR || path.join(process.cwd(), 'backups'));
 
 if (!fs.existsSync(DEFAULT_BACKUP_DIR)) {
   fs.mkdirSync(DEFAULT_BACKUP_DIR, { recursive: true });
@@ -17,7 +17,7 @@ export type BackupType = 'manual' | 'scheduled' | 'shift_close' | 'pre_restore';
 // 'auto_daily' is the pre-Phase 4 name for automatic backups and is still pruned as routine.
 const ROUTINE_BACKUP_TYPES = ['manual', 'scheduled', 'shift_close', 'auto_daily'];
 export const PRE_RESTORE_KEEP = 3;
-export const DEFAULT_RETENTION_LIMIT = 30;
+const DEFAULT_RETENTION_LIMIT = 30;
 
 // Tables every valid PharmaCare database must contain
 const REQUIRED_TABLES = ['system_settings', 'products', 'sales', 'users'];
@@ -38,7 +38,7 @@ export interface BackupResult {
 /**
  * Calculates SHA-256 checksum of a file for integrity verification.
  */
-export function calculateFileChecksum(filePath: string): string {
+function calculateFileChecksum(filePath: string): string {
   if (!fs.existsSync(filePath)) return '';
   const fileBuffer = fs.readFileSync(filePath);
   const hashSum = crypto.createHash('sha256');
@@ -64,7 +64,7 @@ export function verifyBackupFile(filePath: string): { ok: boolean; error?: strin
     fs.closeSync(fd);
   }
   if (header.toString('utf8', 0, 15) !== 'SQLite format 3') {
-    return { ok: false, error: 'File is not a valid SQLite database.' };
+    return { ok: false, error: 'This file is not a valid PharmaCare backup.' };
   }
 
   let check: Database.Database | null = null;
@@ -72,7 +72,7 @@ export function verifyBackupFile(filePath: string): { ok: boolean; error?: strin
     check = new Database(filePath, { readonly: true, fileMustExist: true });
     const integrity = check.pragma('integrity_check') as Array<{ integrity_check: string }>;
     if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok') {
-      return { ok: false, error: `Integrity check failed: ${integrity.map(r => r.integrity_check).join('; ')}` };
+      return { ok: false, error: `Backup file is damaged and cannot be used (${integrity.map(r => r.integrity_check).join('; ')})` };
     }
     const tables = new Set(
       (check.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map(t => t.name)
@@ -307,7 +307,7 @@ export function pruneBackupsByRetentionLimit(customLimit?: number, dir: string =
 /**
  * Keeps only the newest pre-restore safety snapshots in a folder.
  */
-export function prunePreRestoreSnapshots(dir: string = getConfiguredBackupDir()): number {
+function prunePreRestoreSnapshots(dir: string = getConfiguredBackupDir()): number {
   try {
     let deletedCount = 0;
     for (const row of listVerifiedBackups(dir, ['pre_restore']).slice(PRE_RESTORE_KEEP)) {
@@ -384,7 +384,7 @@ export async function restoreDatabase(backupFilePath: string): Promise<{ success
   // Re-verify integrity
   const integrity = db.pragma('quick_check') as Array<{ quick_check: string }>;
   if (integrity.length > 0 && integrity[0].quick_check !== 'ok') {
-    throw new Error(`Database integrity check warning: ${integrity[0].quick_check}`);
+    throw new Error(`The restored data failed its health check (${integrity[0].quick_check})`);
   }
 
   return {
@@ -450,7 +450,7 @@ export function optimizeDatabase(): { success: boolean; message: string; sizeBef
 
   return {
     success: true,
-    message: 'Database optimized successfully. Indexes recomputed and pages defragmented.',
+    message: 'Database optimized successfully.',
     sizeBefore,
     sizeAfter
   };

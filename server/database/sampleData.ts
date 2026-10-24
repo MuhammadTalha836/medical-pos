@@ -1,0 +1,339 @@
+import type Database from 'better-sqlite3';
+
+// Demo catalog for development and the test suites: a sample store identity, companies, medicines with
+// batches, and khata customers. Seeded only when PHARMACARE_SAMPLE_DATA=true, so a real pharmacy install
+// (the packaged app never sets it) starts with an empty catalog.
+export function seedSampleData(db: Database.Database) {
+  const sampleStore: Record<string, string> = {
+    store_name: 'AL-SHIFA PHARMACY & WELLNESS',
+    store_address: 'Suite #12-14, Health Plaza, Main Commercial Ave',
+    store_phone: '+92 300 9876543 / 051-4567890',
+    drug_license_no: 'DL-PHARM-2024-9981',
+    tax_no: 'NTN: 7392819-1',
+    receipt_header: 'Quality Medicines • Certified Pharmacist on Duty'
+  };
+  // Only fills settings that are still empty, so a configured store keeps its own identity
+  const fillSetting = db.prepare("UPDATE system_settings SET value = ? WHERE key = ? AND value = ''");
+  for (const [key, value] of Object.entries(sampleStore)) fillSetting.run(value, key);
+
+  // Companies
+  const companyCount = (db.prepare('SELECT COUNT(*) as count FROM companies').get() as { count: number }).count;
+  if (companyCount === 0) {
+    const insertCompany = db.prepare(`
+      INSERT INTO companies (code, name, contact_person, phone, email, address)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+
+    insertCompany.run('GSK', 'GlaxoSmithKline Healthcare', 'Tariq Mehmood', '+92 321 1112233', 'orders@gsk.example', 'Plot 35, Industrial Area, Karachi');
+    insertCompany.run('ABT', 'Abbott Laboratories', 'Saleem Raza', '+92 333 4445566', 'dist@abbott.example', 'Landhi Industrial Estate, Karachi');
+    insertCompany.run('SEARLE', 'The Searle Company Limited', 'Kamran Sheikh', '+92 300 7778899', 'supply@searle.example', 'F-224, S.I.T.E, Karachi');
+    insertCompany.run('GETZ', 'Getz Pharma (Pvt) Ltd', 'Nadeem Akhtar', '+92 345 2223344', 'sales@getzpharma.example', '29-30/27, Korangi Industrial Area');
+    insertCompany.run('SANO', 'Sanofi-Aventis Pakistan', 'Zahid Hussain', '+92 312 9990011', 'order@sanofi.example', 'Plot 23, Korangi Sector 22');
+    insertCompany.run('BOSC', 'Bosch Pharmaceuticals', 'Faisal Latif', '+92 322 8887766', 'info@bosch.example', 'Federal B Area, Karachi');
+    insertCompany.run('BAY', 'Bayer Healthcare', 'Imran Siddiqui', '+92 301 5554433', 'orders@bayer.example', 'Clifton Corporate Towers');
+  }
+
+  // Products
+  const productCount = (db.prepare('SELECT COUNT(*) as count FROM products').get() as { count: number }).count;
+  if (productCount === 0) {
+    const getCompanyId = db.prepare('SELECT id FROM companies WHERE code = ?');
+
+    const products = [
+      {
+        c_code: 'GSK',
+        p_code: 'GSK-PAN-500',
+        barcode: '89640001001',
+        name: 'Panadol 500mg Tablets',
+        generic_name: 'Paracetamol',
+        unit_type: 'Tablets',
+        packing: 200,
+        box_trade_price: 425.00,
+        box_retail_price: 500.00,
+        unit_trade_price: 2.12,
+        unit_retail_price: 2.50,
+        default_discount_pct: 5.0,
+        location_rack: 'Rack-A1',
+        stock_boxes: 35,
+        stock_loose: 60,
+        min_stock_alert: 10,
+        batches: [
+          { batch_no: 'B-PAN-2024A', expiry_date: '2027-08-30', boxes: 35, loose: 60, cost: 425.0, retail: 500.0 }
+        ]
+      },
+      {
+        c_code: 'GSK',
+        p_code: 'GSK-AUG-625',
+        barcode: '89640001002',
+        name: 'Augmentin 625mg Tablets',
+        generic_name: 'Amoxicillin + Clavulanic Acid',
+        unit_type: 'Tablets',
+        packing: 14,
+        box_trade_price: 295.00,
+        box_retail_price: 345.00,
+        unit_trade_price: 21.07,
+        unit_retail_price: 24.64,
+        default_discount_pct: 5.0,
+        location_rack: 'Rack-A2',
+        stock_boxes: 45,
+        stock_loose: 0,
+        min_stock_alert: 15,
+        batches: [
+          { batch_no: 'B-AUG-9921', expiry_date: '2026-12-15', boxes: 45, loose: 0, cost: 295.0, retail: 345.0 }
+        ]
+      },
+      {
+        c_code: 'ABT',
+        p_code: 'ABT-BRU-400',
+        barcode: '89640002001',
+        name: 'Brufen 400mg Tablets',
+        generic_name: 'Ibuprofen',
+        unit_type: 'Tablets',
+        packing: 300,
+        box_trade_price: 680.00,
+        box_retail_price: 810.00,
+        unit_trade_price: 2.27,
+        unit_retail_price: 2.70,
+        default_discount_pct: 5.0,
+        location_rack: 'Rack-B1',
+        stock_boxes: 20,
+        stock_loose: 150,
+        min_stock_alert: 8,
+        batches: [
+          { batch_no: 'B-BRU-332', expiry_date: '2028-03-31', boxes: 20, loose: 150, cost: 680.0, retail: 810.0 }
+        ]
+      },
+      {
+        c_code: 'ABT',
+        p_code: 'ABT-ARI-FORTE',
+        barcode: '89640002002',
+        name: 'Arinac Forte Tablets',
+        generic_name: 'Ibuprofen + Pseudoephedrine',
+        unit_type: 'Tablets',
+        packing: 100,
+        box_trade_price: 360.00,
+        box_retail_price: 430.00,
+        unit_trade_price: 3.60,
+        unit_retail_price: 4.30,
+        default_discount_pct: 0.0,
+        location_rack: 'Rack-B2',
+        stock_boxes: 28,
+        stock_loose: 20,
+        min_stock_alert: 10,
+        batches: [
+          { batch_no: 'B-ARI-771', expiry_date: '2027-05-15', boxes: 28, loose: 20, cost: 360.0, retail: 430.0 }
+        ]
+      },
+      {
+        c_code: 'SANO',
+        p_code: 'SAN-FLA-400',
+        barcode: '89640003001',
+        name: 'Flagyl 400mg Tablets',
+        generic_name: 'Metronidazole',
+        unit_type: 'Tablets',
+        packing: 200,
+        box_trade_price: 390.00,
+        box_retail_price: 465.00,
+        unit_trade_price: 1.95,
+        unit_retail_price: 2.32,
+        default_discount_pct: 5.0,
+        location_rack: 'Rack-B3',
+        stock_boxes: 25,
+        stock_loose: 40,
+        min_stock_alert: 10,
+        batches: [
+          { batch_no: 'B-FLA-401', expiry_date: '2027-10-30', boxes: 25, loose: 40, cost: 390.0, retail: 465.0 }
+        ]
+      },
+      {
+        c_code: 'GETZ',
+        p_code: 'GTZ-RIS-40',
+        barcode: '89640004001',
+        name: 'Risek 40mg Capsules',
+        generic_name: 'Omeprazole',
+        unit_type: 'Capsules',
+        packing: 14,
+        box_trade_price: 460.00,
+        box_retail_price: 545.00,
+        unit_trade_price: 32.85,
+        unit_retail_price: 38.92,
+        default_discount_pct: 7.0,
+        location_rack: 'Rack-C1',
+        stock_boxes: 30,
+        stock_loose: 7,
+        min_stock_alert: 10,
+        batches: [
+          { batch_no: 'B-RIS-550', expiry_date: '2026-11-20', boxes: 30, loose: 7, cost: 460.0, retail: 545.0 }
+        ]
+      },
+      {
+        c_code: 'SEARLE',
+        p_code: 'SRL-HYD-SYR',
+        barcode: '89640005001',
+        name: 'Hydryllin Syrup 120ml',
+        generic_name: 'Aminophylline Compound',
+        unit_type: 'Syrup',
+        packing: 1,
+        box_trade_price: 98.00,
+        box_retail_price: 118.00,
+        unit_trade_price: 98.00,
+        unit_retail_price: 118.00,
+        default_discount_pct: 0.0,
+        location_rack: 'Syrup-Rack-1',
+        stock_boxes: 50,
+        stock_loose: 0,
+        min_stock_alert: 12,
+        batches: [
+          { batch_no: 'B-HYD-102', expiry_date: '2026-09-10', boxes: 50, loose: 0, cost: 98.0, retail: 118.0 }
+        ]
+      },
+      {
+        c_code: 'GSK',
+        p_code: 'GSK-VEN-INH',
+        barcode: '89640001003',
+        name: 'Ventolin Inhaler 200 Dose',
+        generic_name: 'Salbutamol',
+        unit_type: 'Inhaler',
+        packing: 1,
+        box_trade_price: 275.00,
+        box_retail_price: 325.00,
+        unit_trade_price: 275.00,
+        unit_retail_price: 325.00,
+        default_discount_pct: 0.0,
+        location_rack: 'Inhaler-Sec',
+        stock_boxes: 16,
+        stock_loose: 0,
+        min_stock_alert: 5,
+        batches: [
+          { batch_no: 'B-VEN-441', expiry_date: '2027-02-28', boxes: 16, loose: 0, cost: 275.0, retail: 325.0 }
+        ]
+      },
+      {
+        c_code: 'BAY',
+        p_code: 'BAY-CIP-500',
+        barcode: '89640007001',
+        name: 'Ciproxin 500mg Tablets',
+        generic_name: 'Ciprofloxacin',
+        unit_type: 'Tablets',
+        packing: 10,
+        box_trade_price: 430.00,
+        box_retail_price: 510.00,
+        unit_trade_price: 43.00,
+        unit_retail_price: 51.00,
+        default_discount_pct: 5.0,
+        location_rack: 'Rack-E1',
+        stock_boxes: 22,
+        stock_loose: 0,
+        min_stock_alert: 8,
+        batches: [
+          { batch_no: 'B-CIP-881', expiry_date: '2027-07-20', boxes: 22, loose: 0, cost: 430.0, retail: 510.0 }
+        ]
+      },
+      {
+        c_code: 'GSK',
+        p_code: 'GSK-POL-OINT',
+        barcode: '89640001005',
+        name: 'Polyfax Skin Ointment 20g',
+        generic_name: 'Polymyxin B + Bacitracin',
+        unit_type: 'Ointment',
+        packing: 1,
+        box_trade_price: 88.00,
+        box_retail_price: 108.00,
+        unit_trade_price: 88.00,
+        unit_retail_price: 108.00,
+        default_discount_pct: 0.0,
+        location_rack: 'Rack-Ointment',
+        stock_boxes: 42,
+        stock_loose: 0,
+        min_stock_alert: 15,
+        batches: [
+          { batch_no: 'B-POL-209', expiry_date: '2026-10-01', boxes: 42, loose: 0, cost: 88.0, retail: 108.0 }
+        ]
+      },
+      {
+        c_code: 'SEARLE',
+        p_code: 'SRL-GRA-SYR',
+        barcode: '89640005002',
+        name: 'Gravinate Syrup 120ml',
+        generic_name: 'Dimenhydrinate',
+        unit_type: 'Syrup',
+        packing: 1,
+        box_trade_price: 110.00,
+        box_retail_price: 132.00,
+        unit_trade_price: 110.00,
+        unit_retail_price: 132.00,
+        default_discount_pct: 0.0,
+        location_rack: 'Syrup-Rack-1',
+        stock_boxes: 4, // Intentionally low stock
+        stock_loose: 0,
+        min_stock_alert: 10,
+        batches: [
+          { batch_no: 'B-GRA-099', expiry_date: '2026-10-25', boxes: 4, loose: 0, cost: 110.0, retail: 132.0 }
+        ]
+      },
+      {
+        c_code: 'BOSC',
+        p_code: 'BSC-CEF-400',
+        barcode: '89640008001',
+        name: 'Cefspan 400mg Capsules',
+        generic_name: 'Cefixime',
+        unit_type: 'Capsules',
+        packing: 5,
+        box_trade_price: 490.00,
+        box_retail_price: 580.00,
+        unit_trade_price: 98.00,
+        unit_retail_price: 116.00,
+        default_discount_pct: 5.0,
+        location_rack: 'Rack-C2',
+        stock_boxes: 0, // Intentionally finished / out of stock
+        stock_loose: 0,
+        min_stock_alert: 5,
+        batches: [
+          { batch_no: 'B-CEF-110', expiry_date: '2026-08-15', boxes: 0, loose: 0, cost: 490.0, retail: 580.0 }
+        ]
+      }
+    ];
+
+    const insertProd = db.prepare(`
+      INSERT INTO products (
+        company_id, c_code, p_code, barcode, name, generic_name, unit_type,
+        packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
+        default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert,
+        allow_open_sale, min_sale_qty
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertBatch = db.prepare(`
+      INSERT INTO product_batches (
+        product_id, batch_no, expiry_date, purchase_cost, retail_price, quantity_boxes, quantity_loose
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const p of products) {
+      const comp = getCompanyId.get(p.c_code) as { id: number } | undefined;
+      const compId = comp ? comp.id : null;
+      const allowOpen = p.packing > 1 ? 1 : 0;
+      const minQty = 1;
+
+      const res = insertProd.run(
+        compId, p.c_code, p.p_code, p.barcode, p.name, p.generic_name, p.unit_type,
+        p.packing, p.box_trade_price, p.box_retail_price, p.unit_trade_price, p.unit_retail_price,
+        p.default_discount_pct, p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+        allowOpen, minQty
+      );
+
+      const prodId = res.lastInsertRowid;
+      for (const b of p.batches) {
+        insertBatch.run(prodId, b.batch_no, b.expiry_date, b.cost, b.retail, b.boxes, b.loose);
+      }
+    }
+  }
+
+  // Customers
+  const customerCount = (db.prepare('SELECT COUNT(*) as count FROM customers').get() as { count: number }).count;
+  if (customerCount === 0) {
+    const insertCust = db.prepare('INSERT INTO customers (name, phone, address, credit_limit, current_balance) VALUES (?, ?, ?, ?, ?)');
+    insertCust.run('Walk-in Customer', '', 'Over the counter', 0, 0);
+    insertCust.run('Dr. Naeem Ward-5 Clinic', '+92 300 5551234', 'Opposite Civil Hospital', 50000, 12400);
+    insertCust.run('Al-Kareem Maternity Home', '+92 321 8884433', 'Plot 44, Block C, Satellite Town', 100000, 35000);
+  }
+}

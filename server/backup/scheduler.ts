@@ -75,7 +75,7 @@ export async function getScheduleState(now: Date = new Date()) {
  * Records the outcome of any backup (scheduled, manual or shift-close) so the dashboard and scheduler
  * share one source of truth. Failures keep the last successful backup time untouched.
  */
-export async function recordBackupOutcome(
+async function recordBackupOutcome(
   type: BackupType,
   outcome: { result?: BackupResult; error?: unknown },
   actor?: { id?: number | null; username?: string | null }
@@ -135,6 +135,15 @@ let schedulerRunning = false;
 /**
  * One scheduler tick: runs a scheduled backup if a slot is due (including missed slots after power-off).
  */
+/** Shift-close backup: runs alongside the schedule unless the Developer switched automatic backups off. */
+export async function runShiftCloseBackup(actor: { id?: number | null; username?: string | null }) {
+  const { frequency } = await getScheduleState();
+  if (frequency === 'off') return null;
+  const { result, error } = await runRecordedBackup('shift_close', actor);
+  if (error) console.error('Shift-close backup error:', error);
+  return result ?? null;
+}
+
 export async function runSchedulerTick(now: Date = new Date()): Promise<boolean> {
   if (schedulerRunning) return false;
   schedulerRunning = true;

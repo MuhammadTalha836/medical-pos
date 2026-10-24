@@ -334,3 +334,29 @@ CREATE INDEX IF NOT EXISTS idx_shifts_user_status ON cashier_shifts(user_id, sta
 CREATE INDEX IF NOT EXISTS idx_shifts_shift_no ON cashier_shifts(shift_no);
 CREATE INDEX IF NOT EXISTS idx_shifts_start_time ON cashier_shifts(start_time);
 `;
+
+/**
+ * Columns added after the first release. Databases created before a column existed get it on startup;
+ * new databases already have it from SCHEMA_SQL. To add a column: put it in the CREATE TABLE above, add it
+ * here, add it to prisma/schema.prisma, and run `npm run prisma:generate`.
+ */
+export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definition: string }> = [
+  { table: 'sales', column: 'shift_id', definition: 'INTEGER REFERENCES cashier_shifts(id)' },
+  { table: 'sale_returns', column: 'shift_id', definition: 'INTEGER REFERENCES cashier_shifts(id)' },
+  { table: 'customer_payments', column: 'shift_id', definition: 'INTEGER REFERENCES cashier_shifts(id)' },
+  { table: 'products', column: 'allow_open_sale', definition: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'products', column: 'min_sale_qty', definition: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'users', column: 'email', definition: 'TEXT' },
+  { table: 'users', column: 'totp_secret', definition: 'TEXT' },
+  { table: 'users', column: 'failed_login_attempts', definition: 'INTEGER DEFAULT 0' },
+  { table: 'users', column: 'locked_until', definition: 'DATETIME' },
+  { table: 'audit_logs', column: 'affected_user', definition: 'TEXT' },
+  { table: 'audit_logs', column: 'status', definition: "TEXT DEFAULT 'SUCCESS'" },
+  { table: 'sales', column: 'store_name_snapshot', definition: 'TEXT' },
+  { table: 'sales', column: 'store_address_snapshot', definition: 'TEXT' },
+  { table: 'sales', column: 'invoice_footer_snapshot', definition: 'TEXT' },
+  { table: 'backup_history', column: 'checksum_sha256', definition: 'TEXT' },
+  { table: 'backup_history', column: 'verified', definition: 'INTEGER NOT NULL DEFAULT 1' },
+  { table: 'backup_history', column: 'error_message', definition: 'TEXT' },
+  { table: 'backup_history', column: 'secondary_path', definition: 'TEXT' }
+];

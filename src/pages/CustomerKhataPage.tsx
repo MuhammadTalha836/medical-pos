@@ -10,14 +10,12 @@ import {
   Plus,
   DollarSign,
   UserCheck,
-  AlertCircle,
   CheckCircle2,
-  Receipt,
   FileText,
   Phone,
   MapPin,
-  Clock
 } from 'lucide-react';
+import { currencySymbol, moneyFormatter } from '../utils/format';
 
 interface CustomerKhataPageProps {
   settings?: SystemSettings | null;
@@ -54,7 +52,8 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
   const [loadingLedger, setLoadingLedger] = useState(false);
 
   const [notification, setNotification] = useState<string | null>(null);
-  const currency = settings?.currency_symbol || 'Rs.';
+  const currency = currencySymbol(settings);
+  const money = moneyFormatter(settings);
 
   const loadCustomers = async () => {
     try {
@@ -145,7 +144,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
         if (activeShift) {
           fetchShiftSummary(activeShift.id);
         }
-        setNotification(`Payment of ${currency} ${paymentAmount.toFixed(2)} recorded for ${selectedCustomerForPayment.name}. New Balance: ${currency} ${res.new_balance.toFixed(2)}.`);
+        setNotification(`Payment of ${money(paymentAmount)} recorded for ${selectedCustomerForPayment.name}. New Balance: ${money(res.new_balance)}.`);
         setSelectedCustomerForPayment(null);
         loadCustomers();
         setTimeout(() => setNotification(null), 5000);
@@ -212,7 +211,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
           </div>
           <div className="mt-3">
             <div className="text-2xl font-extrabold font-mono text-amber-600 dark:text-amber-400 tracking-tight">
-              {currency} {totalOutstanding.toFixed(2)}
+              {money(totalOutstanding)}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Receivable across {customersWithCredit} customer account(s)
@@ -341,7 +340,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                       </td>
 
                       <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-400">
-                        {currency} {Number(cust.credit_limit).toFixed(2)}
+                        {money(Number(cust.credit_limit))}
                       </td>
 
                       <td className="py-3 px-4 text-right">
@@ -352,7 +351,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                               : 'text-amber-600 dark:text-amber-400'
                             : 'text-emerald-600 dark:text-emerald-400'
                         }`}>
-                          {currency} {Number(cust.current_balance).toFixed(2)}
+                          {money(Number(cust.current_balance))}
                         </span>
                       </td>
 
@@ -419,7 +418,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
           <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl space-y-1">
             <span className="text-amber-800 dark:text-amber-300 font-semibold block">Outstanding Credit Balance</span>
             <div className="text-2xl font-extrabold font-mono text-amber-700 dark:text-amber-400">
-              {currency} {Number(selectedCustomerForPayment?.current_balance || 0).toFixed(2)}
+              {money(Number(selectedCustomerForPayment?.current_balance || 0))}
             </div>
           </div>
 
@@ -506,7 +505,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
             <div className="text-right">
               <span className="text-slate-400 text-[10px] block">Current Balance</span>
               <span className="font-mono text-base font-bold text-amber-600 dark:text-amber-400">
-                {currency} {Number(selectedCustomerForLedger?.current_balance || 0).toFixed(2)}
+                {money(Number(selectedCustomerForLedger?.current_balance || 0))}
               </span>
             </div>
           </div>
@@ -569,7 +568,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                          {currency} {Number(sale.net_total).toFixed(2)}
+                          {money(Number(sale.net_total))}
                         </td>
                         <td className="py-2 px-3 text-center">
                           <span className={sale.status === 'completed' ? 'badge-success' : 'badge-warning'}>
@@ -611,7 +610,7 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                           {p.payment_date?.split(' ')[0] || p.payment_date}
                         </td>
                         <td className="py-2 px-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {currency} {Number(p.amount).toFixed(2)}
+                          {money(Number(p.amount))}
                         </td>
                         <td className="py-2 px-3 text-center">
                           <span className="px-1.5 py-0.5 rounded-sm text-[10px] uppercase bg-slate-100 dark:bg-[#162032] text-slate-700 dark:text-slate-300 font-semibold">
@@ -619,10 +618,10 @@ export const CustomerKhataPage: React.FC<CustomerKhataPageProps> = ({ settings }
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right font-mono text-slate-500 dark:text-slate-400">
-                          {currency} {Number(p.previous_balance).toFixed(2)}
+                          {money(Number(p.previous_balance))}
                         </td>
                         <td className="py-2 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-                          {currency} {Number(p.new_balance).toFixed(2)}
+                          {money(Number(p.new_balance))}
                         </td>
                         <td className="py-2 px-3 text-slate-600 dark:text-slate-300 truncate max-w-[150px]" title={p.notes}>
                           {p.notes || '-'}

@@ -1,41 +1,7 @@
-export interface RolePermissions {
-  // Module Visibility
-  dashboard: boolean;
-  pos: boolean;
-  sales: boolean;
-  khata: boolean;
-  masters: boolean;
-  purchases: boolean;
-  reports: boolean;
-  utilities: boolean;
-  settings: boolean;
-  shifts: boolean; // Admin Shift Management page
+import type { RolePermissions } from '../../shared/permissions';
+import type { InvoiceTemplate as InvoiceTemplateType, InvoicePaperSize } from '../../shared/invoice';
 
-  // Granular Actions
-  can_add_product: boolean;
-  can_edit_product: boolean;
-  can_delete_product: boolean;
-  can_add_company: boolean;
-  can_edit_company: boolean;
-  can_delete_company: boolean;
-  can_delete_invoice: boolean;
-  can_return_sale: boolean;
-  can_view_all_sales: boolean;
-  can_view_financial_kpis: boolean;
-  can_add_purchase: boolean;
-  can_add_customer: boolean;
-  can_receive_payment: boolean;
-  can_edit_customer: boolean;
-  can_delete_customer: boolean;
-  can_discount: boolean;
-  can_backup: boolean;
-  can_restore: boolean;
-  can_shift_close: boolean;
-  can_manage_shifts: boolean;
-  can_stock_zero: boolean;
-  can_manage_users: boolean;
-  can_manage_roles: boolean;
-}
+export type { RolePermissions, InvoiceTemplateType, InvoicePaperSize };
 
 export interface Role {
   id: number;
@@ -129,28 +95,6 @@ export interface Customer {
   credit_limit: number;
   current_balance: number;
   invoices_count?: number;
-  created_at?: string;
-}
-
-export interface CustomerPayment {
-  id: number;
-  customer_id: number;
-  amount: number;
-  payment_method: 'Cash' | 'Card' | 'Online';
-  notes?: string;
-  shift_id?: number | null;
-  payment_date: string;
-}
-
-export interface ProductBatch {
-  id: number;
-  product_id: number;
-  batch_no: string;
-  expiry_date: string;
-  purchase_cost: number;
-  retail_price: number;
-  quantity_boxes: number;
-  quantity_loose: number;
   created_at?: string;
 }
 
@@ -275,8 +219,6 @@ export interface PurchaseInvoice {
   items?: PurchaseItem[];
 }
 
-export type InvoiceTemplateType = 'classic' | 'compact' | 'detailed';
-export type InvoicePaperSize = '58mm' | '80mm';
 
 export interface SystemSettings {
   store_name: string;
@@ -333,26 +275,6 @@ export interface SystemSettings {
   show_developer_info?: string; // Strictly mandatory 'true'
 
   [key: string]: string | undefined;
-}
-
-export interface DailyClosing {
-  id?: number;
-  closing_date: string;
-  opening_time?: string;
-  closing_time?: string;
-  user_name?: string;
-  opening_cash: number;
-  total_sales_cash: number;
-  total_sales_card: number;
-  total_sales_credit: number;
-  total_returns: number;
-  total_purchases_paid: number;
-  expenses_total: number;
-  expected_cash: number;
-  actual_cash: number;
-  difference: number;
-  notes?: string;
-  is_closed: number;
 }
 
 export interface CashierShift {

@@ -3,8 +3,6 @@ import { api } from '../../services/apiService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Modal } from '../common/Modal';
 import {
-  User,
-  Lock,
   CheckCircle2,
   AlertCircle,
   KeyRound,

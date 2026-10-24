@@ -1,0 +1,197 @@
+import { Router, type Request, type Response } from 'express';
+import { Prisma } from '../generated/prisma/client';
+import { prisma } from '../database/prisma';
+import { sendError } from '../http/context';
+
+// Products master
+const router = Router();
+
+router.get('/api/products', async (req: Request, res: Response) => {
+  try {
+    const { q, company_id, low_stock } = req.query;
+    const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
+
+    if (q) {
+      const search = `%${String(q).trim()}%`;
+      conditions.push(Prisma.sql`(p.name LIKE ${search} OR p.p_code LIKE ${search} OR p.c_code LIKE ${search} OR p.barcode LIKE ${search} OR p.generic_name LIKE ${search})`);
+    }
+
+    if (company_id) {
+      conditions.push(Prisma.sql`p.company_id = ${Number(company_id)}`);
+    }
+
+    if (low_stock === 'true') {
+      conditions.push(Prisma.sql`p.stock_boxes <= p.min_stock_alert`);
+    }
+
+    const whereClause = Prisma.join(conditions, ' AND ');
+
+    const products = await prisma.$queryRaw<any[]>`
+      SELECT p.id, p.company_id, p.c_code, p.p_code, p.barcode, p.name, p.generic_name,
+             p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
+             p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
+             p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.allow_open_sale, p.min_sale_qty,
+             p.status, p.created_at, p.updated_at, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE ${whereClause}
+      ORDER BY p.name ASC
+    `;
+    res.json(products);
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+router.get('/api/products/search', async (req: Request, res: Response) => {
+  try {
+    const { q } = req.query;
+    if (!q) return res.json([]);
+
+    const searchTerm = String(q).trim();
+    const searchWildcard = `%${searchTerm}%`;
+
+    const products = await prisma.$queryRaw<any[]>`
+      SELECT p.id, p.company_id, p.c_code, p.p_code, p.barcode, p.name, p.generic_name,
+             p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
+             p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
+             p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.allow_open_sale, p.min_sale_qty,
+             p.status, p.created_at, p.updated_at, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE p.status = 'active' AND (
+        p.barcode = ${searchTerm} OR
+        p.p_code LIKE ${searchWildcard} OR
+        p.c_code LIKE ${searchWildcard} OR
+        p.name LIKE ${searchWildcard} OR
+        p.generic_name LIKE ${searchWildcard}
+      )
+      ORDER BY (p.barcode = ${searchTerm}) DESC, p.name ASC
+      LIMIT 25
+    `;
+
+    res.json(products);
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+router.get('/api/products/:id', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const products: any[] = await prisma.$queryRaw`
+      SELECT p.id, p.company_id, p.c_code, p.p_code, p.barcode, p.name, p.generic_name,
+             p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
+             p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
+             p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.allow_open_sale, p.min_sale_qty,
+             p.status, p.created_at, p.updated_at, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE p.id = ${id}
+      LIMIT 1
+    `;
+    if (!products || products.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    res.json(products[0]);
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+router.post('/api/products', async (req: Request, res: Response) => {
+  try {
+    const {
+      company_id, c_code, p_code, barcode, name, generic_name, unit_type,
+      packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
+      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert,
+      allow_open_sale, min_sale_qty
+    } = req.body;
+
+    const newProd = await prisma.product.create({
+      data: {
+        companyId: company_id ? Number(company_id) : null,
+        cCode: c_code,
+        pCode: p_code,
+        barcode: barcode || null,
+        name,
+        genericName: generic_name || null,
+        unitType: unit_type || 'Tablets',
+        packing: Number(packing) || 1,
+        boxTradePrice: parseFloat(box_trade_price) || 0,
+        boxRetailPrice: parseFloat(box_retail_price) || 0,
+        unitTradePrice: parseFloat(unit_trade_price) || 0,
+        unitRetailPrice: parseFloat(unit_retail_price) || 0,
+        defaultDiscountPct: parseFloat(default_discount_pct) || 0,
+        locationRack: location_rack || null,
+        stockBoxes: parseInt(stock_boxes) || 0,
+        stockLoose: parseInt(stock_loose) || 0,
+        minStockAlert: parseInt(min_stock_alert) || 10,
+        allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
+        minSaleQty: parseInt(min_sale_qty) || 1,
+        status: 'active'
+      }
+    });
+
+    res.json({ success: true, id: newProd.id });
+  } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+router.put('/api/products/:id', async (req: Request, res: Response) => {
+  try {
+    const idNum = Number(req.params.id);
+    const {
+      company_id, c_code, p_code, barcode, name, generic_name, unit_type,
+      packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
+      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert, status,
+      allow_open_sale, min_sale_qty
+    } = req.body;
+
+    await prisma.product.update({
+      where: { id: idNum },
+      data: {
+        companyId: company_id ? Number(company_id) : null,
+        cCode: c_code,
+        pCode: p_code,
+        barcode: barcode || null,
+        name,
+        genericName: generic_name || null,
+        unitType: unit_type,
+        packing: Number(packing) || 1,
+        boxTradePrice: parseFloat(box_trade_price) || 0,
+        boxRetailPrice: parseFloat(box_retail_price) || 0,
+        unitTradePrice: parseFloat(unit_trade_price) || 0,
+        unitRetailPrice: parseFloat(unit_retail_price) || 0,
+        defaultDiscountPct: parseFloat(default_discount_pct) || 0,
+        locationRack: location_rack || null,
+        stockBoxes: parseInt(stock_boxes) || 0,
+        stockLoose: parseInt(stock_loose) || 0,
+        minStockAlert: parseInt(min_stock_alert) || 10,
+        allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
+        minSaleQty: parseInt(min_sale_qty) || 1,
+        status: status || 'active'
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+router.delete('/api/products/:id', async (req: Request, res: Response) => {
+  try {
+    const idNum = Number(req.params.id);
+    await prisma.product.delete({ where: { id: idNum } });
+    res.json({ success: true });
+  } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+export default router;

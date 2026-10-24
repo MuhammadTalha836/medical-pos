@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/apiService';
 import { CashierShift, SystemSettings } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
-import { useShiftStore } from '../store/useShiftStore';
 import { Modal } from '../components/common/Modal';
 import { ShiftThermalReceipt } from '../components/pos/ShiftThermalReceipt';
 import {
@@ -29,6 +28,7 @@ import {
   RotateCcw,
   CreditCard
 } from 'lucide-react';
+import { currencySymbol, formatDuration, moneyFormatter } from '../utils/format';
 
 interface ShiftsAdminPageProps {
   settings?: SystemSettings | null;
@@ -36,7 +36,6 @@ interface ShiftsAdminPageProps {
 
 export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) => {
   const { user, hasPermission } = useAuthStore();
-  const { setStartModalOpen, setClosingModalOpen } = useShiftStore();
 
   const [shifts, setShifts] = useState<CashierShift[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,7 +73,8 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
   const [forceCloseNotes, setForceCloseNotes] = useState('');
   const [submittingForceClose, setSubmittingForceClose] = useState(false);
 
-  const currency = settings?.currency_symbol || 'Rs.';
+  const currency = currencySymbol(settings);
+  const money = moneyFormatter(settings);
 
   const showNotification = (text: string, type: 'success' | 'error') => {
     setNotification({ text, type });
@@ -247,12 +247,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
   const flaggedShifts = closedShifts.filter(s => s.cash_difference !== null && Math.abs(s.cash_difference || 0) > 0.01);
   const totalVariance = flaggedShifts.reduce((sum, s) => sum + Math.abs(s.cash_difference || 0), 0);
 
-  const formatDuration = (minutes?: number | null) => {
-    if (!minutes) return '\u2014';
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  };
+  const durationLabel = (minutes?: number | null) => (minutes ? formatDuration(minutes) : '\u2014');
 
   const getVarianceBadge = (diff: number | null | undefined, status: string) => {
     if (status === 'open') return <span className="text-[10px] text-slate-400 italic">Pending</span>;
@@ -494,29 +489,29 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                       )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-teal-700 dark:text-teal-300 font-semibold whitespace-nowrap">
-                      {shift.status === 'open' ? 'In Progress' : formatDuration(shift.duration_minutes)}
+                      {shift.status === 'open' ? 'In Progress' : durationLabel(shift.duration_minutes)}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {currency} {shift.opening_cash.toFixed(2)}
+                      {money(shift.opening_cash)}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                      {currency} {(shift.total_sales_amount || 0).toFixed(2)}
+                      {money((shift.total_sales_amount || 0))}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono text-emerald-700 dark:text-emerald-400 font-semibold whitespace-nowrap">
-                      {currency} {(shift.total_cash_sales || 0).toFixed(2)}
+                      {money((shift.total_cash_sales || 0))}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono text-blue-700 dark:text-blue-400 whitespace-nowrap">
-                      {currency} {(shift.total_card_sales || 0).toFixed(2)}
+                      {money((shift.total_card_sales || 0))}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono text-amber-700 dark:text-amber-400 whitespace-nowrap">
-                      {currency} {(shift.total_credit_sales || 0).toFixed(2)}
+                      {money((shift.total_credit_sales || 0))}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono text-teal-700 dark:text-teal-300 font-bold whitespace-nowrap">
-                      {currency} {(shift.expected_cash || 0).toFixed(2)}
+                      {money((shift.expected_cash || 0))}
                     </td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
                       {shift.closing_cash !== null && shift.closing_cash !== undefined
-                        ? `${currency} ${shift.closing_cash.toFixed(2)}` : '\u2014'}
+                        ? `${money(shift.closing_cash)}` : '\u2014'}
                     </td>
                     <td className="py-2.5 px-3 text-center whitespace-nowrap">
                       {getVarianceBadge(shift.cash_difference, shift.status)}
@@ -574,7 +569,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
           <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800/60 bg-slate-50/50 dark:bg-surface-inset-dark/40 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
             <span>Showing <span className="font-bold text-slate-700 dark:text-slate-300">{filteredShifts.length}</span> shifts{hasFilters && <> (filtered)</>}</span>
             <span className="font-mono">Total Sales: <span className="font-bold text-teal-700 dark:text-teal-300">
-              {currency} {filteredShifts.reduce((sum, s) => sum + (s.total_sales_amount || 0), 0).toFixed(2)}
+              {money(filteredShifts.reduce((sum, s) => sum + (s.total_sales_amount || 0), 0))}
             </span></span>
           </div>
         )}
@@ -593,16 +588,16 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-xl border border-slate-200 dark:border-slate-800">
               {[
                 { label: 'Cashier', value: inspectData.shift?.user_name, mono: false },
-                { label: 'Opening Float', value: `${currency} ${(inspectData.shift?.opening_cash || 0).toFixed(2)}`, mono: true },
-                { label: 'Total Sales', value: `${currency} ${(inspectData.shift?.total_sales_amount || 0).toFixed(2)}`, mono: true },
-                { label: 'Cash Sales', value: `${currency} ${(inspectData.shift?.total_cash_sales || 0).toFixed(2)}`, mono: true },
-                { label: 'Card Sales', value: `${currency} ${(inspectData.shift?.total_card_sales || 0).toFixed(2)}`, mono: true },
-                { label: 'Credit Sales', value: `${currency} ${(inspectData.shift?.total_credit_sales || 0).toFixed(2)}`, mono: true },
-                { label: 'Expected Cash', value: `${currency} ${(inspectData.shift?.expected_cash || 0).toFixed(2)}`, mono: true },
+                { label: 'Opening Float', value: `${money((inspectData.shift?.opening_cash || 0))}`, mono: true },
+                { label: 'Total Sales', value: `${money((inspectData.shift?.total_sales_amount || 0))}`, mono: true },
+                { label: 'Cash Sales', value: `${money((inspectData.shift?.total_cash_sales || 0))}`, mono: true },
+                { label: 'Card Sales', value: `${money((inspectData.shift?.total_card_sales || 0))}`, mono: true },
+                { label: 'Credit Sales', value: `${money((inspectData.shift?.total_credit_sales || 0))}`, mono: true },
+                { label: 'Expected Cash', value: `${money((inspectData.shift?.expected_cash || 0))}`, mono: true },
                 {
                   label: 'Actual / Variance',
                   value: inspectData.shift?.closing_cash !== null && inspectData.shift?.closing_cash !== undefined
-                    ? `${currency} ${inspectData.shift.closing_cash.toFixed(2)} (${(inspectData.shift.cash_difference || 0) >= 0 ? '+' : ''}${(inspectData.shift.cash_difference || 0).toFixed(2)})`
+                    ? `${money(inspectData.shift.closing_cash)} (${(inspectData.shift.cash_difference || 0) >= 0 ? '+' : ''}${(inspectData.shift.cash_difference || 0).toFixed(2)})`
                     : 'Active',
                   mono: true
                 }
@@ -651,7 +646,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                         <td className="py-1.5 px-3 text-slate-700 dark:text-slate-300">{sale.customer_name}</td>
                         <td className="py-1.5 px-3 text-slate-500 font-mono text-[11px]">{new Date(sale.sale_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="py-1.5 px-3"><span className="px-1.5 py-0.5 rounded-sm text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono uppercase">{sale.payment_type}</span></td>
-                        <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{currency} {Number(sale.net_total).toFixed(2)}</td>
+                        <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{money(Number(sale.net_total))}</td>
                         <td className="py-1.5 px-3 text-center"><span className={sale.status === 'completed' ? 'badge-success' : sale.status === 'returned' ? 'badge-danger' : 'badge-warning'}>{sale.status?.toUpperCase()}</span></td>
                       </tr>
                     ))}
@@ -676,7 +671,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                         <td className="py-1.5 px-3 font-mono text-slate-500">{ret.original_invoice_no}</td>
                         <td className="py-1.5 px-3 text-slate-700 dark:text-slate-300">{ret.customer_name}</td>
                         <td className="py-1.5 px-3 text-slate-500 italic">{ret.reason || '\u2014'}</td>
-                        <td className="py-1.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">-{currency} {Number(ret.refund_amount).toFixed(2)}</td>
+                        <td className="py-1.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">-{money(Number(ret.refund_amount))}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -698,7 +693,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                         <td className="py-1.5 px-3 font-mono font-bold text-slate-900 dark:text-white uppercase">{p.payment_method}</td>
                         <td className="py-1.5 px-3 text-slate-500 italic">{p.notes || 'Khata Recovery'}</td>
                         <td className="py-1.5 px-3 text-slate-500 font-mono text-[11px]">{new Date(p.payment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td className="py-1.5 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">+{currency} {Number(p.amount).toFixed(2)}</td>
+                        <td className="py-1.5 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">+{money(Number(p.amount))}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -725,11 +720,11 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
           <div className="bg-slate-50 dark:bg-surface-inset-dark p-3 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
             <div className="flex justify-between">
               <span className="text-slate-500">System Expected Cash:</span>
-              <span className="font-mono font-bold text-slate-900 dark:text-white">{currency} {(correctShift?.expected_cash || 0).toFixed(2)}</span>
+              <span className="font-mono font-bold text-slate-900 dark:text-white">{money((correctShift?.expected_cash || 0))}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Originally Recorded:</span>
-              <span className="font-mono text-slate-700 dark:text-slate-300">{currency} {(correctShift?.closing_cash || 0).toFixed(2)}</span>
+              <span className="font-mono text-slate-700 dark:text-slate-300">{money((correctShift?.closing_cash || 0))}</span>
             </div>
           </div>
           <div>
@@ -738,7 +733,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               onChange={e => setCorrectedCash(parseFloat(e.target.value) || 0)} className="w-full pos-input font-mono font-bold" />
             <div className="mt-1 text-[11px] text-slate-400">
               New variance: <span className={`font-mono font-bold ${(correctedCash - (correctShift?.expected_cash || 0)) === 0 ? 'text-emerald-600' : (correctedCash - (correctShift?.expected_cash || 0)) > 0 ? 'text-blue-600' : 'text-rose-600'}`}>
-                {(correctedCash - (correctShift?.expected_cash || 0)) >= 0 ? '+' : ''}{currency} {(correctedCash - (correctShift?.expected_cash || 0)).toFixed(2)}
+                {(correctedCash - (correctShift?.expected_cash || 0)) >= 0 ? '+' : ''}{money((correctedCash - (correctShift?.expected_cash || 0)))}
               </span>
             </div>
           </div>

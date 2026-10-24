@@ -1,6 +1,6 @@
-# Ralph Loop Prompt Structure for Antigravity: Offline Pharmacy Management Software Additions
+# Phase Requirements: Offline Pharmacy Management Software Additions
 
-Copy and paste the structured prompts below into Antigravity using the Ralph Loop iterative workflow to build, test, and refine your software requirements securely.
+The phased requirements below are built, tested and refined one phase at a time.
 
 ---
 
@@ -112,7 +112,7 @@ Copy and paste the structured prompts below into Antigravity using the Ralph Loo
 
 ---
 
-## Recommended Workflow for Antigravity:
-1. **Feed Phase by Phase:** Give Antigravity one phase at a time (e.g., *"Implement Phase 1 completely, including tests"*).
-2. **Review Security Boundaries:** Explicitly ask Antigravity to verify that no security checks rely solely on frontend hiding/UI disabling.
+## Recommended Workflow:
+1. **Feed Phase by Phase:** Implement one phase at a time (e.g., *"Implement Phase 1 completely, including tests"*).
+2. **Review Security Boundaries:** Verify that no security checks rely solely on frontend hiding/UI disabling.
 3. **Run Iterative Loops:** Use prompt loops to test edge cases like offline clock drift, failed database backups, and permission override attempts by Admin accounts.

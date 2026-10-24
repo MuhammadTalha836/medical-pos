@@ -1,7 +1,7 @@
 // Pure backup-schedule math (no database or file access), shared by the scheduler, the API and unit tests.
 
 // Phase 4: Developer-controlled frequency; Admin controls only the time of day.
-export const BACKUP_FREQUENCIES = ['off', 'twice_daily', 'daily', 'weekly'] as const;
+const BACKUP_FREQUENCIES = ['off', 'twice_daily', 'daily', 'weekly'] as const;
 export type BackupFrequency = (typeof BACKUP_FREQUENCIES)[number];
 
 export const DEFAULT_BACKUP_TIME = '23:00';
@@ -21,7 +21,7 @@ export function normalizeFrequency(value: unknown): BackupFrequency {
   return isValidFrequency(value) ? value : 'daily';
 }
 
-export interface ScheduleInput {
+interface ScheduleInput {
   frequency: BackupFrequency;
   time: string; // 'HH:MM' local time
   weekday?: number; // 0 = Sunday ... 6 = Saturday, used by 'weekly'
@@ -31,7 +31,7 @@ export interface ScheduleInput {
   now: Date;
 }
 
-export interface ScheduleResult {
+interface ScheduleResult {
   enabled: boolean;
   latestDueSlot: Date | null; // most recent scheduled slot at or before now
   nextRunAt: Date | null; // when the next backup will run

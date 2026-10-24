@@ -1,7 +1,7 @@
 /**
  * Import this FIRST in every integration suite (ES modules run imports in order, before the suite body).
- * It points the API at a throwaway copy of data/pharmacy.db and a temp backup folder, and installs a fixed
- * test developer key, so suites never change the real database, backups or license.
+ * It points the API at a fresh database (with the sample catalog) and a temp backup folder in an OS temp
+ * folder, and installs a fixed test developer key, so suites never touch the real database, backups or license.
  */
 import fs from 'fs';
 import os from 'os';
@@ -13,19 +13,13 @@ export const TEST_DEVELOPER_EMAIL = 'developer@pharmacare.test';
 
 process.env.NODE_ENV = 'test';
 process.env.TEST_MODE = 'true';
+process.env.PHARMACARE_SAMPLE_DATA = 'true';
 process.env.PHARMACARE_DEV_TOTP_SECRET = TEST_DEVELOPER_SECRET;
 process.env.PHARMACARE_DEVELOPER_EMAIL = TEST_DEVELOPER_EMAIL;
 
-export const TEST_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'pharmacare-suite-'));
+const TEST_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'pharmacare-suite-'));
 const dataDir = path.join(TEST_ROOT, 'data');
 fs.mkdirSync(dataDir, { recursive: true });
-
-// Copy the database together with its WAL so uncheckpointed rows come along
-const sourceDir = path.resolve(process.cwd(), 'data');
-for (const suffix of ['', '-wal', '-shm']) {
-  const source = path.join(sourceDir, `pharmacy.db${suffix}`);
-  if (fs.existsSync(source)) fs.copyFileSync(source, path.join(dataDir, `pharmacy.db${suffix}`));
-}
 
 process.env.PHARMACARE_DATA_DIR = dataDir;
 process.env.PHARMACARE_BACKUP_DIR = path.join(TEST_ROOT, 'backups');

@@ -49,7 +49,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
       .then(status => {
         if (status.developerEmail) setDeveloperEmail(current => current || status.developerEmail || '');
       })
-      .catch(() => {});
+      .catch(err => console.warn('Setup status unavailable:', err));
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -81,11 +81,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
   const handleDeveloperLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!developerEmail || !totpCode) {
-      setErrorMsg('Please enter both Developer Email and 6-digit TOTP code.');
+      setErrorMsg('Please enter the developer email and the 6-digit authenticator code.');
       return;
     }
     if (totpCode.trim().length !== 6) {
-      setErrorMsg('TOTP code must be exactly 6 digits.');
+      setErrorMsg('The authenticator code must be exactly 6 digits.');
       return;
     }
 
@@ -121,7 +121,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
               PharmaCare<span className="text-teal-600 dark:text-teal-400">Pro</span>
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Secure Offline Sign-In & Authentication
+              Secure Sign-In • 100% Offline POS
             </p>
           </div>
         </div>
@@ -154,7 +154,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
-            Developer (TOTP)
+            Developer
           </button>
         </div>
 
@@ -267,7 +267,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                6-Digit Dynamic TOTP Code
+                6-Digit Authenticator Code
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -296,7 +296,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
               disabled={loading || totpCode.length !== 6}
               className="w-full py-2.5 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-amber-500/25 active:scale-98 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
             >
-              <span>{loading ? 'Verifying TOTP...' : 'Verify & Enter as Developer'}</span>
+              <span>{loading ? 'Verifying code...' : 'Verify & Enter as Developer'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -304,7 +304,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onSuccess }) => 
 
         <div className="flex items-center justify-center space-x-1.5 text-[11px] text-slate-400">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-          <span>Local SQLite Embedded Authentication • Bcrypt & TOTP</span>
+          <span>PharmaCare Pro • 100% Offline POS</span>
         </div>
       </div>
     </div>

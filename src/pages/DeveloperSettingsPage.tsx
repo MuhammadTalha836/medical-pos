@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { DeveloperSettingsPayload, AuditLogEntry, User, SaleInvoice, BackupFrequency } from '../types';
 import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
-import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../utils/invoice';
+import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../../shared/invoice';
 import { WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { LicensePanel } from '../components/developer/LicensePanel';
 import { AdminPermissionsPanel } from '../components/developer/AdminPermissionsPanel';
@@ -22,7 +22,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Lock,
-  UserCheck,
   Eye,
   EyeOff,
   Filter,
@@ -246,7 +245,7 @@ export const DeveloperSettingsPage: React.FC = () => {
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
               Developer Console
             </span>
-            <span className="text-xs text-slate-400 font-mono">Offline RFC 6238 Secured</span>
+            <span className="text-xs text-slate-400 font-mono">Authenticator secured</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
             System & Security Master Control
@@ -460,7 +459,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                     )}
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    When disabled, Store Name and Address are protected against modifications by local store staff to guarantee brand integrity and licensed store identity.
+                    When disabled, Store Name and Address are protected against changes by store staff to guarantee brand integrity and licensed store identity.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -585,7 +584,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                     />
                     <div className="flex justify-between gap-2 mt-1 text-[10px] text-slate-400">
                       <span>
-                        Prints on every 58 mm and 80 mm receipt and cannot be removed by local administrators. Long lines wrap automatically; each sale keeps the footer it was printed with.
+                        Prints on every 58 mm and 80 mm receipt and cannot be removed by store administrators. Long lines wrap automatically; each sale keeps the footer it was printed with.
                       </span>
                       <span className={`font-mono whitespace-nowrap ${settings.developer_invoice_footer.length >= FOOTER_MAX_LENGTH ? 'text-amber-500 font-bold' : ''}`}>
                         {settings.developer_invoice_footer.length} / {FOOTER_MAX_LENGTH}
@@ -739,7 +738,7 @@ export const DeveloperSettingsPage: React.FC = () => {
                   <span>Developer Staff Password Reset Hub</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Directly override forgotten administrator or cashier passwords using bcrypt offline hashing.
+                  Set a new password for an administrator or cashier who forgot theirs.
                 </p>
               </div>
 

@@ -1,7 +1,8 @@
 import React from 'react';
 import { CashierShift, SystemSettings } from '../../types';
 import { Printer, CheckCircle } from 'lucide-react';
-import { normalizePaperSize } from '../../utils/invoice';
+import { normalizePaperSize } from '../../../shared/invoice';
+import { formatDuration, moneyFormatter } from '../../utils/format';
 
 interface ShiftThermalReceiptProps {
   shift: CashierShift;
@@ -16,11 +17,11 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
   onPrint,
   onClose
 }) => {
-  const storeName = settings?.store_name || 'AL-SHIFA PHARMACY & HEALTHCARE';
+  const storeName = settings?.store_name || 'PharmaCare Pro';
   const storeAddress = settings?.store_address || 'Suite #12-14, Health Plaza, Main Commercial Ave';
   const storePhone = settings?.store_phone || '+92 300 9876543 / 051-4567890';
   const drugLicenseNo = settings?.drug_license_no || 'DL-PHARM-2024-9981';
-  const currency = settings?.currency_symbol || 'Rs.';
+  const money = moneyFormatter(settings);
   const is58 = normalizePaperSize(settings?.invoice_paper_size ?? settings?.paper_width) === '58mm';
 
   const handlePrint = () => {
@@ -34,7 +35,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
   const startTimeStr = shift.start_time ? new Date(shift.start_time).toLocaleString() : 'N/A';
   const endTimeStr = shift.end_time ? new Date(shift.end_time).toLocaleString() : 'Ongoing';
   const durationStr = shift.duration_minutes
-    ? `${Math.floor(shift.duration_minutes / 60)}h ${shift.duration_minutes % 60}m`
+    ? formatDuration(shift.duration_minutes)
     : 'N/A';
 
   const opening = shift.opening_cash || 0;
@@ -124,27 +125,27 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
           <div className="font-bold uppercase text-[10px]">Cash Drawer Accounting:</div>
           <div className="flex justify-between">
             <span>Opening Float:</span>
-            <span>{currency} {opening.toFixed(2)}</span>
+            <span>{money(opening)}</span>
           </div>
           <div className="flex justify-between">
             <span>(+) Cash Sales ({shift.total_sales_count} inv):</span>
-            <span>{currency} {cashSales.toFixed(2)}</span>
+            <span>{money(cashSales)}</span>
           </div>
           <div className="flex justify-between">
             <span>(+) Khata Recoveries:</span>
-            <span>{currency} {recoveries.toFixed(2)}</span>
+            <span>{money(recoveries)}</span>
           </div>
           <div className="flex justify-between text-rose-700">
             <span>(-) Cash Returns:</span>
-            <span>-{currency} {returns.toFixed(2)}</span>
+            <span>-{money(returns)}</span>
           </div>
           <div className="flex justify-between font-bold pt-1 border-t border-black text-xs">
             <span>EXPECTED CASH:</span>
-            <span>{currency} {expected.toFixed(2)}</span>
+            <span>{money(expected)}</span>
           </div>
           <div className="flex justify-between font-bold text-xs">
             <span>ACTUAL COUNTED:</span>
-            <span>{currency} {actual.toFixed(2)}</span>
+            <span>{money(actual)}</span>
           </div>
           <div className="flex justify-between font-bold text-[11px] pt-1 border-t border-dotted border-black">
             <span>DRAWER VARIANCE:</span>
@@ -152,8 +153,8 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
               {diff === 0
                 ? '0.00 (BALANCED)'
                 : diff > 0
-                ? `+${currency} ${diff.toFixed(2)} (OVER)`
-                : `-${currency} ${Math.abs(diff).toFixed(2)} (SHORT)`}
+                ? `+${money(diff)} (OVER)`
+                : `-${money(Math.abs(diff))} (SHORT)`}
             </span>
           </div>
         </div>
@@ -163,15 +164,15 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
           <div className="font-bold uppercase">Non-Drawer Transactions:</div>
           <div className="flex justify-between">
             <span>Card Transactions:</span>
-            <span>{currency} {cardSales.toFixed(2)}</span>
+            <span>{money(cardSales)}</span>
           </div>
           <div className="flex justify-between">
             <span>Credit Khata Sales:</span>
-            <span>{currency} {creditSales.toFixed(2)}</span>
+            <span>{money(creditSales)}</span>
           </div>
           <div className="flex justify-between font-bold pt-1 border-t border-dotted border-black">
             <span>TOTAL SHIFT REVENUE:</span>
-            <span>{currency} {(shift.total_sales_amount || 0).toFixed(2)}</span>
+            <span>{money((shift.total_sales_amount || 0))}</span>
           </div>
         </div>
 
@@ -190,7 +191,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
             <span className="border-t border-black pt-1 w-28 text-center">Manager Signature</span>
           </div>
           <div className="text-center text-[9px] text-slate-600">
-            Automated SQLite Audit Seal • PharmaCare Pro
+            PharmaCare Pro • 100% Offline POS
           </div>
         </div>
       </div>

@@ -5,9 +5,9 @@ import { BackupFrequency, SetupCompletePayload } from '../../types';
 import { BACKUP_FREQUENCY_LABELS, WEEKDAY_LABELS, describeBackupSchedule } from '../../utils/backup';
 import {
   ADMIN_POLICY_TOGGLES,
-  DEFAULT_ADMIN_PERMISSION_STATE,
   PERMISSION_GROUPS
 } from '../../utils/permissions';
+import { DEFAULT_ADMIN_PERMISSIONS } from '../../../shared/permissions';
 import {
   ShieldCheck,
   Building,
@@ -70,7 +70,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
   const [backupWeekday, setBackupWeekday] = useState(0);
 
   // Admin permissions & policies
-  const [adminPermissions, setAdminPermissions] = useState<Record<string, boolean>>(DEFAULT_ADMIN_PERMISSION_STATE);
+  const [adminPermissions, setAdminPermissions] = useState<Record<string, boolean>>({ ...DEFAULT_ADMIN_PERMISSIONS });
   const [policies, setPolicies] = useState<SetupCompletePayload['policies']>({
     allow_admin_create_cashier: true,
     allow_admin_create_admin: false,
@@ -93,7 +93,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
         setDeveloperEmail(status.developerEmail || '');
         setKeyConfigured(status.developerKeyConfigured !== false);
       })
-      .catch(() => {});
+      .catch(err => setErrorMsg(`Could not load setup status: ${err.message}`));
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -274,7 +274,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
 
               {!keyConfigured && (
                 <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl text-[11px] text-amber-800 dark:text-amber-300">
-                  This build has no developer master key. Run <code>npm run developer:key</code> and rebuild before installing.
+                  This installation is missing the developer key. Please contact the developer.
                 </div>
               )}
 

@@ -8,7 +8,7 @@
 import './testEnv';
 import http from 'http';
 import { app } from '../api';
-import { authHeaders, useFullTestLicense } from './testAuth';
+import { authHeaders, ensureTestDeveloper, useFullTestLicense } from './testAuth';
 import { prisma } from '../database/prisma';
 import { hashPassword } from '../security/passwords';
 import { saveLicense } from '../security/license';
@@ -76,12 +76,11 @@ async function runPhase5Tests() {
     }
   }
 
-  // Fixtures on the temporary database copy
+  // Fixtures on the test database
   const suffix = Date.now().toString(36);
   const adminPassword = 'AdminPass#55';
   const cashierPassword = 'CashierPass#55';
-  const devUser = await prisma.user.findFirst({ where: { role: 'developer' } });
-  if (!devUser) throw new Error('Test database has no developer user');
+  const devUser = await ensureTestDeveloper();
   const adminUser = await prisma.user.create({
     data: { username: `p5_admin_${suffix}`, password: await hashPassword(adminPassword), fullName: 'P5 Admin', role: 'admin', status: 'active' }
   });

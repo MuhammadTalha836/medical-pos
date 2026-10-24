@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
 import { SaleInvoice, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
-import { ThermalReceipt } from '../components/pos/ThermalReceipt';
+import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { useAuthStore } from '../store/useAuthStore';
 import { useShiftStore } from '../store/useShiftStore';
 import {
@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
+import { moneyFormatter } from '../utils/format';
 
 interface SalesHistoryPageProps {
   settings?: SystemSettings | null;
@@ -38,7 +39,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const currency = settings?.currency_symbol || 'Rs.';
+  const money = moneyFormatter(settings);
 
   const loadSales = async () => {
     try {
@@ -138,7 +139,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
           fetchShiftSummary(activeShift.id);
         }
         setIsReturnModalOpen(false);
-        setSuccessMessage(`Return voucher ${res.returnNo} generated. Refund amount: ${currency} ${refundSum.toFixed(2)}. Stock restored.`);
+        setSuccessMessage(`Return voucher ${res.returnNo} generated. Refund amount: ${money(refundSum)}. Stock restored.`);
         loadSales();
         setTimeout(() => setSuccessMessage(null), 6000);
       }
@@ -291,13 +292,13 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-400">
-                      {currency} {sale.total_gross.toFixed(2)}
+                      {money(sale.total_gross)}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                      -{currency} {(sale.total_item_discount + sale.bill_discount_amt).toFixed(2)}
+                      -{money((sale.total_item_discount + sale.bill_discount_amt))}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white text-sm">
-                      {currency} {sale.net_total.toFixed(2)}
+                      {money(sale.net_total)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className={sale.status === 'completed' ? 'badge-success' : 'badge-warning'}>
@@ -343,7 +344,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
         maxWidth="max-w-md"
       >
         {selectedInvoice && (
-          <ThermalReceipt
+          <UnifiedInvoice
             invoice={selectedInvoice}
             settings={settings}
             onClose={() => setIsReceiptModalOpen(false)}
@@ -362,7 +363,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
           <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-200 flex items-start space-x-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
-              Specify the returned quantity for each medicine item below. Returned inventory will be automatically restored to the available stock in SQLite.
+              Specify the returned quantity for each medicine item below. Returned inventory will be automatically restored to the available stock.
             </div>
           </div>
 
@@ -385,7 +386,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                     <tr key={prodId} className="hover:bg-teal-500/5 dark:hover:bg-teal-500/10 transition-colors">
                       <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-white">{data.name}</td>
                       <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400">{data.maxQty}</td>
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{currency} {data.price.toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{money(data.price)}</td>
                       <td className="py-2.5 px-3 text-center">
                         <input
                           type="number"
@@ -403,7 +404,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                         />
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-                        {currency} {refund.toFixed(2)}
+                        {money(refund)}
                       </td>
                     </tr>
                   );

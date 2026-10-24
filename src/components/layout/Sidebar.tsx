@@ -164,17 +164,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
       {!collapsed && (
         <div className="p-3.5 m-2.5 rounded-xl bg-slate-200/50 dark:bg-[#111827]/70 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
           <div className="flex items-center justify-between font-semibold text-slate-800 dark:text-slate-300">
-            <span>Engine Status</span>
+            <span>System Status</span>
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           </div>
           <div className="text-[11px] space-y-0.5 text-slate-500 dark:text-slate-400">
             <div className="flex justify-between">
-              <span>Storage:</span>
-              <span className="font-mono text-slate-700 dark:text-slate-300">SQLite (WAL)</span>
-            </div>
-            <div className="flex justify-between">
               <span>Mode:</span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">100% Offline</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">100% Offline POS</span>
             </div>
           </div>
         </div>

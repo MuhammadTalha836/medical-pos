@@ -8,22 +8,17 @@ import { ShiftThermalReceipt } from '../pos/ShiftThermalReceipt';
 import {
   Clock,
   Printer,
-  Calendar,
   Search,
   Filter,
   CheckCircle2,
   AlertTriangle,
-  RotateCcw,
   Edit3,
   Lock,
   Unlock,
   Eye,
-  Coins,
-  FileText,
-  User,
-  ShieldCheck,
   Plus
 } from 'lucide-react';
+import { currencySymbol, formatDuration, moneyFormatter } from '../../utils/format';
 
 interface ShiftHistoryHubProps {
   settings?: SystemSettings | null;
@@ -57,7 +52,8 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
   const [correctReason, setCorrectReason] = useState<string>('');
   const [isSubmittingCorrect, setIsSubmittingCorrect] = useState<boolean>(false);
 
-  const currency = settings?.currency_symbol || 'Rs.';
+  const currency = currencySymbol(settings);
+  const money = moneyFormatter(settings);
 
   const loadShifts = async () => {
     try {
@@ -149,7 +145,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
 
       setNotification({
         type: 'success',
-        text: `Cash drawer count for ${correctModalShift.shift_no} adjusted to ${currency} ${correctedCash.toFixed(2)}. Discrepancy logged.`
+        text: `Cash drawer count for ${correctModalShift.shift_no} adjusted to ${money(correctedCash)}. Discrepancy logged.`
       });
       setCorrectModalShift(null);
       setCorrectReason('');
@@ -210,7 +206,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {activeShift
-                  ? `Cashier: ${activeShift.user_name} • Started: ${new Date(activeShift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Opening Float: ${currency} ${activeShift.opening_cash.toFixed(2)}`
+                  ? `Cashier: ${activeShift.user_name} • Started: ${new Date(activeShift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Opening Float: ${money(activeShift.opening_cash)}`
                   : 'Start a new cashier shift to record hours and authorize POS sales and billing.'}
               </p>
             </div>
@@ -339,8 +335,6 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                 </tr>
               ) : (
                 filteredShifts.map((shift, idx) => {
-                  const durationHours = Math.floor((shift.duration_minutes || 0) / 60);
-                  const durationMins = (shift.duration_minutes || 0) % 60;
                   const diff = shift.cash_difference || 0;
 
                   return (
@@ -377,20 +371,20 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                         )}
                       </td>
                       <td className="py-2.5 px-3 font-mono text-teal-700 dark:text-teal-300 font-semibold">
-                        {shift.end_time ? `${durationHours}h ${durationMins}m` : 'In Progress'}
+                        {shift.end_time ? formatDuration(shift.duration_minutes || 0) : 'In Progress'}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-700 dark:text-slate-300">
-                        {currency} {shift.opening_cash.toFixed(2)}
+                        {money(shift.opening_cash)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                        +{currency} {(shift.total_cash_sales || 0).toFixed(2)}
+                        +{money((shift.total_cash_sales || 0))}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-teal-600 dark:text-teal-400 font-bold">
-                        {currency} {(shift.expected_cash || 0).toFixed(2)}
+                        {money((shift.expected_cash || 0))}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
                         {shift.closing_cash !== null && shift.closing_cash !== undefined
-                          ? `${currency} ${shift.closing_cash.toFixed(2)}`
+                          ? `${money(shift.closing_cash)}`
                           : '-'}
                       </td>
                       <td className="py-2.5 px-3 text-center">
@@ -516,13 +510,13 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
               <div>
                 <span className="text-[10px] text-slate-400 block">Opening Float</span>
                 <span className="font-mono font-bold text-slate-900 dark:text-white">
-                  {currency} {inspectData.opening_cash.toFixed(2)}
+                  {money(inspectData.opening_cash)}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 block">Actual Deposited</span>
                 <span className="font-mono font-bold text-teal-600 dark:text-teal-400">
-                  {inspectData.closing_cash !== null ? `${currency} ${inspectData.closing_cash.toFixed(2)}` : 'In Progress'}
+                  {inspectData.closing_cash !== null ? `${money(inspectData.closing_cash)}` : 'In Progress'}
                 </span>
               </div>
               <div>
@@ -530,7 +524,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                 <span className={`font-mono font-bold ${
                   (inspectData.cash_difference || 0) === 0 ? 'text-emerald-600' : 'text-rose-600'
                 }`}>
-                  {inspectData.cash_difference !== null ? `${currency} ${(inspectData.cash_difference || 0).toFixed(2)}` : '-'}
+                  {inspectData.cash_difference !== null ? `${money((inspectData.cash_difference || 0))}` : '-'}
                 </span>
               </div>
             </div>
@@ -572,7 +566,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                             </span>
                           </td>
                           <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                            {currency} {Number(sale.netTotal).toFixed(2)}
+                            {money(Number(sale.netTotal))}
                           </td>
                         </tr>
                       ))
@@ -600,7 +594,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                           <span className="text-slate-400 block text-[9px]">Inv: {ret.originalInvoiceNo}</span>
                         </div>
                         <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
-                          -{currency} {Number(ret.refundAmount).toFixed(2)}
+                          -{money(Number(ret.refundAmount))}
                         </span>
                       </div>
                     ))
@@ -624,7 +618,7 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
                           <span className="text-slate-400 block text-[9px]">{p.notes || 'Khata Recovery'}</span>
                         </div>
                         <span className="font-mono font-bold text-teal-600 dark:text-teal-400">
-                          +{currency} {Number(p.amount).toFixed(2)}
+                          +{money(Number(p.amount))}
                         </span>
                       </div>
                     ))
@@ -717,13 +711,13 @@ export const ShiftHistoryHub: React.FC<ShiftHistoryHubProps> = ({ settings }) =>
             <div className="flex justify-between">
               <span className="text-slate-500">Expected System Cash:</span>
               <span className="font-mono font-bold text-slate-900 dark:text-white">
-                {currency} {(correctModalShift?.expected_cash || 0).toFixed(2)}
+                {money((correctModalShift?.expected_cash || 0))}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Originally Recorded Count:</span>
               <span className="font-mono text-slate-900 dark:text-white">
-                {currency} {(correctModalShift?.closing_cash || 0).toFixed(2)}
+                {money((correctModalShift?.closing_cash || 0))}
               </span>
             </div>
           </div>

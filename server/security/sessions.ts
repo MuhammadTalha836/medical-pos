@@ -5,7 +5,7 @@ import crypto from 'crypto';
  * role they have is decided here, never from anything the client sends. Sessions live in the API
  * process memory (the Electron main process when packaged), so restarting the app logs everyone out.
  */
-export interface SessionRecord {
+interface SessionRecord {
   userId: number;
   role: string;
   createdAt: number;

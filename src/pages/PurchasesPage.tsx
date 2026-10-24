@@ -6,12 +6,11 @@ import {
   Truck,
   Plus,
   Trash2,
-  Calendar,
   Eye,
   CheckCircle2,
-  Receipt,
   Printer
 } from 'lucide-react';
+import { moneyFormatter } from '../utils/format';
 
 interface PurchasesPageProps {
   settings?: SystemSettings | null;
@@ -29,7 +28,6 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
   const [supplierInvoiceNo, setSupplierInvoiceNo] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Pending' | 'Partial'>('Paid');
-  const [notes, setNotes] = useState('');
 
   // Items in current draft purchase
   const [draftItems, setDraftItems] = useState<Array<{
@@ -53,13 +51,12 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
   const [lineBonus, setLineBonus] = useState(0);
   const [lineCost, setLineCost] = useState(100);
   const [lineRetail, setLineRetail] = useState(120);
-  const [lineDiscPct, setLineDiscPct] = useState(0);
 
   // View Modal
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const currency = settings?.currency_symbol || 'Rs.';
+  const money = moneyFormatter(settings);
 
   const loadData = async () => {
     try {
@@ -111,9 +108,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
     const prod = products.find(p => String(p.id) === lineProductId);
     if (!prod) return;
 
-    const gross = lineBoxes * lineCost;
-    const disc = (gross * lineDiscPct) / 100;
-    const total = gross - disc;
+    const total = lineBoxes * lineCost;
 
     setDraftItems(prev => [
       ...prev,
@@ -126,7 +121,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
         bonus_boxes: lineBonus,
         box_cost_price: lineCost,
         box_retail_price: lineRetail,
-        discount_pct: lineDiscPct,
+        discount_pct: 0,
         total_cost: total
       }
     ]);
@@ -162,7 +157,6 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
         discount_amount: totalDiscountDraft,
         tax_amount: 0,
         net_total: totalNetDraft,
-        notes,
         items: draftItems
       };
 
@@ -171,7 +165,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
         setIsNewPurchaseModalOpen(false);
         setDraftItems([]);
         setSupplierInvoiceNo('');
-        setFeedback(`Purchase ${res.invoiceNo} saved! Stock and trade prices updated in SQLite.`);
+        setFeedback(`Purchase ${res.invoiceNo} saved! Stock and trade prices updated.`);
         loadData();
         setTimeout(() => setFeedback(null), 6000);
       }
@@ -266,13 +260,13 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                       {pur.purchase_date}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-slate-500 dark:text-slate-400">
-                      {currency} {pur.total_gross.toFixed(2)}
+                      {money(pur.total_gross)}
                     </td>
                     <td className="py-3 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                      -{currency} {pur.discount_amount.toFixed(2)}
+                      -{money(pur.discount_amount)}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-slate-900 dark:text-white text-sm">
-                      {currency} {pur.net_total.toFixed(2)}
+                      {money(pur.net_total)}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <span className={pur.payment_status === 'Paid' ? 'badge-success' : 'badge-warning'}>
@@ -486,9 +480,9 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                         <span className="font-bold text-slate-900 dark:text-white">{item.quantity_boxes}</span>
                         {item.bonus_boxes > 0 && <span className="text-emerald-600 dark:text-emerald-400 text-[10px] ml-1">(+{item.bonus_boxes})</span>}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{currency} {item.box_cost_price.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">{currency} {item.box_retail_price.toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{currency} {item.total_cost.toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{money(item.box_cost_price)}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">{money(item.box_retail_price)}</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">{money(item.total_cost)}</td>
                       <td className="py-2 px-2 text-center">
                         <button
                           type="button"
@@ -514,7 +508,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
             <div className="flex items-center space-x-2">
               <span className="font-semibold text-slate-700 dark:text-slate-300">Total Purchase Cost:</span>
               <span className="text-xl font-extrabold font-mono text-teal-600 dark:text-teal-400">
-                {currency} {totalNetDraft.toFixed(2)}
+                {money(totalNetDraft)}
               </span>
             </div>
           </div>
@@ -558,7 +552,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
               </div>
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-sm">
                 <span className="font-semibold text-slate-700 dark:text-slate-300">Total Net Amount:</span>
-                <span className="font-extrabold font-mono text-teal-600 dark:text-teal-400">{currency} {viewInvoice.net_total.toFixed(2)}</span>
+                <span className="font-extrabold font-mono text-teal-600 dark:text-teal-400">{money(viewInvoice.net_total)}</span>
               </div>
             </div>
 

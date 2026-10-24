@@ -24,8 +24,11 @@ export const SESSION_STORAGE_KEY = 'pharmacare_user_session';
 // Fired when the server ends the session (expired, logged out elsewhere, demo ended); the auth store logs out
 export const SESSION_ENDED_EVENT = 'pharmacare:session-ended';
 
-export function getSessionToken(): string | null {
-  if (typeof window === 'undefined') return null;
+type Query = Record<string, string | number | boolean | undefined | null>;
+type Success = { success: boolean };
+type SuccessMessage = { success: boolean; message: string };
+
+function getSessionToken(): string | null {
   try {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     return stored ? JSON.parse(stored)?.token || null : null;
@@ -34,28 +37,33 @@ export function getSessionToken(): string | null {
   }
 }
 
-export function getAuthHeaders(customHeaders?: Record<string, string>): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...customHeaders
-  };
-  const token = getSessionToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-}
-
-// Every API call carries the session token; the server decides who the user is
-function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(input, { ...init, headers: getAuthHeaders(init.headers as Record<string, string> | undefined) });
-}
-
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) {
     super(message);
   }
 }
 
-async function handleResponse<T>(res: Response): Promise<T> {
+function buildUrl(path: string, query?: Query): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined && value !== null && value !== '' && value !== false) params.append(key, String(value));
+  }
+  const qs = params.toString();
+  return `${API_BASE}${path}${qs ? `?${qs}` : ''}`;
+}
+
+// Every API call carries the session token; the server decides who the user is
+async function request<T>(method: string, path: string, options: { body?: unknown; query?: Query } = {}): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getSessionToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(buildUrl(path, options.query), {
+    method,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ error: 'Unknown server error' }));
     if ((res.status === 401 && errorData.code === 'SESSION_REQUIRED') || errorData.code === 'LICENSE_EXPIRED') {
@@ -66,342 +74,135 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json();
 }
 
+const get = <T>(path: string, query?: Query) => request<T>('GET', path, { query });
+const post = <T>(path: string, body?: unknown) => request<T>('POST', path, { body });
+const put = <T>(path: string, body?: unknown) => request<T>('PUT', path, { body });
+const del = <T>(path: string) => request<T>('DELETE', path);
+
+type DateRange = { date_from?: string; date_to?: string };
+type AdminShiftAction = { admin_id: number; admin_name: string; reason: string };
+
 export const api = {
-  // Setup & First-Time Initialization
-  getSetupStatus: () =>
-    apiFetch(`${API_BASE}/setup/status`).then(r => handleResponse<SetupStatusResponse>(r)),
-  unlockSetup: (code: string) =>
-    apiFetch(`${API_BASE}/setup/unlock`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ code })
-    }).then(r => handleResponse<SetupUnlockResponse>(r)),
-  completeSetup: (data: SetupCompletePayload) =>
-    apiFetch(`${API_BASE}/setup/complete`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<LoginResponse>(r)),
-  getLicenseStatus: () => apiFetch(`${API_BASE}/license/status`).then(r => handleResponse<LicenseStatus>(r)),
+  // Setup & first-time initialization
+  getSetupStatus: () => get<SetupStatusResponse>('/setup/status'),
+  unlockSetup: (code: string) => post<SetupUnlockResponse>('/setup/unlock', { code }),
+  completeSetup: (data: SetupCompletePayload) => post<LoginResponse>('/setup/complete', data),
+  getLicenseStatus: () => get<LicenseStatus>('/license/status'),
 
-  // Auth & Status
-  getStatus: () => apiFetch(`${API_BASE}/status`).then(r => handleResponse<{ status: string; time: string }>(r)),
-  getDashboardStats: () => apiFetch(`${API_BASE}/dashboard/stats`, { headers: getAuthHeaders() }).then(r => handleResponse<any>(r)),
-  login: (credentials: { username: string; password: string }) =>
-    apiFetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
-    }).then(r => handleResponse<LoginResponse>(r)),
-  developerLogin: (credentials: { email: string; code: string }) =>
-    apiFetch(`${API_BASE}/auth/developer-login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
-    }).then(r => handleResponse<LoginResponse>(r)),
-  logout: () =>
-    apiFetch(`${API_BASE}/auth/logout`, { method: 'POST', headers: getAuthHeaders() }).then(r => handleResponse<{ success: boolean }>(r)),
+  // Auth & dashboard
+  getDashboardStats: () => get<any>('/dashboard/stats'),
+  login: (credentials: { username: string; password: string }) => post<LoginResponse>('/auth/login', credentials),
+  developerLogin: (credentials: { email: string; code: string }) => post<LoginResponse>('/auth/developer-login', credentials),
+  logout: () => post<Success>('/auth/logout'),
   updateProfile: (data: { userId?: number; username: string; full_name: string; currentPassword?: string; newPassword?: string }) =>
-    apiFetch(`${API_BASE}/auth/profile`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; user: User; message: string }>(r)),
+    put<{ success: boolean; user: User; message: string }>('/auth/profile', data),
 
-  // Users Management
-  getUsers: () => apiFetch(`${API_BASE}/users`, { headers: getAuthHeaders() }).then(r => handleResponse<User[]>(r)),
-  createUser: (data: any) =>
-    apiFetch(`${API_BASE}/users`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; id: number }>(r)),
-  updateUser: (id: number, data: any) =>
-    apiFetch(`${API_BASE}/users/${id}`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean }>(r)),
-  deleteUser: (id: number) =>
-    apiFetch(`${API_BASE}/users/${id}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    }).then(r => handleResponse<{ success: boolean }>(r)),
+  // Users
+  getUsers: () => get<User[]>('/users'),
+  createUser: (data: { username: string; password: string; full_name: string; role: string }) =>
+    post<{ success: boolean; id: number }>('/users', data),
+  updateUser: (id: number, data: { username?: string; full_name?: string; role?: string; status?: string; password?: string }) =>
+    put<Success>(`/users/${id}`, data),
+  deleteUser: (id: number) => del<Success>(`/users/${id}`),
 
-  // Roles & Permissions
-  getRoles: () => apiFetch(`${API_BASE}/roles`).then(r => handleResponse<Role[]>(r)),
-  createRole: (data: Partial<Role>) =>
-    apiFetch(`${API_BASE}/roles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; id: number }>(r)),
-  updateRole: (id: number, data: Partial<Role>) =>
-    apiFetch(`${API_BASE}/roles/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean }>(r)),
-  deleteRole: (id: number) =>
-    apiFetch(`${API_BASE}/roles/${id}`, {
-      method: 'DELETE'
-    }).then(r => handleResponse<{ success: boolean }>(r)),
+  // Roles & permissions
+  getRoles: () => get<Role[]>('/roles'),
+  createRole: (data: Partial<Role>) => post<{ success: boolean; id: number }>('/roles', data),
+  updateRole: (id: number, data: Partial<Role>) => put<Success>(`/roles/${id}`, data),
+  deleteRole: (id: number) => del<Success>(`/roles/${id}`),
 
-  // Customers & Credit (Khata)
-  getCustomers: () => apiFetch(`${API_BASE}/customers`).then(r => handleResponse<Customer[]>(r)),
-  createCustomer: (data: Partial<Customer>) =>
-    apiFetch(`${API_BASE}/customers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; id: number }>(r)),
-  updateCustomer: (id: number, data: Partial<Customer>) =>
-    apiFetch(`${API_BASE}/customers/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean }>(r)),
+  // Customers & credit (khata)
+  getCustomers: () => get<Customer[]>('/customers'),
+  createCustomer: (data: Partial<Customer>) => post<{ success: boolean; id: number }>('/customers', data),
+  updateCustomer: (id: number, data: Partial<Customer>) => put<Success>(`/customers/${id}`, data),
   recordCustomerPayment: (customerId: number, data: { amount: number; payment_method: string; notes?: string; shift_id?: number | null }) =>
-    apiFetch(`${API_BASE}/customers/${customerId}/payment`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; new_balance: number }>(r)),
+    post<{ success: boolean; new_balance: number }>(`/customers/${customerId}/payment`, data),
   getCustomerLedger: (customerId: number) =>
-    apiFetch(`${API_BASE}/customers/${customerId}/ledger`).then(r => handleResponse<{ customer: Customer; sales: any[]; payments: any[] }>(r)),
+    get<{ customer: Customer; sales: any[]; payments: any[] }>(`/customers/${customerId}/ledger`),
 
   // Companies
-  getCompanies: () => apiFetch(`${API_BASE}/companies`).then(r => handleResponse<Company[]>(r)),
-  createCompany: (data: Partial<Company>) =>
-    apiFetch(`${API_BASE}/companies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; id: number }>(r)),
-  updateCompany: (id: number, data: Partial<Company>) =>
-    apiFetch(`${API_BASE}/companies/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean }>(r)),
-  deleteCompany: (id: number) =>
-    apiFetch(`${API_BASE}/companies/${id}`, { method: 'DELETE' }).then(r => handleResponse<{ success: boolean }>(r)),
+  getCompanies: () => get<Company[]>('/companies'),
+  createCompany: (data: Partial<Company>) => post<{ success: boolean; id: number }>('/companies', data),
+  updateCompany: (id: number, data: Partial<Company>) => put<Success>(`/companies/${id}`, data),
 
   // Products
-  getProducts: (params?: { q?: string; company_id?: number; low_stock?: boolean }) => {
-    const url = new URL(`${API_BASE}/products`, window.location.origin);
-    if (params?.q) url.searchParams.append('q', params.q);
-    if (params?.company_id) url.searchParams.append('company_id', String(params.company_id));
-    if (params?.low_stock) url.searchParams.append('low_stock', 'true');
-    return apiFetch(url.toString()).then(r => handleResponse<Product[]>(r));
-  },
-  searchProducts: (q: string) =>
-    apiFetch(`${API_BASE}/products/search?q=${encodeURIComponent(q)}`).then(r => handleResponse<Product[]>(r)),
-  createProduct: (data: Partial<Product>) =>
-    apiFetch(`${API_BASE}/products`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; id: number }>(r)),
-  updateProduct: (id: number, data: Partial<Product>) =>
-    apiFetch(`${API_BASE}/products/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean }>(r)),
-  deleteProduct: (id: number) =>
-    apiFetch(`${API_BASE}/products/${id}`, { method: 'DELETE' }).then(r => handleResponse<{ success: boolean }>(r)),
+  getProducts: (params?: { q?: string; company_id?: number; low_stock?: boolean }) => get<Product[]>('/products', params),
+  searchProducts: (q: string) => get<Product[]>('/products/search', { q }),
+  createProduct: (data: Partial<Product>) => post<{ success: boolean; id: number }>('/products', data),
+  updateProduct: (id: number, data: Partial<Product>) => put<Success>(`/products/${id}`, data),
+  deleteProduct: (id: number) => del<Success>(`/products/${id}`),
 
   // Sales & POS
-  createSale: (data: any) =>
-    apiFetch(`${API_BASE}/sales`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{
+  createSale: (data: unknown) =>
+    post<{
       success: boolean;
       saleId: number;
       invoiceNo: string;
       store_name_snapshot?: string | null;
       store_address_snapshot?: string | null;
       invoice_footer_snapshot?: string | null;
-    }>(r)),
-  getSales: (params?: { date_from?: string; date_to?: string; invoice_no?: string }) => {
-    const url = new URL(`${API_BASE}/sales`, window.location.origin);
-    if (params?.date_from) url.searchParams.append('date_from', params.date_from);
-    if (params?.date_to) url.searchParams.append('date_to', params.date_to);
-    if (params?.invoice_no) url.searchParams.append('invoice_no', params.invoice_no);
-    return apiFetch(url.toString()).then(r => handleResponse<SaleInvoice[]>(r));
-  },
-  getSaleById: (id: number) => apiFetch(`${API_BASE}/sales/${id}`).then(r => handleResponse<SaleInvoice>(r)),
-  createSaleReturn: (data: any) =>
-    apiFetch(`${API_BASE}/sales/return`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<any>(r)),
+    }>('/sales', data),
+  getSales: (params?: DateRange & { invoice_no?: string }) => get<SaleInvoice[]>('/sales', params),
+  getSaleById: (id: number) => get<SaleInvoice>(`/sales/${id}`),
+  createSaleReturn: (data: unknown) => post<any>('/sales/return', data),
 
   // Purchases
-  getPurchases: () => apiFetch(`${API_BASE}/purchases`).then(r => handleResponse<PurchaseInvoice[]>(r)),
-  createPurchase: (data: any) =>
-    apiFetch(`${API_BASE}/purchases`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; purchaseId: number; invoiceNo: string }>(r)),
+  getPurchases: () => get<PurchaseInvoice[]>('/purchases'),
+  createPurchase: (data: unknown) => post<{ success: boolean; purchaseId: number; invoiceNo: string }>('/purchases', data),
 
   // Reports
-  getAvailableStockReport: () => apiFetch(`${API_BASE}/reports/stock/available`).then(r => handleResponse<any[]>(r)),
-  getExpiredStockReport: (days = 0) => apiFetch(`${API_BASE}/reports/stock/expired?days=${days}`).then(r => handleResponse<any[]>(r)),
-  getFinishedStockReport: () => apiFetch(`${API_BASE}/reports/stock/finished`).then(r => handleResponse<any[]>(r)),
-  getPnlSummaryReport: (params?: { date_from?: string; date_to?: string }) => {
-    const url = new URL(`${API_BASE}/reports/financial/pnl-summary`, window.location.origin);
-    if (params?.date_from) url.searchParams.append('date_from', params.date_from);
-    if (params?.date_to) url.searchParams.append('date_to', params.date_to);
-    return apiFetch(url.toString()).then(r => handleResponse<any>(r));
-  },
-  getInvoicePnlReport: (params?: { date_from?: string; date_to?: string }) => {
-    const url = new URL(`${API_BASE}/reports/financial/invoice-pnl`, window.location.origin);
-    if (params?.date_from) url.searchParams.append('date_from', params.date_from);
-    if (params?.date_to) url.searchParams.append('date_to', params.date_to);
-    return apiFetch(url.toString()).then(r => handleResponse<any[]>(r));
-  },
-  getProductWiseSalesReport: () => apiFetch(`${API_BASE}/reports/sales/product-wise`).then(r => handleResponse<any[]>(r)),
-  getCompanyWiseSalesReport: () => apiFetch(`${API_BASE}/reports/sales/company-wise`).then(r => handleResponse<any[]>(r)),
+  getAvailableStockReport: () => get<any[]>('/reports/stock/available'),
+  getExpiredStockReport: (days = 0) => get<any[]>('/reports/stock/expired', { days: String(days) }),
+  getFinishedStockReport: () => get<any[]>('/reports/stock/finished'),
+  getPnlSummaryReport: (params?: DateRange) => get<any>('/reports/financial/pnl-summary', params),
+  getInvoicePnlReport: (params?: DateRange) => get<any[]>('/reports/financial/invoice-pnl', params),
+  getProductWiseSalesReport: () => get<any[]>('/reports/sales/product-wise'),
+  getCompanyWiseSalesReport: () => get<any[]>('/reports/sales/company-wise'),
 
-  // Utilities & Local Backup
-  getBackupList: () => apiFetch(`${API_BASE}/utilities/backups`, { headers: getAuthHeaders() }).then(r => handleResponse<any>(r)),
-  // Backups always go to the saved primary/secondary folders (Utilities -> Backup & Vault)
-  createBackup: () =>
-    apiFetch(`${API_BASE}/utilities/backup`, {
-      method: 'POST',
-      headers: getAuthHeaders()
-    }).then(r => handleResponse<any>(r)),
-  restoreBackup: (backupFilePath: string) =>
-    apiFetch(`${API_BASE}/utilities/restore`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ backupFilePath })
-    }).then(r => handleResponse<any>(r)),
-  getBackupStatus: () =>
-    apiFetch(`${API_BASE}/backups/status`, { headers: getAuthHeaders() }).then(r => handleResponse<BackupStatus>(r)),
+  // Backups & utilities (backups always go to the saved primary/secondary folders)
+  getBackupList: () => get<any>('/utilities/backups'),
+  createBackup: () => post<any>('/utilities/backup'),
+  restoreBackup: (backupFilePath: string) => post<any>('/utilities/restore', { backupFilePath }),
+  getBackupStatus: () => get<BackupStatus>('/backups/status'),
   updateBackupTime: (backupScheduledTime: string) =>
-    apiFetch(`${API_BASE}/backups/schedule`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ backup_scheduled_time: backupScheduledTime })
-    }).then(r => handleResponse<{ success: boolean; backup_scheduled_time: string; next_run_at: string | null }>(r)),
-  resetStockZero: (data: { company_id?: number; confirmation_code: string; user_id?: number; user_name?: string }) =>
-    apiFetch(`${API_BASE}/utilities/stock-zero`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<any>(r)),
-  optimizeDatabase: () =>
-    apiFetch(`${API_BASE}/utilities/optimize`, { method: 'POST' }).then(r => handleResponse<any>(r)),
-  recordDailyClosing: (data: any) =>
-    apiFetch(`${API_BASE}/utilities/closing`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<any>(r)),
+    put<{ success: boolean; backup_scheduled_time: string; next_run_at: string | null }>('/backups/schedule', {
+      backup_scheduled_time: backupScheduledTime
+    }),
+  resetStockZero: (data: { company_id?: number; confirmation_code: string }) => post<any>('/utilities/stock-zero', data),
+  optimizeDatabase: () => post<any>('/utilities/optimize'),
 
-  // Cashier Shifts & Drawer Reconciliation
+  // Cashier shifts & drawer reconciliation
   getActiveShift: (userId: number) =>
-    apiFetch(`${API_BASE}/shifts/active?user_id=${userId}`).then(r => handleResponse<{ activeShift: CashierShift | null; summary?: ShiftSummary }>(r)),
+    get<{ activeShift: CashierShift | null; summary?: ShiftSummary }>('/shifts/active', { user_id: userId }),
   startShift: (data: { user_id: number; user_name: string; opening_cash: number; notes?: string }) =>
-    apiFetch(`${API_BASE}/shifts/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; shift: CashierShift }>(r)),
-  getShiftSummary: (shiftId: number) =>
-    apiFetch(`${API_BASE}/shifts/${shiftId}/summary`).then(r => handleResponse<{ shift: CashierShift; summary: ShiftSummary }>(r)),
+    post<{ success: boolean; shift: CashierShift }>('/shifts/start', data),
+  getShiftSummary: (shiftId: number) => get<{ shift: CashierShift; summary: ShiftSummary }>(`/shifts/${shiftId}/summary`),
   closeShift: (shiftId: number, data: { actual_cash: number; notes?: string; user_id?: number; user_name?: string }) =>
-    apiFetch(`${API_BASE}/shifts/${shiftId}/close`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift; backup?: any }>(r)),
-  getShifts: (params?: { user_id?: number; status?: string; date_from?: string; date_to?: string }) => {
-    const url = new URL(`${API_BASE}/shifts`, window.location.origin);
-    if (params?.user_id) url.searchParams.append('user_id', String(params.user_id));
-    if (params?.status) url.searchParams.append('status', params.status);
-    if (params?.date_from) url.searchParams.append('date_from', params.date_from);
-    if (params?.date_to) url.searchParams.append('date_to', params.date_to);
-    return apiFetch(url.toString()).then(r => handleResponse<CashierShift[]>(r));
-  },
+    post<{ success: boolean; message: string; shift: CashierShift; backup?: any }>(`/shifts/${shiftId}/close`, data),
+  getShifts: (params?: DateRange & { user_id?: number; status?: string }) => get<CashierShift[]>('/shifts', params),
   getShiftDetails: (shiftId: number) =>
-    apiFetch(`${API_BASE}/shifts/${shiftId}`).then(r => handleResponse<{ shift: CashierShift; sales: any[]; returns: any[]; payments: any[] }>(r)),
-  reopenShiftByAdmin: (shiftId: number, data: { admin_id: number; admin_name: string; reason: string }) =>
-    apiFetch(`${API_BASE}/shifts/${shiftId}/admin/reopen`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift }>(r)),
-  correctShiftByAdmin: (shiftId: number, data: { admin_id: number; admin_name: string; corrected_closing_cash: number; reason: string }) =>
-    apiFetch(`${API_BASE}/shifts/${shiftId}/admin/correct`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift }>(r)),
-  adminForceCloseShift: (shiftId: number, data: { admin_id: number; admin_name: string; actual_cash: number; reason: string; notes?: string }) =>
-    apiFetch(`${API_BASE}/shifts/${shiftId}/admin/force-close`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; message: string; shift: CashierShift }>(r)),
+    get<{ shift: CashierShift; sales: any[]; returns: any[]; payments: any[] }>(`/shifts/${shiftId}`),
+  reopenShiftByAdmin: (shiftId: number, data: AdminShiftAction) =>
+    post<SuccessMessage & { shift: CashierShift }>(`/shifts/${shiftId}/admin/reopen`, data),
+  correctShiftByAdmin: (shiftId: number, data: AdminShiftAction & { corrected_closing_cash: number }) =>
+    post<SuccessMessage & { shift: CashierShift }>(`/shifts/${shiftId}/admin/correct`, data),
+  adminForceCloseShift: (shiftId: number, data: AdminShiftAction & { actual_cash: number; notes?: string }) =>
+    post<SuccessMessage & { shift: CashierShift }>(`/shifts/${shiftId}/admin/force-close`, data),
 
-  // System Settings
-  getSettings: () => apiFetch(`${API_BASE}/settings`).then(r => handleResponse<SystemSettings>(r)),
-  saveSettings: (settings: Partial<SystemSettings>) =>
-    apiFetch(`${API_BASE}/settings`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(settings)
-    }).then(r => handleResponse<{ success: boolean; message: string }>(r)),
+  // System settings
+  getSettings: () => get<SystemSettings>('/settings'),
+  saveSettings: (settings: Partial<SystemSettings>) => post<SuccessMessage>('/settings', settings),
 
-  // Developer Protected Settings & RBAC
-  getDeveloperSettings: () =>
-    apiFetch(`${API_BASE}/developer/settings`, {
-      headers: getAuthHeaders()
-    }).then(r => handleResponse<DeveloperSettingsPayload>(r)),
-  updateDeveloperSettings: (data: Partial<DeveloperSettingsPayload>) =>
-    apiFetch(`${API_BASE}/developer/settings`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<{ success: boolean; message: string }>(r)),
+  // Developer-protected settings, license and audit log
+  getDeveloperSettings: () => get<DeveloperSettingsPayload>('/developer/settings'),
+  updateDeveloperSettings: (data: Partial<DeveloperSettingsPayload>) => put<SuccessMessage>('/developer/settings', data),
   developerResetPassword: (userId: number, newPassword: string) =>
-    apiFetch(`${API_BASE}/developer/users/${userId}/reset-password`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ new_password: newPassword })
-    }).then(r => handleResponse<{ success: boolean; message: string }>(r)),
-  getDeveloperAuditLogs: (params?: { page?: number; limit?: number; module?: string; action?: string; status?: string; user?: string }) => {
-    const url = new URL(`${API_BASE}/developer/audit-logs`, window.location.origin);
-    if (params?.page) url.searchParams.append('page', String(params.page));
-    if (params?.limit) url.searchParams.append('limit', String(params.limit));
-    if (params?.module) url.searchParams.append('module', params.module);
-    if (params?.action) url.searchParams.append('action', params.action);
-    if (params?.status) url.searchParams.append('status', params.status);
-    if (params?.user) url.searchParams.append('user', params.user);
-    return apiFetch(url.toString(), {
-      headers: getAuthHeaders()
-    }).then(r => handleResponse<{ logs: AuditLogEntry[]; total: number; page: number; totalPages: number }>(r));
-  },
+    post<SuccessMessage>(`/developer/users/${userId}/reset-password`, { new_password: newPassword }),
+  getDeveloperAuditLogs: (params?: { page?: number; limit?: number; module?: string; action?: string; status?: string; user?: string }) =>
+    get<{ logs: AuditLogEntry[]; total: number; page: number; totalPages: number }>('/developer/audit-logs', params),
   updateLicense: (data: { action: 'full' } | { action: 'demo' | 'extend'; demoDays: number }) =>
-    apiFetch(`${API_BASE}/developer/license`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(data)
-    }).then(r => handleResponse<LicenseStatus & { success: boolean }>(r)),
-  getAdminPermissions: () =>
-    apiFetch(`${API_BASE}/developer/admin-permissions`, { headers: getAuthHeaders() }).then(r => handleResponse<Record<string, boolean>>(r)),
+    put<LicenseStatus & { success: boolean }>('/developer/license', data),
+  getAdminPermissions: () => get<Record<string, boolean>>('/developer/admin-permissions'),
   updateAdminPermissions: (permissions: Record<string, boolean>) =>
-    apiFetch(`${API_BASE}/developer/admin-permissions`, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(permissions)
-    }).then(r => handleResponse<{ success: boolean; permissions: Record<string, boolean> }>(r)),
+    put<{ success: boolean; permissions: Record<string, boolean> }>('/developer/admin-permissions', permissions)
 };

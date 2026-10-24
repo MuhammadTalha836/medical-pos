@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidPaperSize, isValidTemplate, normalizePaperSize, normalizeTemplate } from './invoiceSettings';
+import { isValidPaperSize, isValidTemplate, normalizePaperSize, normalizeTemplate } from './invoice';
 
 describe('thermal-only invoice settings', () => {
   it('accepts only the three thermal designs', () => {

@@ -21,7 +21,8 @@ import { app } from '../api';
 import { authHeaders, adminAuthHeaders, useFullTestLicense } from './testAuth';
 import { prisma } from '../database/prisma';
 import { hashPassword } from '../security/passwords';
-import { migrateLegacyInvoiceSettings, FOOTER_MAX_LENGTH } from '../invoice/invoiceSettings';
+import { migrateLegacyInvoiceSettings } from '../invoice/invoiceSettings';
+import { FOOTER_MAX_LENGTH } from '../../shared/invoice';
 
 const colors = {
   green: (t: string) => `\x1b[32m${t}\x1b[0m`,

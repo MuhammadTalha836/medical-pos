@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
 import { SystemSettings, SaleInvoice } from '../types';
 import { Modal } from '../components/common/Modal';
-import { ThermalReceipt } from '../components/pos/ThermalReceipt';
+import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { useAuthStore } from '../store/useAuthStore';
 import { BackupHealthCard } from '../components/backup/BackupHealthCard';
 import {
@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Lock
 } from 'lucide-react';
+import { moneyFormatter } from '../utils/format';
 
 interface DashboardProps {
   settings?: SystemSettings | null;
@@ -31,7 +32,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
   const [selectedInvoice, setSelectedInvoice] = useState<SaleInvoice | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
-  const currency = settings?.currency_symbol || 'Rs.';
+  const money = moneyFormatter(settings);
 
   const loadStats = async () => {
     try {
@@ -110,7 +111,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
             {hasPermission('can_view_financial_kpis') ? (
               <>
                 <div className="text-2xl font-extrabold font-mono text-slate-900 dark:text-white tracking-tight">
-                  {currency} {todayRevenue.toFixed(2)}
+                  {money(todayRevenue)}
                 </div>
                 <div className="flex items-center space-x-1.5 mt-1 text-xs text-teal-600 dark:text-teal-400 font-medium">
                   <TrendingUp className="w-3.5 h-3.5" />
@@ -320,7 +321,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
                         </span>
                       </td>
                       <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 dark:text-white">
-                        {currency} {Number(sale.net_total).toFixed(2)}
+                        {money(Number(sale.net_total))}
                       </td>
                       <td className="py-2 px-3 text-center">
                         <button
@@ -348,7 +349,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
         maxWidth="max-w-md"
       >
         {selectedInvoice && (
-          <ThermalReceipt
+          <UnifiedInvoice
             invoice={selectedInvoice}
             settings={settings}
             onClose={() => setIsReceiptModalOpen(false)}

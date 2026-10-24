@@ -1,6 +1,6 @@
 import { prisma } from '../database/prisma';
 
-export interface SecurityAuditOptions {
+interface SecurityAuditOptions {
   action: string;
   module: string;
   details?: string;

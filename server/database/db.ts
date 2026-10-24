@@ -1,13 +1,22 @@
 import Database from 'better-sqlite3';
-import { SCHEMA_SQL } from './schema';
+import { COLUMN_MIGRATIONS, SCHEMA_SQL } from './schema';
 import { seedInitialData } from './seed';
 import { DB_PATH } from './paths';
 
 export { DB_PATH };
 
-export function initDatabase(customPath?: string): Database.Database {
-  const targetPath = customPath || DB_PATH;
-  const db = new Database(targetPath);
+// Adds any column an older database is missing (checked first, so nothing fails or logs on a current database)
+function applyColumnMigrations(db: Database.Database) {
+  for (const { table, column, definition } of COLUMN_MIGRATIONS) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!columns.some(c => c.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+    }
+  }
+}
+
+function initDatabase(): Database.Database {
+  const db = new Database(DB_PATH);
 
   // Performance and integrity pragmas
   db.pragma('journal_mode = WAL');
@@ -15,30 +24,11 @@ export function initDatabase(customPath?: string): Database.Database {
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
 
-  // Execute schema
+  // Tables, indexes, then columns added since the first release
   db.exec(SCHEMA_SQL);
+  applyColumnMigrations(db);
 
-  // Safe migrations for shift_id and product open-sale columns if upgrading existing database
-  try { db.exec(`ALTER TABLE sales ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
-  try { db.exec(`ALTER TABLE sale_returns ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
-  try { db.exec(`ALTER TABLE customer_payments ADD COLUMN shift_id INTEGER REFERENCES cashier_shifts(id);`); } catch {}
-  try { db.exec(`ALTER TABLE products ADD COLUMN allow_open_sale INTEGER NOT NULL DEFAULT 1;`); } catch {}
-  try { db.exec(`ALTER TABLE products ADD COLUMN min_sale_qty INTEGER NOT NULL DEFAULT 1;`); } catch {}
-  try { db.exec(`ALTER TABLE users ADD COLUMN email TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;`); } catch {}
-  try { db.exec(`ALTER TABLE users ADD COLUMN locked_until DATETIME;`); } catch {}
-  try { db.exec(`ALTER TABLE audit_logs ADD COLUMN affected_user TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE audit_logs ADD COLUMN status TEXT DEFAULT 'SUCCESS';`); } catch {}
-  try { db.exec(`ALTER TABLE sales ADD COLUMN store_name_snapshot TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE sales ADD COLUMN store_address_snapshot TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE sales ADD COLUMN invoice_footer_snapshot TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE backup_history ADD COLUMN checksum_sha256 TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE backup_history ADD COLUMN verified INTEGER NOT NULL DEFAULT 1;`); } catch {}
-  try { db.exec(`ALTER TABLE backup_history ADD COLUMN error_message TEXT;`); } catch {}
-  try { db.exec(`ALTER TABLE backup_history ADD COLUMN secondary_path TEXT;`); } catch {}
-
-  // Seed default data if database is fresh
+  // Default settings and roles (never overwrites existing rows)
   seedInitialData(db);
 
   return db;

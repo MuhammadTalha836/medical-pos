@@ -4,7 +4,7 @@ import { verifyTotpStep } from './totp';
 
 const LAST_STEP_KEY = 'developer_totp_last_step';
 
-export type DeveloperCodeResult = 'ok' | 'invalid' | 'replayed' | 'not_configured';
+type DeveloperCodeResult = 'ok' | 'invalid' | 'replayed' | 'not_configured';
 
 /**
  * Checks a 6-digit code against the developer master key (±30 s drift). A code is accepted once:
@@ -36,7 +36,7 @@ export async function verifyDeveloperCode(code: string): Promise<DeveloperCodeRe
 export const DEVELOPER_CODE_ERRORS: Record<Exclude<DeveloperCodeResult, 'ok'>, string> = {
   invalid: 'Invalid verification code. Check the developer authenticator app and try again.',
   replayed: 'This code was already used. Wait for the next code in the authenticator app.',
-  not_configured: 'Developer master key is not configured in this build. Run "npm run developer:key" and rebuild.'
+  not_configured: 'This installation is missing the developer key. Please contact the developer.'
 };
 
 export const DEVELOPER_TOTP_STATE_KEYS = [LAST_STEP_KEY];

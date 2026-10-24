@@ -1,6 +1,6 @@
 # PROGRESS — Audit against `docs/IMPLEMENTATION_PLAN.md`
 
-Audit date: 2026-10-24 · Commit audited: `f0bc939` (after Phases 1–4 of `ralph_loop_prompt_for_antigravity.md`)
+Audit date: 2026-10-24 · Commit audited: `f0bc939` (after Phases 1–4 of `PHASE_REQUIREMENTS.md`)
 
 Status legend (from `IMPLEMENTATION_PLAN1.md`): ✅ Done · 🟡 Partial · ⚠️ Done but wrong/insecure · ❌ Missing · ➖ Not applicable
 
@@ -30,7 +30,7 @@ Status legend (from `IMPLEMENTATION_PLAN1.md`): ✅ Done · 🟡 Partial · ⚠�
 | Tailwind v4 + `@tailwindcss/vite` | required | Tailwind 3.4 + PostCSS + autoprefixer | ✅ 4.3.3 via `@tailwindcss/vite`; config moved to `@theme` in `src/index.css` | `vite.config.ts`, `electron.vite.config.ts`, `src/index.css`, 23 `src/**/*.tsx` files (class renames by the official codemod) |
 | bcryptjs | required | 3.0.3 | ✅ unchanged | `server/security/passwords.ts` |
 | otplib v12 | required | hand-written HMAC TOTP | ✅ 12.0.1 (RFC 6238 vectors verified) | `server/security/totp.ts` |
-| qrcode | required | 1.5.4 | ✅ unchanged | `server/api.ts` (setup QR) |
+| qrcode | required | 1.5.4 | ✅ unchanged (dev dependency) | `scripts/developer-key.ts` (developer key QR) |
 | zod | required | missing | ✅ 4.6.7 | `server/validation/schemas.ts` → setup, logins, users, settings, developer settings, backup schedule, sales, shift reopen |
 | lucide-react | required | 0.475 | ✅ unchanged (1.x is a new major; not in this round) | 24 files in `src/` |
 | vitest | required | missing | ✅ 5.0.5, 28 unit tests | `vitest.config.ts`, `server/**/*.spec.ts`, `src/**/*.spec.ts` |
@@ -44,11 +44,11 @@ Status legend (from `IMPLEMENTATION_PLAN1.md`): ✅ Done · 🟡 Partial · ⚠�
 
 | # | Requirement | Status | Evidence / gap | Proposed fix |
 |---|---|---|---|---|
-| 0.1 | `docs/ARCHITECTURE.md` | ❌ | Not present. `CLAUDE.md`/`GEMINI.md` cover part of it | Write it (folders, routes/IPC, models, pages) |
+| 0.1 | `docs/ARCHITECTURE.md` | ❌ | Not present. `CLAUDE.md`/`docs/PROJECT_GUIDE.md` cover part of it | Write it (folders, routes/IPC, models, pages) |
 | 0.2 | Prisma works in dev **and packaged build** | ✅ (Linux) | `npm run build:unpack` → `release/linux-unpacked`; the packaged app served `/api/status`, settings via Prisma 7 and the renderer on 127.0.0.1. Windows NSIS build not run on this machine | Owner: run `npm run build:win` on Windows and smoke-test |
 | 0.3 | Dependencies: zod, lucide-react, vitest; tailwind in devDeps | ✅ | All installed; tailwind and `@tailwindcss/vite` are devDependencies | — |
 | 0.4 | Final `name`, `productName`, `appId` | 🟡 | `electron-builder.yml`: `appId: com.pharmacarepro.desktop`, `productName: PharmaCare Pro`. `name` still `pharmacy-management-system` | **Owner must confirm appId before the first client release** (it can never change) |
-| 0.5 | Main-process layout `src/main/{db, migrate, session, permissions, audit, ipc, services, printing, backup}` | ⚠️ | Logic lives in one 3,900-line `server/api.ts` behind HTTP | Phase-0/2 decision: move the API into Electron main + IPC, or keep Express with a real session token |
+| 0.5 | Main-process layout `src/main/{db, migrate, session, permissions, audit, ipc, services, printing, backup}` | 🟡 | API split into `server/app.ts` + 17 routers in `server/routes/` + `server/http/` helpers (2026-10-24); still Express over loopback HTTP with real session tokens | Phase-0/2 decision: move the API into Electron main + IPC, or keep Express with a real session token |
 | 0.6 | Shared IPC helper `handle(channel, permission, zodSchema, fn)` | ❌ | No IPC. Ad-hoc checks per route | Central `requirePermission` + zod middleware |
 | 0.7 | `CHANGELOG.md` | ✅ | Created this round | — |
 | 0.8 | Production hardening (no DevTools, menu, reload keys) | ✅ | `electron/main.ts`: `devTools: isDev`, `Menu.setApplicationMenu(null)`, F5/Ctrl+R/F12/Ctrl+Shift+I blocked when packaged, navigation locked to the app origin | — |
@@ -84,7 +84,7 @@ Status legend (from `IMPLEMENTATION_PLAN1.md`): ✅ Done · 🟡 Partial · ⚠�
 
 | # | Requirement | Status | Evidence / gap | Proposed fix |
 |---|---|---|---|---|
-| 2.1 | Central permission matrix, **deny by default** | 🟡 | Every `/api` route now needs a login session (deny by default, public allow-list in `api.ts`). Permission checks added to users, roles, shift admin actions and stock zero. Other routes (e.g. product delete, sale return, purchases) still check only that someone is logged in | `requirePermission(key)` on every remaining route |
+| 2.1 | Central permission matrix, **deny by default** | 🟡 | Every `/api` route now needs a login session (deny by default, public allow-list in `server/app.ts`). Permission checks added to users, roles, shift admin actions and stock zero. Other routes (e.g. product delete, sale return, purchases) still check only that someone is logged in | `requirePermission(key)` on every remaining route |
 | 2.2 | Session only in main; renderer never sends userId/role | ✅ | Server-side sessions (`server/security/sessions.ts`): random bearer token, held in the API process (Electron main when packaged); `x-user-id` ignored; `user_id`/`admin_id` in bodies replaced by the session user. Logout, password reset/change and disabling revoke sessions | — |
 | 2.3 | Nobody changes own role / escalation blocked | 🟡 | Blocked in user routes (Phase 2 tests). But `PUT /api/roles/:id` has no auth, so anyone can give the cashier role every permission | Covered by 2.1 |
 | 2.4 | Setup wizard (8 steps incl. recovery codes, store identity, first Admin) | 🟡 | 7 steps: developer master-code unlock → store → first Admin (username + password) → backup folder/schedule → Admin permissions + policies → Demo/Full license → review. Permanent lock ✅ | Recovery codes |
@@ -158,7 +158,7 @@ Status legend (from `IMPLEMENTATION_PLAN1.md`): ✅ Done · 🟡 Partial · ⚠�
 | 7.4 | Visibility toggles don't affect calculations | ✅ | Display only | — |
 | 7.5 | Footer always printed; Admin edits only if `adminCanEditFooter` | 🟡 | Always printed ✅, Developer-only ✅. No grant flag | Add the flag |
 | 7.6 | Store name/address protected unless granted | ✅ | Phase 3 hide/edit locks, server-enforced | — |
-| 7.7 | Reprints use snapshots; policy documented | ✅ | `*_snapshot` columns; GEMINI.md | — |
+| 7.7 | Reprints use snapshots; policy documented | ✅ | `*_snapshot` columns; PROJECT_GUIDE.md | — |
 | 7.8 | Tested on a real thermal printer | ❌ | Not possible here | Owner hardware test |
 
 ## Phase 8 — Admin panel
@@ -190,7 +190,7 @@ Status legend (from `IMPLEMENTATION_PLAN1.md`): ✅ Done · 🟡 Partial · ⚠�
 | # | Requirement | Status | Evidence / gap | Proposed fix |
 |---|---|---|---|---|
 | 10.1 | Design system applied everywhere | ❌ | Depends on 3.x | Phase 10 |
-| 10.2 | vitest unit tests (rules, pricing, shifts, retention, scheduler, TOTP) | 🟡 | vitest runs 28 specs (scheduler, invoice rules, TOTP, passwords, schemas, UI helpers). No specs yet for sale rules / shift totals (that logic is still inside `api.ts`) | Add specs when `saleRules.ts` is extracted |
+| 10.2 | vitest unit tests (rules, pricing, shifts, retention, scheduler, TOTP) | 🟡 | vitest runs 28 specs (scheduler, invoice rules, TOTP, passwords, schemas, UI helpers). No specs yet for sale rules / shift totals (that logic is still inside `server/routes/sales.ts` / `shifts.ts`) | Add specs when `saleRules.ts` is extracted |
 | 10.3 | `TEST_PLAN.md`, `TEST_REPORT.md` | ❌ | Missing | Phase 10 |
 | 10.4 | Upgrade test, NSIS installer, `extraResources` migrations | ❌ | No packaging yet | After Electron tooling (this round) |
 

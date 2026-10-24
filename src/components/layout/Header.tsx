@@ -15,9 +15,8 @@ import {
   Sun,
   Moon,
   LogOut,
-  Lock,
-  PlayCircle
 } from 'lucide-react';
+import { useShiftElapsed } from '../../hooks/useShiftElapsed';
 
 interface HeaderProps {
   onQuickBackup?: () => void;
@@ -31,7 +30,6 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [time, setTime] = useState<string>('');
   const [date, setDate] = useState<string>('');
-  const [elapsedMinutes, setElapsedMinutes] = useState<number>(0);
   const [license, setLicense] = useState<LicenseStatus | null>(null);
 
   // Demo countdown for the Admin and Developer (rechecked hourly)
@@ -40,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
       setLicense(null);
       return;
     }
-    const check = () => api.getLicenseStatus().then(setLicense).catch(() => {});
+    const check = () => api.getLicenseStatus().then(setLicense).catch(err => console.warn('License status unavailable:', err));
     check();
     const interval = setInterval(check, 60 * 60 * 1000);
     return () => clearInterval(interval);
@@ -58,24 +56,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!activeShift?.start_time) {
-      setElapsedMinutes(0);
-      return;
-    }
-    const updateElapsed = () => {
-      const startMs = new Date(activeShift.start_time).getTime();
-      const diffMs = Math.max(0, Date.now() - startMs);
-      setElapsedMinutes(Math.floor(diffMs / 60000));
-    };
-    updateElapsed();
-    const interval = setInterval(updateElapsed, 30000);
-    return () => clearInterval(interval);
-  }, [activeShift?.start_time]);
-
-  const elapsedHours = Math.floor(elapsedMinutes / 60);
-  const elapsedRemMinutes = elapsedMinutes % 60;
-  const elapsedFormatted = elapsedHours > 0 ? `${elapsedHours}h ${elapsedRemMinutes}m` : `${elapsedRemMinutes}m`;
+  const elapsedFormatted = useShiftElapsed(activeShift?.start_time);
 
   return (
     <header className="h-16 bg-white/95 dark:bg-[#111827]/95 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-5 select-none z-20 transition-colors duration-150">
@@ -102,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Offline Desktop Pharmacy System</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">100% Offline POS</p>
           </div>
         </div>
 
@@ -111,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
         {/* Offline Badge */}
         <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full badge-success">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          <span>100% Offline (SQLite Local)</span>
+          <span>100% Offline POS</span>
         </div>
       </div>
 
@@ -153,7 +134,7 @@ export const Header: React.FC<HeaderProps> = ({ onQuickBackup, onOpenClosing }) 
         {onQuickBackup && hasPermission('can_backup') && (
           <button
             onClick={onQuickBackup}
-            title="Instant Local Database Backup"
+            title="Instant Backup"
             className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors"
           >
             <Database className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />

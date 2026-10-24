@@ -55,7 +55,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: '#0b1120',
-    title: 'PharmaCare Pro - Pharmacy Management & POS System',
+    title: 'PharmaCare Pro – 100% Offline POS',
     webPreferences: {
       preload: path.join(import.meta.dirname, '../preload/index.cjs'),
       nodeIntegration: false,
@@ -108,10 +108,11 @@ if (!gotTheLock) {
 
     try {
       await startApi();
-    } catch (err: any) {
+    } catch (err) {
+      console.error('[PharmaCare] API failed to start:', err);
       dialog.showErrorBox(
         'PharmaCare Pro could not start',
-        `The local database service failed to start on port ${API_PORT}: ${err?.message || err}`
+        'The database service failed to start. Close any other copy of PharmaCare Pro and open it again.'
       );
       app.quit();
       return;
@@ -173,7 +174,7 @@ ipcMain.handle('dialog:select-restore-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [
-      { name: 'SQLite Database Backups', extensions: ['db', 'sqlite', 'sqlite3'] },
+      { name: 'PharmaCare Backups', extensions: ['db', 'sqlite', 'sqlite3'] },
       { name: 'All Files', extensions: ['*'] }
     ],
     title: 'Select Backup Database to Restore'

@@ -14,24 +14,22 @@ import { ShiftsAdminPage } from './pages/ShiftsAdminPage';
 import { DeveloperSettingsPage } from './pages/DeveloperSettingsPage';
 import { api } from './services/apiService';
 import { SystemSettings } from './types';
-import { CheckCircle2, Download, Database } from 'lucide-react';
-import { useThemeStore } from './store/useThemeStore';
+import { CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from './store/useAuthStore';
 import { useShiftStore } from './store/useShiftStore';
 import { LoginModal } from './components/auth/LoginModal';
 import { SetupWizardModal } from './components/setup/SetupWizardModal';
 import { ShiftStartModal } from './components/pos/ShiftStartModal';
 import { ShiftClosingModal } from './components/pos/ShiftClosingModal';
+import { currencySymbol } from './utils/format';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('pos');
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [isSetupCompleted, setIsSetupCompleted] = useState<boolean | null>(null);
   const [quickNotification, setQuickNotification] = useState<string | null>(null);
-  const { theme } = useThemeStore();
   const { user, isAuthenticated, hasModuleAccess } = useAuthStore();
   const {
-    activeShift,
     fetchActiveShift,
     isStartModalOpen,
     setStartModalOpen,
@@ -93,7 +91,7 @@ export const App: React.FC = () => {
 
   const handleQuickBackup = async () => {
     try {
-      setQuickNotification('Creating local backup...');
+      setQuickNotification('Creating backup...');
       const res = await api.createBackup();
       if (res.success) {
         setQuickNotification(`Backup saved: ${res.filename}`);
@@ -166,7 +164,7 @@ export const App: React.FC = () => {
       <ShiftStartModal
         isOpen={isStartModalOpen}
         onClose={() => setStartModalOpen(false)}
-        currency={settings?.currency_symbol || 'Rs.'}
+        currency={currencySymbol(settings)}
         onShiftStarted={() => {
           setQuickNotification('Cashier Shift Started Successfully');
           setTimeout(() => setQuickNotification(null), 4000);
@@ -177,7 +175,7 @@ export const App: React.FC = () => {
       <ShiftClosingModal
         isOpen={isClosingModalOpen}
         onClose={() => setClosingModalOpen(false)}
-        currency={settings?.currency_symbol || 'Rs.'}
+        currency={currencySymbol(settings)}
         settings={settings}
         onShiftClosed={() => {
           setQuickNotification('Shift Reconciled & Closed. Auto backup recorded.');
