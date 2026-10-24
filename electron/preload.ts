@@ -18,13 +18,16 @@ export interface ElectronAPI {
   listPrinters: () => Promise<PrinterInfo[]>;
   selectBackupDir: () => Promise<string | null>;
   selectRestoreFile: () => Promise<string | null>;
+  /** Opens the Google sign-in page for online backups in the system browser */
+  openCloudSignIn: (url: string) => Promise<boolean>;
 }
 
 const api: ElectronAPI = {
   printThermal: (options) => ipcRenderer.invoke('print:thermal', options),
   listPrinters: () => ipcRenderer.invoke('printers:list'),
   selectBackupDir: () => ipcRenderer.invoke('dialog:select-backup-dir'),
-  selectRestoreFile: () => ipcRenderer.invoke('dialog:select-restore-file')
+  selectRestoreFile: () => ipcRenderer.invoke('dialog:select-restore-file'),
+  openCloudSignIn: (url) => ipcRenderer.invoke('cloud:open-sign-in', url)
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

@@ -5,7 +5,8 @@ import { defineConfig } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// The developer master TOTP key is baked into the main bundle at build time (never read from the user's PC).
+// The developer master TOTP key (and the optional Google sign-in client) is baked into the main bundle at build time
+// (never read from the user's PC).
 // A release cannot be built without it; `npm run developer:key` creates .env.developer.
 function developerKeyDefines(command: 'build' | 'serve'): Record<string, string> {
   const file = resolve('.env.developer');
@@ -21,7 +22,10 @@ function developerKeyDefines(command: 'build' | 'serve'): Record<string, string>
   }
   return {
     'process.env.PHARMACARE_DEV_TOTP_SECRET': JSON.stringify(env.PHARMACARE_DEV_TOTP_SECRET),
-    'process.env.PHARMACARE_DEVELOPER_EMAIL': JSON.stringify(env.PHARMACARE_DEVELOPER_EMAIL || 'muhammadtalhatalha425@gmail.com')
+    'process.env.PHARMACARE_DEVELOPER_EMAIL': JSON.stringify(env.PHARMACARE_DEVELOPER_EMAIL || 'muhammadtalhatalha425@gmail.com'),
+    // Optional Google sign-in client for online backups; empty means offline backups only
+    'process.env.PHARMACARE_GOOGLE_CLIENT_ID': JSON.stringify(env.PHARMACARE_GOOGLE_CLIENT_ID || ''),
+    'process.env.PHARMACARE_GOOGLE_CLIENT_SECRET': JSON.stringify(env.PHARMACARE_GOOGLE_CLIENT_SECRET || '')
   };
 }
 

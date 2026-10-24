@@ -20,7 +20,7 @@ npm run <script-name>
 | Open the app while developing | `npm run dev` |
 | Check code for errors | `npm run lint` |
 | Unit tests | `npm test` |
-| Full integration tests | `npm run test:functional` + `test:phase1` … `test:phase6` |
+| Full integration tests | `npm run test:functional` + `test:phase1` … `test:phase7` |
 | After editing `prisma/schema.prisma` | `npm run prisma:generate` |
 | First-time developer key setup | `npm run developer:key` |
 | Check that the desktop bundle compiles | `npm run build` |
@@ -136,12 +136,13 @@ npm run <script-name>
 - **Kaise:** `npm run test:watch`. Press `q` to quit.
 - **Kyun:** It is faster than running `npm test` again and again by hand.
 
-### Integration suites (`test:functional`, `test:phase1` … `test:phase6`)
+### Integration suites (`test:functional`, `test:phase1` … `test:phase7`)
 ```json
 "test:functional": "node scripts/electron.mjs test server/tests/functional_test.ts",
 ...
 "test:phase5": "node scripts/electron.mjs test server/tests/phase5_test.ts"
-"test:phase6": "node scripts/electron.mjs test server/tests/phase6_test.ts"
+"test:phase6": "node scripts/electron.mjs test server/tests/phase6_test.ts",
+"test:phase7": "node scripts/electron.mjs test server/tests/phase7_test.ts"
 ```
 
 **What they do:**
@@ -159,7 +160,7 @@ npm run <script-name>
 - `npm run test:phase3` runs one suite.
 - To run all of them:
   ```bash
-  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6
+  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7
   ```
 
 **Why:** These prove that the real business flows still work (sale, stock, shifts, permissions, license, backups) and not just single functions.
@@ -173,6 +174,7 @@ npm run <script-name>
 | `test:phase4` | Backups: verification, retention/cleanup, offline scheduler, who may back up or restore |
 | `test:phase5` | Login sessions, developer-only admin permissions, Demo/Full license lock |
 | `test:phase6` | Khata customers: unique phone, credit sale needs a saved customer, credit limit, credit returns |
+| `test:phase7` | Online backup: backup type (Developer only), Google sign-in, encrypted upload, offline retry, Drive retention, restore from Drive (Google faked, no internet needed) |
 
 ---
 
@@ -188,12 +190,14 @@ npm run <script-name>
 - **Kab chalayein:**
   - **once**, on first setup of the project, before running the setup wizard or making any build;
   - with `-- --show` on a new phone, to see the QR again;
-  - with `-- --rotate` only if the key is leaked or lost.
+  - with `-- --rotate` only if the key is leaked or lost;
+  - with `-- --google <client-id> <client-secret>` once, to turn on online backups to Google Drive (`docs/ONLINE_BACKUP_SETUP.md`).
 - **Kaise:**
   ```bash
   npm run developer:key              # create the key (refuses if one already exists)
   npm run developer:key -- --show    # show the QR of the existing key again
   npm run developer:key -- --rotate  # replace the key (old builds keep the old key)
+  npm run developer:key -- --google <client-id> <client-secret>   # Google sign-in client for online backups
   ```
   After creating it, restart `npm run dev`.
 - **Kyun:**
@@ -287,7 +291,7 @@ npm run lint && npm test
 
 **Before a commit:**
 ```bash
-npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6
+npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7
 ```
 
 **Client release (on Windows):**

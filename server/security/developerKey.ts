@@ -60,3 +60,14 @@ export function getDeveloperEmail(): string {
   loadKeyFile();
   return (process.env.PHARMACARE_DEVELOPER_EMAIL || DEFAULT_DEVELOPER_EMAIL).trim().toLowerCase();
 }
+
+/**
+ * Google sign-in client (a "Desktop app" OAuth client from the developer's Google Cloud project) used for
+ * online backups. Optional: without it the build offers only offline backups. Comes from .env.developer.
+ */
+export function getGoogleOAuthClient(): { clientId: string; clientSecret: string } | null {
+  loadKeyFile();
+  const clientId = (process.env.PHARMACARE_GOOGLE_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.PHARMACARE_GOOGLE_CLIENT_SECRET || '').trim();
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
+}

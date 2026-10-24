@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
 import express from 'express';
@@ -224,4 +224,18 @@ ipcMain.handle('dialog:select-restore-file', async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
+});
+
+// IPC: Open the Google sign-in page (online backups) in the system browser. Only that page is allowed.
+ipcMain.handle('cloud:open-sign-in', async (_event, url: unknown) => {
+  if (typeof url !== 'string') return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'accounts.google.com') return false;
+  await shell.openExternal(parsed.toString());
+  return true;
 });

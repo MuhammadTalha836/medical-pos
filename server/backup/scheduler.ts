@@ -1,6 +1,7 @@
 import { prisma } from '../database/prisma';
 import { createBackup, BackupResult, BackupType, getConfiguredBackupDir } from '../database/backup';
 import { logSecurityAudit } from '../security/audit';
+import { queueCloudUpload, runCloudUploads } from './cloud/cloudBackup';
 import {
   computeSchedule,
   DEFAULT_BACKUP_TIME,
@@ -123,6 +124,8 @@ export async function runRecordedBackup(
   try {
     const result = await createBackup(type, getConfiguredBackupDir(), s.secondary_backup_dir || undefined);
     await recordBackupOutcome(type, { result }, actor);
+    // Online/Both: queue the verified file for Google Drive; the upload never delays the backup itself
+    if (await queueCloudUpload(result.historyId)) void runCloudUploads({ force: true });
     return { result };
   } catch (error) {
     await recordBackupOutcome(type, { error }, actor);
@@ -148,6 +151,8 @@ export async function runSchedulerTick(now: Date = new Date()): Promise<boolean>
   if (schedulerRunning) return false;
   schedulerRunning = true;
   try {
+    // Retry online uploads that waited for the internet (backoff is handled inside)
+    void runCloudUploads({ now: now.getTime() });
     const { schedule } = await getScheduleState(now);
     if (!schedule.isDue) return false;
     console.log('[Backup Scheduler] Scheduled backup is due, starting...');

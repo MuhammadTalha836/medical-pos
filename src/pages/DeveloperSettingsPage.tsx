@@ -9,6 +9,9 @@ import { WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { LicensePanel } from '../components/developer/LicensePanel';
 import { AdminPermissionsPanel } from '../components/developer/AdminPermissionsPanel';
 import { DeveloperProfilePanel } from '../components/developer/DeveloperProfilePanel';
+import { BackupModePicker } from '../components/backup/BackupModePicker';
+import { CloudBackupCard } from '../components/backup/CloudBackupCard';
+import { normalizeBackupMode, usesCloud } from '../../shared/backup';
 import {
   ShieldAlert,
   ShieldCheck,
@@ -93,6 +96,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
     developer_email: ''
   });
   const [loadingSettings, setLoadingSettings] = useState(false);
+  const [onlineBackupAvailable, setOnlineBackupAvailable] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
 
@@ -172,6 +176,13 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
       fetchAuditLogs(1);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab !== 'backups' || user?.role !== 'developer') return;
+    api.getCloudBackupStatus()
+      .then(status => setOnlineBackupAvailable(status.available))
+      .catch(() => setOnlineBackupAvailable(false));
+  }, [activeTab, user]);
 
   useEffect(() => {
     if (activeTab === 'audit' && user?.role === 'developer') {
@@ -659,6 +670,19 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
               </p>
             </div>
 
+            <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div>
+                <span className="field-label">Backup Type</span>
+                <p className="field-hint">Where backups are kept. Online backups go to the store owner's Google Drive, encrypted so only this app can restore them.</p>
+              </div>
+              <BackupModePicker
+                value={normalizeBackupMode(settings.backup_mode)}
+                onChange={mode => setSettings(prev => ({ ...prev, backup_mode: mode }))}
+                onlineAvailable={onlineBackupAvailable}
+              />
+              {usesCloud(normalizeBackupMode(settings.backup_mode)) && <CloudBackupCard />}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -674,7 +698,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
                   onChange={(e) => setSettings(prev => ({ ...prev, backup_retention_limit: e.target.value }))}
                   className="field-input w-full font-mono font-bold"
                 />
-                <span className="text-2xs text-slate-400 mt-1 block">1–365 scheduled, manual &amp; shift-close backups. Pre-restore safety snapshots are kept separately (newest 3).</span>
+                <span className="text-2xs text-slate-400 mt-1 block">1–365 scheduled, manual &amp; shift-close backups (Google Drive keeps the same number). Pre-restore safety snapshots are kept separately (newest 3).</span>
               </div>
 
               <div>

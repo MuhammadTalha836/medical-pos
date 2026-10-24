@@ -280,6 +280,10 @@ CREATE TABLE IF NOT EXISTS backup_history (
   verified INTEGER NOT NULL DEFAULT 1,
   error_message TEXT,
   secondary_path TEXT,
+  cloud_status TEXT, -- online copy: 'pending', 'uploaded', 'skipped' (a newer backup was uploaded instead); NULL = offline only
+  cloud_file_id TEXT,
+  cloud_uploaded_at DATETIME,
+  cloud_error TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -358,5 +362,9 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definitio
   { table: 'backup_history', column: 'checksum_sha256', definition: 'TEXT' },
   { table: 'backup_history', column: 'verified', definition: 'INTEGER NOT NULL DEFAULT 1' },
   { table: 'backup_history', column: 'error_message', definition: 'TEXT' },
-  { table: 'backup_history', column: 'secondary_path', definition: 'TEXT' }
+  { table: 'backup_history', column: 'secondary_path', definition: 'TEXT' },
+  { table: 'backup_history', column: 'cloud_status', definition: 'TEXT' },
+  { table: 'backup_history', column: 'cloud_file_id', definition: 'TEXT' },
+  { table: 'backup_history', column: 'cloud_uploaded_at', definition: 'DATETIME' },
+  { table: 'backup_history', column: 'cloud_error', definition: 'TEXT' }
 ];

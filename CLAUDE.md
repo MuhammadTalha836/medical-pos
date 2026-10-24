@@ -27,8 +27,9 @@ npm run test:phase3      # thermal-only invoices, protected identity, sale snaps
 npm run test:phase4      # backup retention, verification, offline scheduler, backup RBAC
 npm run test:phase5      # server sessions, Developer-only admin permissions, Demo/Full license
 npm run test:phase6      # khata customers: unique phone, credit sales need a saved customer, credit limit, credit returns
+npm run test:phase7      # online backup to Google Drive (Google faked by a fetch stub): mode, sign-in, encrypted upload, retry, restore
 
-npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate
+npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
 ```
 
@@ -124,6 +125,27 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - Retention is per folder, based on `backup_history` rows; `pre_restore` snapshots are kept separately (newest 3).
 - `computeSchedule` is pure (catch-up, backoff, clock rollback). `runRecordedBackup` / `recordBackupOutcome` update the `last_backup_*` settings that the Dashboard status endpoint reads.
 - The Developer owns the frequency; the Admin can change only `backup_scheduled_time`.
+- **Online backup** (`server/backup/cloud/`, guide `docs/ONLINE_BACKUP_SETUP.md`). `backup_mode` (`shared/backup.ts`) is one of:
+  - `offline`;
+  - `online` (local retention capped at 2 by `getLocalRetentionLimit`);
+  - `both`.
+
+  The mode is Developer-only.
+
+  **Upload queue.** `runRecordedBackup` marks the new `backup_history` row `cloud_status = 'pending'`, and `runCloudUploads` uploads the newest pending row. It skips older pending rows and retries with backoff on every scheduler tick.
+
+  **Google Drive.** `googleDrive.ts` uses plain `fetch` (no SDK) with the `drive.file` scope.
+  - Sign-in runs through the system browser with a one-shot loopback listener on 127.0.0.1 + PKCE.
+  - The `cloud:open-sign-in` IPC only opens `accounts.google.com`.
+  - The client ID/secret come from `.env.developer` (`getGoogleOAuthClient`) and are baked into the build like the master key. Without them, only Offline is offered.
+
+  **Encryption.** Files and the stored refresh token are encrypted with HKDF keys derived from the master key (`cloudCrypto.ts`).
+
+  **Protected settings.** `gdrive_*` keys (`CLOUD_SETTING_KEYS`) are never readable or writable through `/api/settings`.
+
+  **Restore.** Every restore runs inside `keepingCloudConnection`, so restoring an older backup never brings back a revoked sign-in.
+
+  **Setup wizard.** It connects Drive through `POST /api/setup/cloud/{connect,status}`, which is authorized by the setup token.
 
 **Electron** (`electron/main.ts`, `preload.ts`, `electron.vite.config.ts`, `electron-builder.yml`):
 - Main dynamically imports `server/api.ts` after setting `PHARMACARE_DATA_DIR` / `PHARMACARE_BACKUP_DIR` to the per-user folder (packaged only), and listens on `127.0.0.1:${PHARMACARE_API_PORT || 3001}`.

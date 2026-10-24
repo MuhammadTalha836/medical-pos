@@ -1,5 +1,6 @@
 import { DEFAULT_DEVELOPER_FOOTER } from './invoice';
 import { DEFAULT_DEVELOPER_PROFILE_SETTINGS } from './developerProfile';
+import { DEFAULT_BACKUP_MODE } from './backup';
 
 // Default system_settings values, shared by the seed, GET /api/settings and the Settings page.
 // Settings are stored as strings; booleans are 'true' / 'false'.
@@ -69,6 +70,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   setup_completed: 'false',
   developer_email: '',
   backup_retention_limit: '10',
+  backup_mode: DEFAULT_BACKUP_MODE,
   backup_frequency: 'daily',
   backup_scheduled_time: '23:00',
   backup_weekly_day: '0',

@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../../services/apiService';
 import { useAuthStore } from '../../store/useAuthStore';
-import { BackupFrequency, SetupCompletePayload } from '../../types';
+import { BackupFrequency, BackupMode, SetupCompletePayload } from '../../types';
+import { BackupModePicker } from '../backup/BackupModePicker';
+import { GoogleDriveConnect, DriveConnectionState } from '../backup/GoogleDriveConnect';
+import { BACKUP_MODE_LABELS, usesCloud } from '../../../shared/backup';
 import { BACKUP_FREQUENCY_LABELS, WEEKDAY_LABELS, describeBackupSchedule } from '../../utils/backup';
 import {
   ADMIN_POLICY_TOGGLES,
@@ -64,6 +67,9 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
   const [adminPasswordConfirm, setAdminPasswordConfirm] = useState('');
 
   // Backups
+  const [backupMode, setBackupMode] = useState<BackupMode>('offline');
+  const [onlineAvailable, setOnlineAvailable] = useState(false);
+  const [drive, setDrive] = useState<DriveConnectionState | null>(null);
   const [backupDir, setBackupDir] = useState('');
   const [backupFrequency, setBackupFrequency] = useState<BackupFrequency>('daily');
   const [backupTime, setBackupTime] = useState('23:00');
@@ -92,9 +98,14 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
       .then(status => {
         setDeveloperEmail(status.developerEmail || '');
         setKeyConfigured(status.developerKeyConfigured !== false);
+        setOnlineAvailable(status.onlineBackupAvailable === true);
       })
       .catch(err => setErrorMsg(`Could not load setup status: ${err.message}`));
   }, [isOpen]);
+
+  // Google Drive sign-in during setup is authorized by the setup token (no developer session yet)
+  const getDriveStatus = useCallback(() => api.getCloudBackupSetupStatus(setupToken), [setupToken]);
+  const startDriveConnect = useCallback(() => api.connectCloudBackupInSetup(setupToken), [setupToken]);
 
   if (!isOpen) return null;
 
@@ -139,6 +150,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
     }
     if (current === 3) {
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(backupTime)) return 'Backup time must use 24-hour HH:MM format.';
+      if (usesCloud(backupMode) && !drive?.connected) return 'Connect the owner\'s Google Drive, or choose Offline backups for now.';
     }
     if (current === 5 && licenseMode === 'demo') {
       if (!Number.isInteger(demoDays) || demoDays < 1 || demoDays > 365) return 'Demo days must be a whole number from 1 to 365.';
@@ -181,6 +193,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
         admin: { fullName: adminFullName.trim(), username: adminUsername.trim(), password: adminPassword },
         backup: {
           dir: backupDir.trim() || undefined,
+          mode: backupMode,
           frequency: backupFrequency,
           time: backupTime,
           weeklyDay: backupWeekday
@@ -211,6 +224,7 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
     ['Developer', developerEmail],
     ['Store', `${storeName.trim()} — ${storeAddress.trim()}`],
     ['Admin', `${adminFullName.trim()} (${adminUsername.trim()})`],
+    ['Backup type', `${BACKUP_MODE_LABELS[backupMode]}${usesCloud(backupMode) && drive?.account_email ? ` — ${drive.account_email}` : ''}`],
     ['Backup folder', backupDir.trim() || 'Default app folder'],
     ['Automatic backups', describeBackupSchedule(backupFrequency, backupTime, backupWeekday)],
     ['Admin permissions', `${Object.values(adminPermissions).filter(Boolean).length} of ${Object.keys(adminPermissions).length} allowed`],
@@ -374,6 +388,13 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
           {step === 3 && (
             <div className="space-y-4">
               <SectionTitle icon={<HardDrive className="w-4 h-4" />} title="Backups" hint="Verified automatic backups run while the app is open, and missed ones run at the next start." />
+              <div className="space-y-3">
+                <span className={labelClass}>Backup Type</span>
+                <BackupModePicker value={backupMode} onChange={setBackupMode} onlineAvailable={onlineAvailable} />
+                {usesCloud(backupMode) && setupToken && (
+                  <GoogleDriveConnect getStatus={getDriveStatus} startConnect={startDriveConnect} onStatus={setDrive} />
+                )}
+              </div>
               <div>
                 <label className={labelClass}>Backup Folder</label>
                 <div className="flex gap-2">

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
-import { getBackupList, restoreDatabase, resetStockZero, optimizeDatabase, countRetainedBackups, getRetentionLimit, PRE_RESTORE_KEEP } from '../database/backup';
+import { getBackupList, restoreDatabase, resetStockZero, optimizeDatabase, countRetainedBackups, getLocalRetentionLimit, PRE_RESTORE_KEEP } from '../database/backup';
+import { getCloudStatus, keepingCloudConnection, listCloudBackups, restoreFromCloud } from '../backup/cloud/cloudBackup';
 import { getScheduleState, isValidBackupTime, runRecordedBackup } from '../backup/scheduler';
 import { logSecurityAudit } from '../security/audit';
 import { parseBody, backupScheduleSchema } from '../validation/schemas';
@@ -60,6 +61,7 @@ router.get('/api/backups/status', async (req: Request, res: Response) => {
     }
     const canSeePaths = await hasRolePermission(actingUser.role, 'can_backup');
     const { settings, frequency, time, weekday, schedule } = await getScheduleState();
+    const cloud = await getCloudStatus();
 
     res.json({
       frequency,
@@ -74,9 +76,18 @@ router.get('/api/backups/status', async (req: Request, res: Response) => {
       last_error: settings.last_backup_status === 'failed' ? settings.last_backup_error || null : null,
       last_type: settings.last_backup_type || null,
       last_backup_file: canSeePaths ? settings.last_backup_file || null : null,
-      retention_limit: getRetentionLimit(),
+      retention_limit: getLocalRetentionLimit(),
       retained_count: countRetainedBackups(),
-      pre_restore_keep: PRE_RESTORE_KEEP
+      pre_restore_keep: PRE_RESTORE_KEEP,
+      cloud: {
+        mode: cloud.mode,
+        connected: cloud.connected,
+        account_email: canSeePaths ? cloud.account_email : null,
+        last_upload_at: cloud.last_upload_at,
+        last_error: cloud.last_error,
+        pending_count: cloud.pending_count,
+        next_retry_at: cloud.next_retry_at
+      }
     });
   } catch (error: unknown) {
     sendError(res, error);
@@ -127,7 +138,7 @@ router.post('/api/utilities/restore', async (req: Request, res: Response) => {
   }
 
   try {
-    const result = await restoreDatabase(backupFilePath);
+    const result = await keepingCloudConnection(() => restoreDatabase(backupFilePath));
     await logSecurityAudit({
       action: 'DATABASE_RESTORE',
       module: 'BACKUP',
@@ -143,6 +154,49 @@ router.post('/api/utilities/restore', async (req: Request, res: Response) => {
       module: 'BACKUP',
       status: 'FAILED',
       details: error instanceof Error ? error.message : String(error),
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+    sendError(res, error, 400);
+  }
+});
+
+// Online backups in the owner's Google Drive (restore operators only)
+router.get('/api/utilities/cloud-backups', async (req: Request, res: Response) => {
+  try {
+    if (!(await requireBackupPermission(req, res, 'can_restore', 'CLOUD_BACKUP_LIST'))) return;
+    res.json(await listCloudBackups());
+  } catch (error: unknown) {
+    sendError(res, error, 502);
+  }
+});
+
+router.post('/api/utilities/restore-cloud', async (req: Request, res: Response) => {
+  const actingUser = await requireBackupPermission(req, res, 'can_restore', 'DATABASE_RESTORE');
+  if (!actingUser) return;
+
+  const fileId = req.body?.fileId;
+  if (typeof fileId !== 'string' || !/^[\w-]{1,200}$/.test(fileId)) {
+    return res.status(400).json({ error: 'Choose an online backup to restore' });
+  }
+
+  try {
+    const result = await restoreFromCloud(fileId);
+    await logSecurityAudit({
+      action: 'DATABASE_RESTORE',
+      module: 'BACKUP',
+      status: 'SUCCESS',
+      details: `Database restored from online backup ${result.name}`,
+      userId: actingUser.id,
+      userName: actingUser.username
+    });
+    res.json({ success: true, message: result.message });
+  } catch (error: unknown) {
+    await logSecurityAudit({
+      action: 'DATABASE_RESTORE',
+      module: 'BACKUP',
+      status: 'FAILED',
+      details: `Online restore failed: ${error instanceof Error ? error.message : String(error)}`,
       userId: actingUser.id,
       userName: actingUser.username
     });

@@ -3,6 +3,8 @@ import { api } from '../services/apiService';
 import { BackupStatus, SystemSettings } from '../types';
 import { BACKUP_FREQUENCY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { ShiftHistoryHub } from '../components/shifts/ShiftHistoryHub';
+import { CloudBackupList } from '../components/backup/CloudBackupList';
+import { useAuthStore } from '../store/useAuthStore';
 import {
   Database,
   Download,
@@ -28,6 +30,7 @@ interface UtilitiesPageProps {
 }
 
 export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefreshSettings }) => {
+  const { hasPermission } = useAuthStore();
   const [activeSubTab, setActiveSubTab] = useState<'shifts' | 'backups' | 'guide'>('shifts');
 
   // Backups state
@@ -568,6 +571,17 @@ export const UtilitiesPage: React.FC<UtilitiesPageProps> = ({ settings, onRefres
                   </table>
                 </div>
               </div>
+
+              {backupStatus && backupStatus.cloud.mode !== 'offline' && backupStatus.cloud.connected && hasPermission('can_restore') && (
+                <CloudBackupList
+                  accountEmail={backupStatus.cloud.account_email}
+                  onRestored={text => {
+                    setMessage({ type: 'success', text });
+                    loadData();
+                  }}
+                  onError={text => setMessage({ type: 'error', text })}
+                />
+              )}
             </div>
 
             {/* Right Column: Database Optimization & Diagnostic Health */}

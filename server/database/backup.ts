@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
 import { db, DB_PATH } from './db';
+import { localRetentionFor, normalizeBackupMode } from '../../shared/backup';
 
 // The Electron app points PHARMACARE_BACKUP_DIR at its per-user folder; dev and tests use ./backups
 const DEFAULT_BACKUP_DIR = path.resolve(process.env.PHARMACARE_BACKUP_DIR || path.join(process.cwd(), 'backups'));
@@ -24,6 +25,8 @@ const REQUIRED_TABLES = ['system_settings', 'products', 'sales', 'users'];
 
 export interface BackupResult {
   success: boolean;
+  /** backup_history row id */
+  historyId: number;
   filename: string;
   filepath: string;
   sizeBytes: number;
@@ -111,9 +114,15 @@ export function getConfiguredBackupDir(): string {
   return configured && configured.trim() ? path.resolve(path.dirname(DEFAULT_BACKUP_DIR), configured.trim()) : DEFAULT_BACKUP_DIR;
 }
 
+/** The Developer retention limit (what Google Drive keeps in Online/Both mode). */
 export function getRetentionLimit(): number {
   const parsed = parseInt(getSettingValue('backup_retention_limit') || '', 10);
   return isNaN(parsed) || parsed < 1 ? DEFAULT_RETENTION_LIMIT : parsed;
+}
+
+/** Backups kept on this computer: the retention limit, or only the newest few in Online mode. */
+export function getLocalRetentionLimit(): number {
+  return localRetentionFor(normalizeBackupMode(getSettingValue('backup_mode')), getRetentionLimit());
 }
 
 // Serializes all backups (manual, scheduled, shift-close, pre-restore) so they never overlap
@@ -197,7 +206,7 @@ async function runBackup(backupType: BackupType, customDir?: string, secondaryDi
     }
 
     // 4. Record the verified backup
-    db.prepare(`
+    const history = db.prepare(`
       INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status, checksum_sha256, verified, secondary_path)
       VALUES (?, ?, ?, ?, 'success', ?, 1, ?)
     `).run(filename, filepath, backupType, stats.size, checksum, secondaryPath ?? null);
@@ -209,6 +218,7 @@ async function runBackup(backupType: BackupType, customDir?: string, secondaryDi
 
     return {
       success: true,
+      historyId: Number(history.lastInsertRowid),
       filename,
       filepath,
       secondaryPath,
@@ -278,13 +288,13 @@ export function countRetainedBackups(dir: string = getConfiguredBackupDir()): nu
 }
 
 /**
- * Enforces the Developer retention limit on routine backups in a folder: keeps the newest N verified
+ * Enforces the local retention limit on routine backups in a folder: keeps the newest N verified
  * backups and deletes older ones (with their checksum sidecars and secondary copies).
  * The newest verified backup is never deleted because N is at least 1.
  */
 export function pruneBackupsByRetentionLimit(customLimit?: number, dir: string = getConfiguredBackupDir()): number {
   try {
-    let maxKeep = customLimit ?? getRetentionLimit();
+    let maxKeep = customLimit ?? getLocalRetentionLimit();
     if (isNaN(maxKeep) || maxKeep < 1) maxKeep = 1;
 
     const retained = listVerifiedBackups(dir, ROUTINE_BACKUP_TYPES);

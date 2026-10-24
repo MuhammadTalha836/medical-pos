@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Response } from 'express';
 import { CUSTOMER_NAME_MAX, PHONE_MAX_DIGITS, PHONE_MIN_DIGITS, isValidPhone } from '../../shared/customers';
+import { BACKUP_MODES } from '../../shared/backup';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
 // Objects are loose: unknown keys pass through untouched and handlers keep their domain rules.
@@ -47,6 +48,7 @@ export const setupCompleteSchema = z.strictObject({
   }, { error: 'Admin account details are required' }),
   backup: z.strictObject({
     dir: z.string().trim().max(400).optional(),
+    mode: z.enum(BACKUP_MODES, { error: 'Backup type must be offline, online or both' }).optional(),
     frequency: z.string({ error: 'Backup frequency is required' }),
     time: z.string({ error: 'Backup time must use 24-hour HH:MM format' }),
     weeklyDay: z.coerce.number().int().min(0).max(6).optional()

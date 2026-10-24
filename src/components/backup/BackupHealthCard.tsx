@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../../services/apiService';
 import { BackupStatus } from '../../types';
 import { BACKUP_FREQUENCY_LABELS, describeBackupSchedule } from '../../utils/backup';
-import { Database, ShieldCheck, AlertTriangle, Clock, PauseCircle } from 'lucide-react';
+import { Database, ShieldCheck, AlertTriangle, Clock, PauseCircle, Cloud } from 'lucide-react';
 
 const REFRESH_MS = 60 * 1000;
 
@@ -94,6 +94,23 @@ export const BackupHealthCard: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {status.cloud.mode !== 'offline' && (
+        <div className={`flex items-start space-x-2 p-2.5 rounded-lg border text-xs ${
+          status.cloud.connected && !status.cloud.last_error
+            ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-200 dark:border-sky-900 text-sky-800 dark:text-sky-300'
+            : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300'
+        }`}>
+          <Cloud className="w-4 h-4 mt-0.5 shrink-0" />
+          <span className="wrap-anywhere">
+            {!status.cloud.connected
+              ? 'Online backup: Google Drive is not connected. Ask the developer to connect it.'
+              : `Online backup: last upload ${formatDateTime(status.cloud.last_upload_at)}${
+                  status.cloud.pending_count > 0 ? `, ${status.cloud.pending_count} waiting for the internet` : ''
+                }${status.cloud.last_error ? `. Last attempt failed: ${status.cloud.last_error}` : ''}.`}
+          </span>
+        </div>
+      )}
 
       {status.last_status === 'failed' && status.last_error && (
         <div className="flex items-start space-x-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300">

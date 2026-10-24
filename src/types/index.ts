@@ -1,5 +1,7 @@
 import type { RolePermissions } from '../../shared/permissions';
 import type { InvoiceTemplate as InvoiceTemplateType, InvoicePaperSize } from '../../shared/invoice';
+import type { BackupMode } from '../../shared/backup';
+export type { BackupMode };
 
 export type { RolePermissions, InvoiceTemplateType, InvoicePaperSize };
 
@@ -31,6 +33,8 @@ export interface SetupStatusResponse {
   isSetupCompleted: boolean;
   developerEmail?: string | null;
   developerKeyConfigured?: boolean;
+  /** This build can upload backups to Google Drive */
+  onlineBackupAvailable?: boolean;
 }
 
 export interface SetupUnlockResponse {
@@ -47,7 +51,7 @@ export interface SetupCompletePayload {
   storeName: string;
   storeAddress: string;
   admin: { fullName: string; username: string; password: string };
-  backup: { dir?: string; frequency: string; time: string; weeklyDay?: number };
+  backup: { dir?: string; mode?: BackupMode; frequency: string; time: string; weeklyDay?: number };
   adminPermissions: Record<string, boolean>;
   policies: {
     allow_admin_create_cashier: boolean;
@@ -382,10 +386,51 @@ export interface BackupStatus {
   retention_limit: number;
   retained_count: number;
   pre_restore_keep: number;
+  cloud: {
+    mode: BackupMode;
+    connected: boolean;
+    account_email: string | null;
+    last_upload_at: string | null;
+    last_error: string | null;
+    pending_count: number;
+    next_retry_at: string | null;
+  };
+}
+
+/** Google Drive sign-in started from the app (polled until connected or failed) */
+export type CloudConnectProgress =
+  | { status: 'idle' }
+  | { status: 'waiting'; startedAt: string }
+  | { status: 'connected'; email: string }
+  | { status: 'failed'; error: string };
+
+export interface CloudBackupStatus {
+  mode: BackupMode;
+  /** This build can upload to Google Drive */
+  available: boolean;
+  connected: boolean;
+  account_email: string | null;
+  connected_at: string | null;
+  last_upload_at: string | null;
+  last_upload_file: string | null;
+  last_attempt_at: string | null;
+  last_error: string | null;
+  pending_count: number;
+  next_retry_at: string | null;
+  connect: CloudConnectProgress;
+}
+
+export interface CloudBackupFile {
+  id: string;
+  name: string;
+  size: number;
+  createdTime: string;
+  checksum: string | null;
 }
 
 export interface DeveloperSettingsPayload {
   backup_retention_limit: string;
+  backup_mode?: BackupMode;
   backup_frequency: string;
   backup_scheduled_time?: string;
   backup_weekly_day?: string;
@@ -419,6 +464,8 @@ export interface ElectronAPI {
   listPrinters: () => Promise<PrinterInfo[]>;
   selectBackupDir: () => Promise<string | null>;
   selectRestoreFile: () => Promise<string | null>;
+  /** Opens the Google sign-in page for online backups in the system browser */
+  openCloudSignIn: (url: string) => Promise<boolean>;
 }
 
 declare global {

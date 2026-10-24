@@ -37,6 +37,8 @@ const PUBLIC_API_ROUTES = new Set([
   'GET /api/setup/status',
   'POST /api/setup/unlock',
   'POST /api/setup/complete',
+  'POST /api/setup/cloud/connect',
+  'POST /api/setup/cloud/status',
   'POST /api/auth/login',
   'POST /api/auth/developer-login',
   'GET /api/license/status',

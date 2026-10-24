@@ -368,6 +368,10 @@ model BackupHistory {
   verified       Int      @default(1)
   errorMessage   String?  @map("error_message")
   secondaryPath  String?  @map("secondary_path")
+  cloudStatus    String?  @map("cloud_status")
+  cloudFileId    String?  @map("cloud_file_id")
+  cloudUploadedAt DateTime? @map("cloud_uploaded_at")
+  cloudError     String?  @map("cloud_error")
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("backup_history")

@@ -95,6 +95,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
     - **Pre-Restore Rollback Snapshot**: A safety snapshot (`pre_restore`) is taken before a restore. These are kept separately from the retention limit (newest 3). A restore is refused if the chosen file fails verification.
     - **Offline Backup Scheduler (`server/backup/scheduler.ts`)**: The Developer sets the frequency (`off` / `twice_daily` / `daily` / `weekly` + weekday); the Admin sets only the time of day (`PUT /api/backups/schedule`). The scheduler checks every minute and 15 s after startup. Runs missed while the PC was off are caught up with a single backup, failures are retried after a 15-minute backoff, and a clock moved backwards cannot stop backups. It is disabled under `TEST_MODE`.
     - **Backup Health dashboard card**: `GET /api/backups/status` reports the last success, next run, retained count / limit, and the last failure message.
+    - **Online backup to Google Drive (`server/backup/cloud/`, `docs/ONLINE_BACKUP_SETUP.md`)**: The Developer chooses the backup type (`backup_mode`): Offline, Online (owner's Google Drive; only the newest 2 copies stay on the PC) or Both, in the setup wizard or Developer → Backup Retention, and connects the store owner's Google account (browser sign-in, `drive.file` scope: the app sees only its "100% Offline POS Backups" folder). After every verified backup, the newest one is encrypted (AES-256-GCM, key derived from the master key) and uploaded; without internet it waits as pending and retries with backoff. Drive keeps the retention limit. Backup & Recovery → Online Backups restores any copy (`can_restore`), keeping the current Google connection. The Dashboard card shows last upload / waiting uploads.
     - **Backup permissions**: Listing and creating backups need `can_backup` and restoring needs `can_restore` (the Developer always passes). Denied attempts and every backup or restore outcome are audited.
     - **In-App Disaster Recovery Guide**: Detailed documentation and recovery procedures.
     - **Stock Zero Audit Utility**: Protected by confirmation code `RESET-ZERO-CONFIRM`.
@@ -107,7 +108,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 
 12. **Developer-Controlled Installation, License & Sessions (`SetupWizardModal.tsx`, `server/security/*`)**:
     - **Developer master key**: one TOTP key (one authenticator entry) for every installation, created with `npm run developer:key` (`.env.developer`, never committed) and baked into packaged builds. Developer sign-in uses the fixed developer email + a code from that key; each code works once (replay protection). Staff (Admin, Cashier, custom roles) sign in with username + password only.
-    - **Setup wizard (7 steps)**: unlock with the developer code → store name/address → first Admin (full name, username, password) → backup folder, frequency and time → Admin permissions and policies → Demo (N days) or Full → review and lock. No default staff accounts exist on a fresh install.
+    - **Setup wizard (7 steps)**: unlock with the developer code → store name/address → first Admin (full name, username, password) → backup type (Offline / Online / Both, with Connect Google Drive), folder, frequency and time → Admin permissions and policies → Demo (N days) or Full → review and lock. No default staff accounts exist on a fresh install.
     - **Demo / Full license**: signed `license_*` settings; Developer Settings → License extends the demo, starts a new one or activates Full. When a demo ends, Admin/Cashier cannot sign in (the login screen shows a notice) and signed-in staff are signed out; the Developer still can. Clock rollback and database edits cannot extend it. The header shows a countdown badge.
     - **Server sessions**: login returns a bearer token held only by the API process; every `/api` route (except status, setup, login, license status and the public store identity) needs it. Identity always comes from the session, never from headers or request bodies.
     - See `docs/DEVELOPER_RECOVERY.md` for a lost phone, key rotation and expired demos.
@@ -158,7 +159,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 │   ├── app.ts                  # Express app: session/license gate, routers, JSON error handler
 │   ├── routes/                 # One Router per area (auth, users, roles, sales, shifts, utilities, settings, ...)
 │   ├── http/                   # context.ts (actor, permissions, sendError), formatters.ts (snake_case mappers)
-│   ├── backup/                 # schedule.ts (pure math), scheduler.ts (offline scheduler)
+│   ├── backup/                 # schedule.ts (pure math), scheduler.ts (offline scheduler), cloud/ (Google Drive online backup)
 │   ├── database/
 │   │   ├── backup.ts           # Backup, verify, restore, stock zero, optimize
 │   │   ├── db.ts               # better-sqlite3 connection, pragmas, schema + column migrations, seed
@@ -215,7 +216,7 @@ When modifying or extending this project, you **MUST** follow these strict rules
 ### 1. 100% Offline Integrity (CRITICAL)
 - The application must remain **100% offline-first**. Never introduce dependencies on external cloud APIs, CDN scripts, remote fonts, or network-required auth services.
 - All database queries must execute locally against `data/pharmacy.db` via `better-sqlite3` and `@prisma/client`.
-- Backups must write to the local file system (`./backups`) or attached local USB storage.
+- Backups are always written and verified on the local file system (`./backups`) or attached USB storage first; the optional online copy (Google Drive) is uploaded from that verified file.
 
 ### 2. SQLite Database & SQL Rules
 - **Pragmas**: Always ensure `PRAGMA foreign_keys = ON;`, `PRAGMA journal_mode = WAL;`, and `PRAGMA busy_timeout = 5000;` are respected.

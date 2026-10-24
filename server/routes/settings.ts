@@ -3,6 +3,7 @@ import { prisma } from '../database/prisma';
 import { logSecurityAudit } from '../security/audit';
 import { DEVELOPER_TOTP_STATE_KEYS } from '../security/developerAuth';
 import { LICENSE_SETTING_KEYS } from '../security/license';
+import { CLOUD_SETTING_KEYS } from '../backup/cloud/cloudBackup';
 import { parseBody, settingsSchema } from '../validation/schemas';
 import { DEFAULT_DEVELOPER_FOOTER, isValidPaperSize, isValidTemplate, normalizePaperSize, normalizeTemplate } from '../../shared/invoice';
 import { DEFAULT_INVOICE_SETTINGS, DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
@@ -14,8 +15,8 @@ const router = Router();
 
 // Shown on the login screen before anyone signs in; everything else needs a session
 const PUBLIC_SETTING_KEYS = ['store_name', 'store_address', 'store_phone', 'currency_symbol'];
-// Signed license and TOTP replay state are never readable or writable through /api/settings
-const INTERNAL_SETTING_KEYS = [...LICENSE_SETTING_KEYS, ...DEVELOPER_TOTP_STATE_KEYS];
+// Signed license, TOTP replay state and the Google Drive sign-in are never readable or writable through /api/settings
+const INTERNAL_SETTING_KEYS = [...LICENSE_SETTING_KEYS, ...DEVELOPER_TOTP_STATE_KEYS, ...CLOUD_SETTING_KEYS];
 
 router.get('/api/settings', async (req: Request, res: Response) => {
   try {
@@ -80,6 +81,7 @@ const DEVELOPER_ONLY_SETTING_KEYS = [
   'allow_admin_edit_store_identity',
   'allow_admin_hide_store_identity',
   'backup_retention_limit',
+  'backup_mode',
   'backup_frequency',
   'backup_scheduled_time',
   'backup_weekly_day',

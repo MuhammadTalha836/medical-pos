@@ -14,6 +14,9 @@ import { buildDemoLicense, buildFullLicense } from '../security/licenseMath';
 import { DEFAULT_ADMIN_PERMISSIONS, normalizePermissions } from '../../shared/permissions';
 import { parseBody, setupUnlockSchema, setupCompleteSchema } from '../validation/schemas';
 import { isSetupLocked, sendError } from '../http/context';
+import { getCloudStatus, getDriveConnectProgress, startDriveConnect } from '../backup/cloud/cloudBackup';
+import { isDriveConfigured } from '../backup/cloud/googleDrive';
+import { DEFAULT_BACKUP_MODE } from '../../shared/backup';
 import { sessionUserPayload } from '../http/formatters';
 
 // First-time setup wizard, unlocked only by the developer master authenticator code
@@ -44,7 +47,8 @@ router.get('/api/setup/status', async (_req: Request, res: Response) => {
       success: true,
       isSetupCompleted: await isSetupLocked(),
       developerEmail: getDeveloperEmail(),
-      developerKeyConfigured: isDeveloperKeyConfigured()
+      developerKeyConfigured: isDeveloperKeyConfigured(),
+      onlineBackupAvailable: isDriveConfigured()
     });
   } catch (error: unknown) {
     sendError(res, error);
@@ -98,6 +102,38 @@ router.post('/api/setup/unlock', async (req: Request, res: Response) => {
   }
 });
 
+// Google Drive for online backups can be connected from the wizard (the developer is not signed in yet)
+async function requireSetupToken(req: Request, res: Response): Promise<boolean> {
+  if (await isSetupLocked()) {
+    res.status(403).json(SETUP_LOCKED_ERROR);
+    return false;
+  }
+  if (typeof req.body?.setupToken !== 'string' || !isSetupTokenValid(req.body.setupToken)) {
+    res.status(401).json({ error: 'Setup session expired. Unlock the wizard with the developer code again.' });
+    return false;
+  }
+  return true;
+}
+
+router.post('/api/setup/cloud/connect', async (req: Request, res: Response) => {
+  try {
+    if (!(await requireSetupToken(req, res))) return;
+    res.json(await startDriveConnect({ username: 'Developer (setup)' }));
+  } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+router.post('/api/setup/cloud/status', async (req: Request, res: Response) => {
+  try {
+    if (!(await requireSetupToken(req, res))) return;
+    const status = await getCloudStatus();
+    res.json({ available: status.available, connected: status.connected, account_email: status.account_email, connect: getDriveConnectProgress() });
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
 router.post('/api/setup/complete', async (req: Request, res: Response) => {
   try {
     if (await isSetupLocked()) {
@@ -109,7 +145,7 @@ router.post('/api/setup/complete', async (req: Request, res: Response) => {
       storeName: string;
       storeAddress: string;
       admin: { fullName: string; username: string; password: string };
-      backup: { dir?: string; frequency: string; time: string; weeklyDay?: number };
+      backup: { dir?: string; mode?: string; frequency: string; time: string; weeklyDay?: number };
       adminPermissions: Record<string, boolean>;
       policies: Record<string, boolean>;
       license: { mode: 'full' } | { mode: 'demo'; demoDays: number };
@@ -153,6 +189,7 @@ router.post('/api/setup/complete', async (req: Request, res: Response) => {
     const settings: Record<string, string> = {
       store_name: body.storeName.trim(),
       store_address: body.storeAddress.trim(),
+      backup_mode: body.backup.mode ?? DEFAULT_BACKUP_MODE,
       backup_frequency: body.backup.frequency,
       backup_scheduled_time: body.backup.time,
       backup_weekly_day: String(body.backup.weeklyDay ?? 0),

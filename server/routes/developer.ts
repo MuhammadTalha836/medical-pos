@@ -2,6 +2,14 @@ import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
 import { pruneBackupsByRetentionLimit, getConfiguredBackupDir } from '../database/backup';
 import { isValidBackupTime, isValidFrequency } from '../backup/scheduler';
+import {
+  disconnectDrive,
+  getCloudStatus,
+  getDriveConnectProgress,
+  runCloudUploads,
+  startDriveConnect
+} from '../backup/cloud/cloudBackup';
+import { isBackupMode } from '../../shared/backup';
 import { hashPassword } from '../security/passwords';
 import { logSecurityAudit } from '../security/audit';
 import { getDeveloperEmail } from '../security/developerKey';
@@ -24,6 +32,7 @@ const router = Router();
 // Settings the Developer edits on the Developer page (developer_email is read-only: it comes from the master key)
 const WRITABLE_DEVELOPER_SETTING_KEYS = [
   'backup_retention_limit',
+  'backup_mode',
   'backup_frequency',
   'backup_scheduled_time',
   'backup_weekly_day',
@@ -90,6 +99,9 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
     }
 
     // Backup policy validation
+    if (updates.backup_mode !== undefined && !isBackupMode(updates.backup_mode)) {
+      return res.status(400).json({ error: 'Invalid backup type. Allowed: offline, online, both' });
+    }
     if (updates.backup_frequency !== undefined && !isValidFrequency(updates.backup_frequency)) {
       return res.status(400).json({ error: 'Invalid backup frequency. Allowed: off, twice_daily, daily, weekly' });
     }
@@ -158,9 +170,9 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
       );
     }
 
-    // Apply a lowered retention limit right away (only verified routine backups in the backup folder)
-    if (updates.backup_retention_limit) {
-      pruneBackupsByRetentionLimit(Number(updates.backup_retention_limit), getConfiguredBackupDir());
+    // Apply a lowered retention limit (or Online mode's smaller local copy count) right away
+    if (updates.backup_retention_limit || updates.backup_mode) {
+      pruneBackupsByRetentionLimit(undefined, getConfiguredBackupDir());
     }
 
     await logSecurityAudit({
@@ -173,6 +185,60 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
     });
 
     res.json({ success: true, message: 'Developer settings updated successfully' });
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+// -------------------------------------------------------------
+// Online backup (Google Drive): only the Developer connects or changes the account
+// -------------------------------------------------------------
+async function requireDeveloper(req: Request, res: Response) {
+  const actingUser = await getActingUser(req);
+  if (!actingUser || actingUser.role !== 'developer') {
+    res.status(403).json({ error: 'Access denied: Developer role required' });
+    return null;
+  }
+  return actingUser;
+}
+
+router.get('/api/developer/cloud', async (req: Request, res: Response) => {
+  try {
+    if (!(await requireDeveloper(req, res))) return;
+    res.json({ ...(await getCloudStatus()), connect: getDriveConnectProgress() });
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+router.post('/api/developer/cloud/connect', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await requireDeveloper(req, res);
+    if (!actingUser) return;
+    res.json(await startDriveConnect({ id: actingUser.id, username: actingUser.username }));
+  } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+router.post('/api/developer/cloud/disconnect', async (req: Request, res: Response) => {
+  try {
+    const actingUser = await requireDeveloper(req, res);
+    if (!actingUser) return;
+    await disconnectDrive({ id: actingUser.id, username: actingUser.username });
+    res.json({ success: true, message: 'Google Drive disconnected. Online backups are paused until it is connected again.' });
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+// Retry waiting uploads now instead of waiting for the next automatic retry
+router.post('/api/developer/cloud/upload', async (req: Request, res: Response) => {
+  try {
+    if (!(await requireDeveloper(req, res))) return;
+    const outcome = await runCloudUploads({ force: true });
+    if (outcome.status === 'failed') return res.status(502).json({ error: outcome.error });
+    res.json(outcome);
   } catch (error: unknown) {
     sendError(res, error);
   }

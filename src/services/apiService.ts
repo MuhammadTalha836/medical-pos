@@ -1,5 +1,8 @@
 import {
   BackupStatus,
+  CloudBackupFile,
+  CloudBackupStatus,
+  CloudConnectProgress,
   Company,
   Product,
   SaleInvoice,
@@ -173,6 +176,8 @@ export const api = {
     }),
   resetStockZero: (data: { company_id?: number; confirmation_code: string }) => post<any>('/utilities/stock-zero', data),
   optimizeDatabase: () => post<any>('/utilities/optimize'),
+  getCloudBackups: () => get<CloudBackupFile[]>('/utilities/cloud-backups'),
+  restoreCloudBackup: (fileId: string) => post<SuccessMessage>('/utilities/restore-cloud', { fileId }),
 
   // Cashier shifts & drawer reconciliation
   getActiveShift: (userId: number) =>
@@ -199,6 +204,15 @@ export const api = {
   // Developer-protected settings, license and audit log
   getDeveloperSettings: () => get<DeveloperSettingsPayload>('/developer/settings'),
   updateDeveloperSettings: (data: Partial<DeveloperSettingsPayload>) => put<SuccessMessage>('/developer/settings', data),
+  getCloudBackupStatus: () => get<CloudBackupStatus>('/developer/cloud'),
+  connectCloudBackup: () => post<{ authUrl: string }>('/developer/cloud/connect'),
+  disconnectCloudBackup: () => post<SuccessMessage>('/developer/cloud/disconnect'),
+  uploadCloudBackupNow: () =>
+    post<{ status: 'idle'; reason: string } | { status: 'uploaded'; filename: string; pruned: number }>('/developer/cloud/upload'),
+  // Setup wizard (before the developer account exists): authorized by the setup token
+  connectCloudBackupInSetup: (setupToken: string) => post<{ authUrl: string }>('/setup/cloud/connect', { setupToken }),
+  getCloudBackupSetupStatus: (setupToken: string) =>
+    post<{ available: boolean; connected: boolean; account_email: string | null; connect: CloudConnectProgress }>('/setup/cloud/status', { setupToken }),
   developerResetPassword: (userId: number, newPassword: string) =>
     post<SuccessMessage>(`/developer/users/${userId}/reset-password`, { new_password: newPassword }),
   getDeveloperAuditLogs: (params?: { page?: number; limit?: number; module?: string; action?: string; status?: string; user?: string }) =>
