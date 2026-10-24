@@ -14,7 +14,9 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 
 1. **POS Counter Sales (`PosPage.tsx`, `usePosStore.ts`)**:
    - **Keyboard-First Workflow**: High-speed counter checkout powered by dedicated hotkeys:
-     - `F2`: Start New Invoice (with confirmation prompt if unsaved cart items exist).
+     - `F2` / `Ctrl+T`: Open a new invoice tab (the current invoice stays open).
+     - `Ctrl+→` / `Ctrl+Tab`, `Ctrl+←` / `Ctrl+Shift+Tab`: Next / previous invoice tab (wraps around); `Ctrl+1`…`Ctrl+9`: jump to tab N.
+     - `Ctrl+W`: Close the current invoice tab (asks first if it has items).
      - `F3`: Focus and select Product / Barcode Search input.
      - `F4`: Focus Customer Name / Phone input.
      - `F6`: Focus Bill Discount (%) input (strictly guarded by `can_discount` cashier permission).
@@ -22,6 +24,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
      - `F9`: Save Invoice without printing (anti-duplicate lock protected).
      - `F10`: Save & Print Receipt (or reprint most recently completed sale).
      - `Esc`: Safely close modal dialogs or dismiss search results.
+   - **Invoice tabs (`InvoiceTabs.tsx`)**: Up to 10 open invoices, like browser tabs, so a customer who pauses (e.g. takes a call) keeps their order while the next customer is served. Each tab has its own cart, customer, discount, payment and cash received. Saving a sale closes only its tab. Open tabs are saved on the computer (`localStorage` key `pharmacare_pos_invoices_v1`, zustand `persist`) and come back after a restart; they belong to the user who opened them (another user starts with one empty tab) and are cleared on sign-out. The server re-checks stock and prices when a restored invoice is saved.
    - **Visual Shortcut Ribbon & HUD**: Persistent bottom ribbon displaying active shortcut hotkeys and an interactive **Shortcuts Guide** dialog. High-contrast `<kbd>` badge pills across all key form inputs.
    - **Anti-Duplicate Invoice Lock & Concurrency Defense**: Synchronous frontend submission lock (`isSubmittingRef`) and `e.repeat` suppression prevent double-submissions from rapid clicks or held keys. Backend moves invoice sequence calculation inside `prisma.$transaction` with a 5-attempt retry loop handling SQLite locks (`SQLITE_BUSY`) and collision retries.
    - **Instant Barcode & Text Search**: Real-time matching across Brand Name, Generic Formula, C-Code, and P-Code/Barcode.
@@ -44,6 +47,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Protected store identity**: Store name/address come from the Developer-protected settings. Admins cannot hide them unless the Developer enables `allow_admin_hide_store_identity` (enforced in `GET`/`POST /api/settings`).
    - **Developer invoice footer**: `developer_invoice_footer` (max 500 chars, multi-line) prints on every design and width, wrapping long text with `overflow-wrap: anywhere`.
    - **Sale snapshots**: Each sale stores `store_name_snapshot`, `store_address_snapshot` and `invoice_footer_snapshot`, so reprints match the original receipt. Older sales without a snapshot fall back to current settings.
+   - **Printing without the dialog (`src/utils/printReceipt.ts`, `ReceiptPrinterCard.tsx`, `electron/main.ts`)**: Each computer picks its receipt printer and can turn on "Print without dialog" (Settings → Invoice → Receipt Printer; stored in `localStorage` key `pharmacare_print_prefs`, because each counter has its own printer). The receipt is sent as a standalone HTML document to the `print:thermal` IPC, which prints it from a hidden, sandboxed window sized to the roll width and the receipt's real length, so the roll is not fed past the end. If the printer fails, or the option is off, the normal print dialog opens. `printers:list` returns the installed printers.
    - **Granular Field Visibility Controls**: Admin checkboxes across Store Info, Cashier/Customer Info, Itemized Table Columns, Financial Summary, and Regulatory Policies.
    - **Settings authorization**: `POST /api/settings` requires the Developer or a role with the `settings` permission (the Developer decides whether the Admin has it); developer-only keys (footer, RBAC toggles, backup policy) are stripped for non-developers and `setup_completed` / `developer_email` can never be written through it.
 
@@ -52,9 +56,12 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Stock Conversion Card**: Real-time formula card displaying exact pack vs individual-unit inventory deduction.
    - **Multi-Level Enforcement**: Disables `+ Loose` buttons in search and strikes through `[Loose]` cart toggles for non-openable medicines. Automatically clamps quantities to `min_sale_qty`. Backend rejects loose unit sales (HTTP 400), sub-minimum sales (HTTP 400), and loose returns for sealed medicines.
 
-5. **Customer Khata (Credit / Udhar) Management (`CustomerKhataPage.tsx`)**:
-   - Customer ledger and balance tracking.
-   - Customer selection required for Credit POS sales.
+5. **Customers & Khata (`CustomersPage.tsx`, `components/customers/*`)** (sidebar: Customers):
+   - **Customers tab (`CustomersTab.tsx`)**: every customer with phone, address, invoice count, total bought and khata balance; Edit (`can_edit_customer`) and Delete (`can_delete_customer`). The arrow at the start of a row expands that customer's invoices; clicking one opens `InvoiceModal.tsx` with the full invoice and Print (reprint). A customer can be deleted only with no invoices, payments or balance (`DELETE /api/customers/:id` answers 409 otherwise).
+   - **Khata (Udhaar) tab (`KhataTab.tsx`)**: totals (udhaar to receive, customers with udhaar, over limit), customers with a balance, Receive Payment (`can_receive_payment`), and per customer the credit invoices and payments received (balance before → after).
+   - **POS customer picker (`CustomerPicker.tsx`)**: the customer field shows "Counter Customer" by default. Typing a name or phone searches saved customers (`GET /api/customers/search`) and shows their khata balance. A new name with a phone can be saved on the spot (`can_add_customer`); a phone that already belongs to someone offers that customer instead (409 from `POST /api/customers`).
+   - **Credit (Khata) sales require a saved customer** (checked by the server). The sale raises the customer's balance, is blocked past the customer's credit limit (0 = no limit), and a return on it lowers the balance.
+   - Every customer needs a phone number, unique by digits (`normalizePhone` in `shared/customers.ts`).
    - Partial or full cash recovery payment recording.
    - Customer account statements and history export.
 
@@ -234,6 +241,7 @@ When modifying or extending this project, you **MUST** follow these strict rules
 - **POS Ergonomics**: Pharmacy sales staff work under high transaction volume. Keep inputs autofocus-ready, provide visual stock warnings (Green = in stock, Amber = low stock, Red = out of stock), and preserve keyboard shortcuts (`F2`-`F10`, `Esc`).
 - **Invoice & Print Integrity**:
   - Printing is thermal-only: every template must render correctly on both 58mm and 80mm rolls (no sheet formats).
+  - Print receipts through `printReceipt` / `printReceiptIn` (`src/utils/printReceipt.ts`), never `window.print()` directly; full-page reports still use `window.print()`.
   - Receipt styles in `@media print` must hide the app chrome (`body * { visibility: hidden; }`) and isolate `#thermal-receipt-printable`.
   - Use monospace typography (`JetBrains Mono` / `Courier`) for tabular receipts.
   - The Developer invoice footer is strictly mandatory and cannot be hidden on printed receipts.

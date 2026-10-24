@@ -1,10 +1,11 @@
 Pending:-
-multi invoice or order taking system
 backup type developer jab medical store par install kr raha ho tab backup type online/ offline or  both , online backup mean developer add the email jaha us email ke google drive me backup store ho ga 
-invoice without brower like press print without any chrome popup they print invoice from printer
 
 
 Complete:- 
+multi invoice or order taking system
+invoice without brower like press print without any chrome popup they print invoice from printer
+
 
 software me developer information jaha possiable ho sakti hai show krwao 
 developer apni information add kr de ga like name , number email, or developer ye b cheez select krye ga ke kon konsi jaga par keya keya show ho ga like name or number as tarah ta ke developer ki advertisment b ho jaye 

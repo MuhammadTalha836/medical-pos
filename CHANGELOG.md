@@ -5,13 +5,23 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 ## [Unreleased] — 2026-10-24
 
 ### Added
+- Customers page (sidebar "Customers", replaces "Customer Khata"): a **Customers** tab listing every customer with Edit and Delete; the arrow on a row shows that customer's invoices, and clicking one opens the full invoice with Print (reprint). A **Khata (Udhaar)** tab shows who owes how much, Receive Payment, and each customer's credit invoices and payments. Customers with invoices, payments or udhaar cannot be deleted.
+- POS customer picker: the customer field searches saved customers by name or phone, shows their khata balance and limit, and saves a new customer (name + phone) on the spot. It stays "Counter Customer" by default; a phone that already belongs to someone offers that customer instead of a copy.
+- Customer history: Khata → Ledger lists every invoice of the customer (cash or credit) with a View button showing the items, plus totals bought, on credit and paid.
+- POS invoice tabs: up to 10 open invoices at once, like browser tabs, so a paused customer's order waits while the next customer is served. `F2`/`Ctrl+T` new, `Ctrl+←/→` (or `Ctrl+Tab`) switch, `Ctrl+1…9` jump, `Ctrl+W` close (asks if the invoice has items). Saving a sale closes only its tab. Open invoices survive an app restart and are cleared on sign-out.
+- Print without dialog: Settings → Invoice → Receipt Printer (per computer) picks the printer and turns on direct printing; receipts then go straight to the printer, cut at their real length. A test print button is included. Without it, or if the printer fails, the normal print dialog opens.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
+
+### Fixed
+- Credit sales now reach the customer's khata: they require a saved customer, raise the balance and appear in the ledger (before, the POS never linked the customer, so khata balances did not change). Credit sales past the customer's credit limit are blocked (0 = no limit). Returning goods from a credit sale lowers the balance.
+- New and edited khata customers need a phone number, unique per customer.
 
 ### Changed (design system, phase A)
 - Larger type everywhere (nothing under 12px; body text 15px), 40px inputs/selects/buttons with one shared style (`field-input`, `field-select`, `field-textarea`, `btn-primary`/`btn-secondary`/`btn-danger`/`btn-print`, `btn-sm`, `field-sm`), bigger icons, no all-caps labels, flat buttons without gradients.
 - Plain sidebar names (New Sale, Sales & Returns, Customer Khata, Dashboard, Shifts, Medicines, Purchases, Reports, Backup & Recovery, Settings, Developer) with a high-contrast active item.
-- Receipts no longer print sample phone/license/address text when the store has not filled them in.
+- Receipts and shift slips no longer print sample phone/license/address text when the store has not filled them in.
+- F10 reprint of the last sale now also works after leaving and returning to the POS.
 
 ### Clean-up (refactor, no feature change)
 - `server/api.ts` (4,358 lines) split into `server/app.ts`, `server/routes/*` (17 routers) and `server/http/*` helpers; routes, status codes and responses are unchanged (all suites pass).

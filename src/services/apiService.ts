@@ -7,6 +7,7 @@ import {
   SystemSettings,
   User,
   Customer,
+  CustomerLedger,
   Role,
   CashierShift,
   ShiftSummary,
@@ -37,8 +38,9 @@ function getSessionToken(): string | null {
   }
 }
 
-class ApiError extends Error {
-  constructor(message: string, public status: number, public code?: string) {
+export class ApiError extends Error {
+  /** `data` is the full error body, for answers that carry details (e.g. the existing customer on a 409) */
+  constructor(message: string, public status: number, public code?: string, public data?: any) {
     super(message);
   }
 }
@@ -69,7 +71,7 @@ async function request<T>(method: string, path: string, options: { body?: unknow
     if ((res.status === 401 && errorData.code === 'SESSION_REQUIRED') || errorData.code === 'LICENSE_EXPIRED') {
       window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { code: errorData.code } }));
     }
-    throw new ApiError(errorData.error || `HTTP ${res.status}: ${res.statusText}`, res.status, errorData.code);
+    throw new ApiError(errorData.error || `HTTP ${res.status}: ${res.statusText}`, res.status, errorData.code, errorData);
   }
   return res.json();
 }
@@ -113,12 +115,13 @@ export const api = {
 
   // Customers & credit (khata)
   getCustomers: () => get<Customer[]>('/customers'),
-  createCustomer: (data: Partial<Customer>) => post<{ success: boolean; id: number }>('/customers', data),
+  createCustomer: (data: Partial<Customer>) => post<{ success: boolean; id: number; customer: Customer }>('/customers', data),
+  searchCustomers: (q: string) => get<Customer[]>('/customers/search', { q }),
   updateCustomer: (id: number, data: Partial<Customer>) => put<Success>(`/customers/${id}`, data),
   recordCustomerPayment: (customerId: number, data: { amount: number; payment_method: string; notes?: string; shift_id?: number | null }) =>
     post<{ success: boolean; new_balance: number }>(`/customers/${customerId}/payment`, data),
-  getCustomerLedger: (customerId: number) =>
-    get<{ customer: Customer; sales: any[]; payments: any[] }>(`/customers/${customerId}/ledger`),
+  getCustomerLedger: (customerId: number) => get<CustomerLedger>(`/customers/${customerId}/ledger`),
+  deleteCustomer: (id: number) => del<Success>(`/customers/${id}`),
 
   // Companies
   getCompanies: () => get<Company[]>('/companies'),

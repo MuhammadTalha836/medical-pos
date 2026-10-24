@@ -1,6 +1,9 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
-import { sessionIdentity, sendError } from '../http/context';
+import { getActingUser, hasRolePermission, requirePermission, sessionIdentity, sendError } from '../http/context';
+import { customerSchema, parseBody } from '../validation/schemas';
+import { normalizePhone } from '../../shared/customers';
+import { logSecurityAudit } from '../security/audit';
 
 // Customers and credit ledger (khata)
 const router = Router();
@@ -10,6 +13,7 @@ router.get('/api/customers', async (_req: Request, res: Response) => {
     const customers = await prisma.$queryRaw<any[]>`
       SELECT c.id, c.name, c.phone, c.address, c.credit_limit, c.current_balance, c.created_at,
         (SELECT COUNT(*) FROM sales s WHERE s.customer_id = c.id) as invoices_count,
+        (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.status != 'returned') as total_purchases,
         (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.payment_type = 'Credit') as total_credit_sales,
         (SELECT COALESCE(SUM(p.amount), 0) FROM customer_payments p WHERE p.customer_id = c.id) as total_payments
       FROM customers c
@@ -21,19 +25,88 @@ router.get('/api/customers', async (_req: Request, res: Response) => {
   }
 });
 
+type CustomerRow = { id: number; name: string; phone: string | null; currentBalance: number; creditLimit: number };
+
+// Client contract (snake_case), as in GET /api/customers
+const customerPayload = (c: CustomerRow & { address?: string | null }) => ({
+  id: c.id,
+  name: c.name,
+  phone: c.phone,
+  address: c.address ?? null,
+  current_balance: c.currentBalance,
+  credit_limit: c.creditLimit
+});
+
+const customerFields = { id: true, name: true, phone: true, address: true, currentBalance: true, creditLimit: true } as const;
+
+// Phones are stored as typed; two customers match when their digits match
+async function findByPhone(phone: string, exceptId?: number) {
+  const digits = normalizePhone(phone);
+  if (!digits) return null;
+  const withPhone = await prisma.customer.findMany({ where: { phone: { not: null } }, select: customerFields });
+  return withPhone.find(c => c.id !== exceptId && normalizePhone(c.phone) === digits) ?? null;
+}
+
+const duplicatePhone = (res: Response, existing: CustomerRow) =>
+  res.status(409).json({
+    error: `This phone number already belongs to ${existing.name}.`,
+    customer: customerPayload(existing)
+  });
+
+// POS customer picker: name or phone search
+router.get('/api/customers/search', async (req: Request, res: Response) => {
+  try {
+    const actor = await getActingUser(req);
+    if (!actor || !((await hasRolePermission(actor.role, 'pos')) || (await hasRolePermission(actor.role, 'khata')))) {
+      return res.status(403).json({ error: 'You do not have permission to look up customers.' });
+    }
+    const q = String(req.query.q ?? '').trim().toLowerCase().slice(0, 80);
+    if (!q) return res.json([]);
+    const digits = normalizePhone(q);
+
+    const all = await prisma.customer.findMany({ select: customerFields });
+    const rank = (c: CustomerRow) => {
+      const name = c.name.toLowerCase();
+      const phone = normalizePhone(c.phone);
+      if (digits.length >= 3 && phone === digits) return 0;
+      if (name === q) return 1;
+      if (name.startsWith(q)) return 2;
+      if (name.includes(q)) return 3;
+      if (digits.length >= 3 && phone.includes(digits)) return 4;
+      return -1;
+    };
+    const matches = all
+      .map(c => ({ c, r: rank(c) }))
+      .filter(m => m.r >= 0)
+      .sort((a, b) => a.r - b.r || a.c.name.localeCompare(b.c.name))
+      .slice(0, 8)
+      .map(m => customerPayload(m.c));
+    res.json(matches);
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
 router.post('/api/customers', async (req: Request, res: Response) => {
   try {
-    const { name, phone, address, credit_limit } = req.body;
-    const newCustomer = await prisma.customer.create({
+    if (!(await requirePermission(req, res, 'can_add_customer', 'You do not have permission to add customers.'))) return;
+    const body = parseBody(customerSchema, req.body, res);
+    if (!body) return;
+
+    const existing = await findByPhone(body.phone);
+    if (existing) return duplicatePhone(res, existing);
+
+    const created = await prisma.customer.create({
       data: {
-        name: name.trim(),
-        phone: phone || null,
-        address: address || null,
-        creditLimit: parseFloat(credit_limit) || 0,
+        name: body.name,
+        phone: body.phone,
+        address: body.address || null,
+        creditLimit: body.credit_limit ?? 0,
         currentBalance: 0.0
-      }
+      },
+      select: customerFields
     });
-    res.json({ success: true, id: newCustomer.id });
+    res.json({ success: true, id: created.id, customer: customerPayload(created) });
   } catch (error: unknown) {
     sendError(res, error, 400);
   }
@@ -41,15 +114,21 @@ router.post('/api/customers', async (req: Request, res: Response) => {
 
 router.put('/api/customers/:id', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'can_edit_customer', 'You do not have permission to edit customers.'))) return;
     const idNum = Number(req.params.id);
-    const { name, phone, address, credit_limit } = req.body;
+    const body = parseBody(customerSchema, req.body, res);
+    if (!body) return;
+
+    const existing = await findByPhone(body.phone, idNum);
+    if (existing) return duplicatePhone(res, existing);
+
     await prisma.customer.update({
       where: { id: idNum },
       data: {
-        name: name.trim(),
-        phone: phone || null,
-        address: address || null,
-        creditLimit: parseFloat(credit_limit) || 0
+        name: body.name,
+        phone: body.phone,
+        address: body.address || null,
+        creditLimit: body.credit_limit ?? 0
       }
     });
     res.json({ success: true });
@@ -136,7 +215,8 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
         saleDate: true,
         netTotal: true,
         paymentType: true,
-        status: true
+        status: true,
+        _count: { select: { items: true } }
       },
       orderBy: { id: 'desc' }
     });
@@ -172,7 +252,8 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
         sale_date: s.saleDate,
         net_total: s.netTotal,
         payment_type: s.paymentType,
-        status: s.status
+        status: s.status,
+        items_count: s._count.items
       })),
       payments: payments.map(p => ({
         id: p.id,
@@ -185,6 +266,44 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
         user_name: p.userName
       }))
     });
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+// Only a customer without history can be deleted: invoices and payments feed shift totals and reports
+router.delete('/api/customers/:id', async (req: Request, res: Response) => {
+  try {
+    const actor = await requirePermission(req, res, 'can_delete_customer', 'You do not have permission to delete customers.');
+    if (!actor) return;
+    const idNum = Number(req.params.id);
+    const customer = await prisma.customer.findUnique({
+      where: { id: idNum },
+      include: { _count: { select: { sales: true, payments: true } } }
+    });
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+    const history = [
+      customer._count.sales > 0 && `${customer._count.sales} invoice(s)`,
+      customer._count.payments > 0 && `${customer._count.payments} khata payment(s)`,
+      Math.abs(customer.currentBalance) > 0.004 && 'an outstanding khata balance'
+    ].filter(Boolean);
+    if (history.length > 0) {
+      return res.status(409).json({
+        error: `${customer.name} has ${history.join(', ')}. Customers with history cannot be deleted.`
+      });
+    }
+
+    await prisma.customer.delete({ where: { id: idNum } });
+    await logSecurityAudit({
+      action: 'CUSTOMER_DELETED',
+      module: 'Customers',
+      details: `Deleted customer #${customer.id} ${customer.name} (${customer.phone || 'no phone'})`,
+      affectedUser: customer.name,
+      userId: actor.id,
+      userName: actor.username
+    });
+    res.json({ success: true });
   } catch (error: unknown) {
     sendError(res, error);
   }

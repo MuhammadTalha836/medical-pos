@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { CashierShift, SystemSettings } from '../../types';
 import { Printer, CheckCircle } from 'lucide-react';
 import { normalizePaperSize } from '../../../shared/invoice';
 import { formatDuration, moneyFormatter } from '../../utils/format';
+import { printReceipt } from '../../utils/printReceipt';
 
 interface ShiftThermalReceiptProps {
   shift: CashierShift;
@@ -18,17 +19,19 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
   onClose
 }) => {
   const storeName = settings?.store_name || 'PharmaCare Pro';
-  const storeAddress = settings?.store_address || 'Suite #12-14, Health Plaza, Main Commercial Ave';
-  const storePhone = settings?.store_phone || '+92 300 9876543 / 051-4567890';
-  const drugLicenseNo = settings?.drug_license_no || 'DL-PHARM-2024-9981';
+  // Empty details are left off the slip, never filled with sample text
+  const storeAddress = settings?.store_address || '';
+  const storePhone = settings?.store_phone || '';
+  const drugLicenseNo = settings?.drug_license_no || '';
   const money = moneyFormatter(settings);
   const is58 = normalizePaperSize(settings?.invoice_paper_size ?? settings?.paper_width) === '58mm';
 
+  const receiptRef = useRef<HTMLDivElement>(null);
   const handlePrint = () => {
     if (onPrint) {
       onPrint();
     } else {
-      window.print();
+      void printReceipt(receiptRef.current);
     }
   };
 
@@ -67,7 +70,7 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
           {onClose && (
             <button
               onClick={onClose}
-              className="btn-cancel text-[12px]"
+              className="btn-secondary btn-sm"
             >
               Close
             </button>
@@ -78,15 +81,17 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
       {/* Printable Receipt DOM */}
       <div
         id="thermal-receipt-printable"
+        ref={receiptRef}
+        data-paper-size={is58 ? '58mm' : '80mm'}
         className={`bg-white text-black font-mono leading-tight border border-slate-300 shadow-xs select-text ${is58 ? 'print-paper-58mm w-[58mm] p-2 text-[10px]' : 'print-paper-80mm w-[80mm] p-4 text-[11px]'}`}
         style={{ fontFamily: "'JetBrains Mono', 'Courier New', Courier, monospace" }}
       >
         {/* Pharmacy Header */}
         <div className="text-center pb-2 border-b border-black">
           <div className="font-bold text-[14px] tracking-tight">{storeName}</div>
-          <div className="text-[10px]">{storeAddress}</div>
-          <div className="text-[10px]">Tel: {storePhone}</div>
-          <div className="text-[10px]">Lic: {drugLicenseNo}</div>
+          {storeAddress && <div className="text-[10px]">{storeAddress}</div>}
+          {storePhone && <div className="text-[10px]">Tel: {storePhone}</div>}
+          {drugLicenseNo && <div className="text-[10px]">Lic: {drugLicenseNo}</div>}
           <div className="font-bold text-[12px] mt-2 uppercase tracking-wider py-1 border-y border-dashed border-black">
             CASHIER SHIFT RECONCILIATION
           </div>

@@ -11,7 +11,7 @@ import {
   BarChart3,
   Database,
   Settings,
-  CreditCard,
+  Users,
   ChevronLeft,
   ChevronRight,
   Timer,
@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, setti
   const cashierNavItems: NavItem[] = [
     { id: 'pos', label: 'New Sale', icon: ShoppingCart, hotkey: 'F1' },
     { id: 'sales', label: 'Sales & Returns', icon: Receipt },
-    { id: 'khata', label: 'Customer Khata', icon: CreditCard },
+    { id: 'khata', label: 'Customers', icon: Users },
   ];
 
   const adminNavItems: NavItem[] = [

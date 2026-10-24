@@ -95,7 +95,40 @@ export interface Customer {
   credit_limit: number;
   current_balance: number;
   invoices_count?: number;
+  /** Sum of the customer's non-returned invoices */
+  total_purchases?: number;
+  total_credit_sales?: number;
+  total_payments?: number;
   created_at?: string;
+}
+
+/** One invoice in a customer's history (GET /api/customers/:id/ledger) */
+export interface CustomerInvoiceRow {
+  id: number;
+  invoice_no: string;
+  sale_date: string;
+  net_total: number;
+  payment_type: string;
+  status: string;
+  items_count: number;
+}
+
+/** One khata payment received from a customer */
+export interface CustomerPaymentRow {
+  id: number;
+  amount: number;
+  payment_method: string;
+  notes: string | null;
+  previous_balance: number;
+  new_balance: number;
+  payment_date: string;
+  user_name?: string | null;
+}
+
+export interface CustomerLedger {
+  customer: Customer;
+  sales: CustomerInvoiceRow[];
+  payments: CustomerPaymentRow[];
 }
 
 export interface Product {
@@ -368,8 +401,22 @@ export interface DeveloperSettingsPayload {
   [key: string]: string | undefined;
 }
 
+export interface PrinterInfo {
+  name: string;
+  displayName: string;
+}
+
+export interface ThermalPrintOptions {
+  /** A complete HTML document holding the receipt (#thermal-receipt-printable) */
+  html: string;
+  silent?: boolean;
+  printerName?: string;
+  paperWidthMm?: 58 | 80;
+}
+
 export interface ElectronAPI {
-  printThermal: (options?: { silent?: boolean; printerName?: string; paperWidthMm?: 58 | 80 }) => Promise<{ success: boolean; error?: string }>;
+  printThermal: (options: ThermalPrintOptions) => Promise<{ success: boolean; error?: string }>;
+  listPrinters: () => Promise<PrinterInfo[]>;
   selectBackupDir: () => Promise<string | null>;
   selectRestoreFile: () => Promise<string | null>;
 }

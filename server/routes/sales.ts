@@ -53,6 +53,18 @@ router.post('/api/sales', async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'This shift is closed and locked. Sales cannot be added to a closed shift.' });
     }
 
+    // A sale may be linked to a saved (khata) customer; a credit sale must be
+    const hasCustomerId = customer_id !== undefined && customer_id !== null && customer_id !== '';
+    const linkedCustomer = hasCustomerId
+      ? await prisma.customer.findUnique({ where: { id: Number(customer_id) || 0 } })
+      : null;
+    if (hasCustomerId && !linkedCustomer) {
+      return res.status(400).json({ error: 'The selected customer was not found. Search for the customer again.' });
+    }
+    if (payment_type === 'Credit' && !linkedCustomer) {
+      return res.status(400).json({ error: 'Select or save a khata customer for credit sales.' });
+    }
+
     // Compute item gross, discount, and net amounts defensively
     let computedGross = 0;
     let computedItemDiscount = 0;
@@ -95,6 +107,17 @@ router.post('/api/sales', async (req: Request, res: Response) => {
 
     const executeSaleTransaction = async () => {
       return await prisma.$transaction(async (tx) => {
+        // Credit limit (0 = no limit), checked against the balance at the moment of the sale
+        if (payment_type === 'Credit' && linkedCustomer) {
+          const current = await tx.customer.findUnique({ where: { id: linkedCustomer.id } });
+          const limit = current?.creditLimit ?? 0;
+          const balance = current?.currentBalance ?? 0;
+          if (limit > 0 && balance + finalNetTotal > limit + 0.005) {
+            const available = Math.max(0, limit - balance);
+            throw new Error(`Credit limit reached for ${linkedCustomer.name}: limit ${limit.toFixed(2)}, balance ${balance.toFixed(2)}, available ${available.toFixed(2)}.`);
+          }
+        }
+
         // Query latest invoice sequence today inside transaction
         const latestSale = await tx.sale.findFirst({
           where: { invoiceNo: { startsWith: `INV-${today}-` } },
@@ -126,9 +149,10 @@ router.post('/api/sales', async (req: Request, res: Response) => {
         const sale = await tx.sale.create({
           data: {
             invoiceNo,
-            customerId: customer_id ? Number(customer_id) : null,
-            customerName: customer_name || 'Counter Customer',
-            customerPhone: customer_phone || null,
+            // A linked customer's saved name and phone are used, so their history stays consistent
+            customerId: linkedCustomer?.id ?? null,
+            customerName: linkedCustomer?.name ?? (customer_name || 'Counter Customer'),
+            customerPhone: linkedCustomer ? linkedCustomer.phone : (customer_phone || null),
             userId: user_id ? Number(user_id) : null,
             userName: user_name || 'Cashier',
             shiftId: activeShiftId,
@@ -208,9 +232,9 @@ router.post('/api/sales', async (req: Request, res: Response) => {
       }
 
       // 3. Update customer Khata balance if credit sale
-      if (payment_type === 'Credit' && customer_id) {
+      if (payment_type === 'Credit' && linkedCustomer) {
         await tx.customer.update({
-          where: { id: Number(customer_id) },
+          where: { id: linkedCustomer.id },
           data: {
             currentBalance: { increment: finalNetTotal }
           }
@@ -397,10 +421,27 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
       }
 
       if (sale_id) {
-        await tx.sale.update({
+        const original = await tx.sale.update({
           where: { id: Number(sale_id) },
           data: { status: 'returned' }
         });
+
+        // Returning goods from a credit sale lowers what the customer owes
+        if (original.paymentType === 'Credit' && original.customerId) {
+          const customer = await tx.customer.findUnique({ where: { id: original.customerId } });
+          if (customer) {
+            const newBalance = Math.max(0, customer.currentBalance - totalRefund);
+            await tx.customer.update({ where: { id: customer.id }, data: { currentBalance: newBalance } });
+            await tx.auditLog.create({
+              data: {
+                action: 'KHATA_RETURN_ADJUSTMENT',
+                module: 'Khata',
+                details: `Return ${returnNo} on credit invoice ${original.invoiceNo}: ${customer.name} balance ${customer.currentBalance.toFixed(2)} -> ${newBalance.toFixed(2)}`,
+                userName: user_name || 'Cashier'
+              }
+            });
+          }
+        }
       }
 
       return { returnId: saleReturn.id, returnNo, totalRefund };

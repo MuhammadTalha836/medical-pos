@@ -4,7 +4,7 @@ import { Sidebar, TabType } from './components/layout/Sidebar';
 import { Dashboard } from './pages/Dashboard';
 import { PosPage } from './pages/PosPage';
 import { SalesHistoryPage } from './pages/SalesHistoryPage';
-import { CustomerKhataPage } from './pages/CustomerKhataPage';
+import { CustomersPage } from './pages/CustomersPage';
 import { MastersPage } from './pages/MastersPage';
 import { PurchasesPage } from './pages/PurchasesPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -138,7 +138,7 @@ export const App: React.FC = () => {
             <ShiftsAdminPage settings={settings} />
           )}
           {currentTab === 'khata' && (
-            <CustomerKhataPage settings={settings} />
+            <CustomersPage settings={settings} />
           )}
           {currentTab === 'masters' && (
             <MastersPage settings={settings} />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/apiService';
 import { SystemSettings, User, Role, InvoiceTemplateType, InvoicePaperSize, SaleInvoice } from '../types';
 import { DEFAULT_DEVELOPER_FOOTER, INVOICE_PAPER_SIZES, TEMPLATE_LABELS, normalizePaperSize, normalizeTemplate } from '../../shared/invoice';
@@ -8,6 +8,7 @@ import { ALL_INVOICE_FIELDS_VISIBLE, DEFAULT_INVOICE_SETTINGS, DEFAULT_SETTINGS 
 import { UsersTab } from '../components/settings/UsersTab';
 import { RolesTab } from '../components/settings/RolesTab';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
+import { ReceiptPrinterCard } from '../components/settings/ReceiptPrinterCard';
 import {
   Store,
   Receipt,
@@ -142,6 +143,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles'>('store');
   const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateType>('classic');
   const [previewPaperSize, setPreviewPaperSize] = useState<InvoicePaperSize>('80mm');
+  const previewMountRef = useRef<HTMLDivElement>(null);
   const canHideStoreIdentity = user?.role === 'developer' || settings?.allow_admin_hide_store_identity === 'true';
 
   // Replaced by the saved settings as soon as they load
@@ -711,10 +713,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                     })}
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                    Receipts are thermal-only. Your selection is saved on this computer and used for every sale and reprint.
+                    Receipts are thermal-only. The roll width applies to every counter, for every sale and reprint.
                   </p>
                 </div>
               </div>
+
+              <ReceiptPrinterCard getTestReceipt={() => previewMountRef.current?.querySelector<HTMLElement>('#thermal-receipt-printable') ?? null} />
 
               {/* Card 2: Field Visibility Checkboxes */}
               <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5 shadow-xs">
@@ -1015,7 +1019,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 </div>
 
                 {/* Preview Paper Mount Area */}
-                <div className="bg-slate-100 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-center max-h-[750px] overflow-y-auto">
+                <div ref={previewMountRef} className="bg-slate-100 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-center max-h-[750px] overflow-y-auto">
                   <UnifiedInvoice
                     invoice={MOCK_PREVIEW_INVOICE}
                     settings={{

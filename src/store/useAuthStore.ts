@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { User, RolePermissions } from '../types';
 import { DEFAULT_ADMIN_PERMISSIONS } from '../../shared/permissions';
 import { api, SESSION_ENDED_EVENT, SESSION_STORAGE_KEY } from '../services/apiService';
+import { usePosStore } from './usePosStore';
 
 
 interface AuthState {
@@ -95,6 +96,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
       // Revoke the server session; the local session is cleared even if the server is unreachable
       if (get().token) api.logout().catch(() => { /* the local session is cleared either way */ });
       storeSession(null, null);
+      // Signing out drops this user's open invoices (a session that merely expired keeps them)
+      usePosStore.getState().resetInvoices();
       set({ user: null, permissions: null, token: null, isAuthenticated: false });
     },
 

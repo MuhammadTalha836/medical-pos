@@ -20,7 +20,7 @@ npm run <script-name>
 | Open the app while developing | `npm run dev` |
 | Check code for errors | `npm run lint` |
 | Unit tests | `npm test` |
-| Full integration tests | `npm run test:functional` + `test:phase1` … `test:phase5` |
+| Full integration tests | `npm run test:functional` + `test:phase1` … `test:phase6` |
 | After editing `prisma/schema.prisma` | `npm run prisma:generate` |
 | First-time developer key setup | `npm run developer:key` |
 | Check that the desktop bundle compiles | `npm run build` |
@@ -136,11 +136,12 @@ npm run <script-name>
 - **Kaise:** `npm run test:watch`. Press `q` to quit.
 - **Kyun:** It is faster than running `npm test` again and again by hand.
 
-### Integration suites (`test:functional`, `test:phase1` … `test:phase5`)
+### Integration suites (`test:functional`, `test:phase1` … `test:phase6`)
 ```json
 "test:functional": "node scripts/electron.mjs test server/tests/functional_test.ts",
 ...
 "test:phase5": "node scripts/electron.mjs test server/tests/phase5_test.ts"
+"test:phase6": "node scripts/electron.mjs test server/tests/phase6_test.ts"
 ```
 
 **What they do:**
@@ -158,7 +159,7 @@ npm run <script-name>
 - `npm run test:phase3` runs one suite.
 - To run all of them:
   ```bash
-  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5
+  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6
   ```
 
 **Why:** These prove that the real business flows still work (sale, stock, shifts, permissions, license, backups) and not just single functions.
@@ -171,6 +172,7 @@ npm run <script-name>
 | `test:phase3` | Thermal invoice templates (58mm/80mm), protected store identity, sale snapshots for reprints |
 | `test:phase4` | Backups: verification, retention/cleanup, offline scheduler, who may back up or restore |
 | `test:phase5` | Login sessions, developer-only admin permissions, Demo/Full license lock |
+| `test:phase6` | Khata customers: unique phone, credit sale needs a saved customer, credit limit, credit returns |
 
 ---
 
@@ -285,7 +287,7 @@ npm run lint && npm test
 
 **Before a commit:**
 ```bash
-npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5
+npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6
 ```
 
 **Client release (on Windows):**

@@ -5,6 +5,10 @@ import { api } from '../services/apiService';
 import { Product, SaleInvoice, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
+import { InvoiceTabs } from '../components/pos/InvoiceTabs';
+import { CustomerPicker } from '../components/pos/CustomerPicker';
+import { MAX_OPEN_INVOICES } from '../store/usePosStore';
+import { loadPrintPrefs, printReceiptIn } from '../utils/printReceipt';
 import { useShiftStore } from '../store/useShiftStore';
 import {
   Search,
@@ -91,6 +95,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   const { user, hasPermission } = useAuthStore();
   const {
     cart,
+    customerId,
     customerName,
     customerPhone,
     billDiscountPct,
@@ -103,12 +108,20 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     updateUnitPrice,
     toggleLooseUnit,
     removeItem,
-    clearCart,
     setCustomer,
     setBillDiscountPct,
     setCashTendered,
     setPaymentType,
-    getTotals
+    getTotals,
+    activeId,
+    lastCompletedSale,
+    newInvoice,
+    closeInvoice,
+    switchInvoice,
+    switchInvoiceBy,
+    completeActiveInvoice,
+    claimInvoices,
+    getInvoiceTabs
   } = usePosStore();
 
   const {
@@ -132,13 +145,15 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Tab waiting for "close invoice with items?" confirmation
+  const [pendingCloseId, setPendingCloseId] = useState<string | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const tenderedInputRef = useRef<HTMLInputElement>(null);
   const discountInputRef = useRef<HTMLInputElement>(null);
   const customerNameInputRef = useRef<HTMLInputElement>(null);
   const isSubmittingRef = useRef<boolean>(false);
-  const lastCompletedSaleRef = useRef<SaleInvoice | null>(null);
+  const receiptContainerRef = useRef<HTMLDivElement>(null);
 
   const canDiscount = hasPermission('can_discount');
   const totals = getTotals();
@@ -150,12 +165,13 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     searchInputRef.current?.focus();
   }, []);
 
-  const handleStartNewInvoice = () => {
-    if (cart.length > 0) {
-      const confirmDiscard = window.confirm('Discard current cart items and start a fresh invoice?');
-      if (!confirmDiscard) return;
-    }
-    clearCart();
+  // Open invoices saved on this computer belong to the user who opened them
+  useEffect(() => {
+    claimInvoices(user?.id ?? null);
+  }, [user?.id, claimInvoices]);
+
+  // After opening, closing or switching an invoice tab: clean search and focus it for the next scan
+  const resetWorkspace = () => {
     setSearchQuery('');
     setSearchResults([]);
     setErrorMessage(null);
@@ -166,13 +182,90 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     }, 50);
   };
 
-  // Keyboard shortcuts engine
+  const handleNewInvoice = () => {
+    if (!newInvoice()) {
+      setErrorMessage(`Up to ${MAX_OPEN_INVOICES} invoices can be open at once. Save or close one first.`);
+      return;
+    }
+    resetWorkspace();
+  };
+
+  const handleSwitchInvoice = (id: string) => {
+    if (id === activeId) return;
+    switchInvoice(id);
+    resetWorkspace();
+  };
+
+  const handleSwitchInvoiceBy = (delta: number) => {
+    switchInvoiceBy(delta);
+    resetWorkspace();
+  };
+
+  // A tab with items asks first; an empty one closes at once
+  const requestCloseInvoice = (id: string) => {
+    const tab = getInvoiceTabs().find(t => t.id === id);
+    if (!tab) return;
+    if (tab.draft.cart.length > 0) {
+      setPendingCloseId(id);
+      return;
+    }
+    closeInvoice(id);
+    resetWorkspace();
+  };
+
+  const confirmCloseInvoice = () => {
+    if (pendingCloseId) closeInvoice(pendingCloseId);
+    setPendingCloseId(null);
+    resetWorkspace();
+  };
+
+  const pendingCloseTab = pendingCloseId ? getInvoiceTabs().find(t => t.id === pendingCloseId) : undefined;
+
+  // Prints the receipt shown in the receipt modal (after it has rendered)
+  const printShownReceipt = (delayMs = 0) => {
+    setTimeout(() => { void printReceiptIn(receiptContainerRef.current); }, delayMs);
+  };
+
+  // Keyboard shortcuts engine: attached once, always runs the latest handler
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. F2: Start a new invoice
+    const listener = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
+
+  keyHandlerRef.current = (e: KeyboardEvent) => {
+      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null;
+      const ctrl = e.ctrlKey || e.metaKey;
+      // The close-invoice question takes Enter/Esc itself; no other shortcut runs behind it
+      if (pendingCloseId !== null && e.key !== 'Escape') return;
+
+      // Invoice tabs: Ctrl+T new, Ctrl+W close, Ctrl+←/→ or Ctrl+(Shift+)Tab switch, Ctrl+1…9 jump
+      if (ctrl && !e.altKey) {
+        const key = e.key.toLowerCase();
+        const digit = /^[1-9]$/.test(e.key) ? Number(e.key) : 0;
+        const isTabKey = key === 't' || key === 'w' || key === 'tab' || e.key === 'ArrowRight' || e.key === 'ArrowLeft' || (digit > 0 && !e.shiftKey);
+        if (isTabKey) {
+          e.preventDefault();
+          if (e.repeat || anyModalOpen || isSubmittingRef.current) return;
+          if (key === 't') handleNewInvoice();
+          else if (key === 'w') requestCloseInvoice(activeId);
+          else if (key === 'tab') handleSwitchInvoiceBy(e.shiftKey ? -1 : 1);
+          else if (e.key === 'ArrowRight') handleSwitchInvoiceBy(1);
+          else if (e.key === 'ArrowLeft') handleSwitchInvoiceBy(-1);
+          else {
+            const tab = getInvoiceTabs()[digit - 1];
+            if (tab) handleSwitchInvoice(tab.id);
+          }
+          return;
+        }
+      }
+
+      // 1. F2: Open a new invoice tab (the current one stays open)
       if (e.key === 'F2') {
         e.preventDefault();
-        handleStartNewInvoice();
+        if (e.repeat || anyModalOpen || isSubmittingRef.current) return;
+        handleNewInvoice();
       }
       // 2. F3: Focus the product search field
       else if (e.key === 'F3') {
@@ -214,19 +307,22 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         e.preventDefault();
         if (e.repeat) return;
         if (isReceiptModalOpen) {
-          window.print();
+          printShownReceipt();
         } else if (cart.length > 0) {
           if (isSubmittingRef.current || loadingSale) return;
           handleCompleteSale(true);
-        } else if (lastCompletedSaleRef.current || createdInvoice) {
-          setCreatedInvoice(lastCompletedSaleRef.current || createdInvoice);
+        } else if (lastCompletedSale || createdInvoice) {
+          setCreatedInvoice(lastCompletedSale || createdInvoice);
           setIsReceiptModalOpen(true);
-          setTimeout(() => window.print(), 300);
+          printShownReceipt(300);
         }
       }
       // 8. Esc: Close a dialog or cancel current action where safe
       else if (e.key === 'Escape') {
-        if (isReceiptModalOpen) {
+        if (pendingCloseId) {
+          e.preventDefault();
+          setPendingCloseId(null);
+        } else if (isReceiptModalOpen) {
           e.preventDefault();
           setIsReceiptModalOpen(false);
           searchInputRef.current?.focus();
@@ -240,11 +336,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           searchInputRef.current?.focus();
         }
       }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cart, loadingSale, totals, customerName, paymentType, activeShift, isReceiptModalOpen, isShortcutsModalOpen, searchResults, createdInvoice, hasPermission]);
+  };
 
   // Product search with debounce
   useEffect(() => {
@@ -332,8 +424,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       }
     }
 
-    if (paymentType === 'Credit' && !customerName.trim()) {
-      setErrorMessage('Customer name is required for Credit (Khata) sales. Please specify customer details [F4].');
+    if (paymentType === 'Credit' && !customerId) {
+      setErrorMessage('Select or save the customer for a credit (khata) sale [F4].');
       customerNameInputRef.current?.focus();
       return;
     }
@@ -345,6 +437,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
       const salePayload = {
         shift_id: activeShift.id,
+        customer_id: customerId,
         customer_name: customerName || 'Counter Customer',
         customer_phone: customerPhone || null,
         user_id: user?.id || null,
@@ -412,15 +505,19 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           invoice_footer_snapshot: result.invoice_footer_snapshot ?? null
         };
 
-        clearCart();
+        // The sold invoice's tab closes; other open invoices stay as they were
+        completeActiveInvoice(invoiceObj);
         setCreatedInvoice(invoiceObj);
-        lastCompletedSaleRef.current = invoiceObj;
+        setSearchQuery('');
+        setSearchResults([]);
         if (activeShift) {
           fetchShiftSummary(activeShift.id);
         }
 
         if (shouldPrint) {
           setIsReceiptModalOpen(true);
+          // Print without dialog: the receipt goes to the printer as soon as it is shown
+          if (loadPrintPrefs().silent) printShownReceipt(300);
         }
       }
     } catch (err: any) {
@@ -509,6 +606,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             </div>
           </div>
         )}
+
+        {/* Open invoices */}
+        <InvoiceTabs onNew={handleNewInvoice} onSwitch={handleSwitchInvoice} onClose={requestCloseInvoice} />
 
         {/* Search Bar */}
         <div className="relative">
@@ -647,7 +747,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                     <td colSpan={9} className="py-20 text-center text-slate-400 dark:text-slate-500">
                       <ShoppingBag className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-700 mb-2 stroke-[1.5]" />
                       <div className="font-semibold text-slate-600 dark:text-slate-400">Cart is empty</div>
-                      <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Scan a barcode or search medicines using [F2]</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">Scan a barcode or search medicines using [F3]</div>
                     </td>
                   </tr>
                 ) : (
@@ -813,13 +913,13 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             </div>
             {cart.length > 0 && (
               <button
-                onClick={handleStartNewInvoice}
+                onClick={() => requestCloseInvoice(activeId)}
                 className="flex items-center space-x-1.5 text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-medium transition-colors"
-                title="Discard cart and start a fresh invoice [F2]"
+                title="Discard this invoice and close its tab [Ctrl+W]"
               >
                 <RotateCcw className="w-4 h-4" />
-                <span>New Invoice</span>
-                <kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded-sm border border-rose-200 dark:border-rose-800">F2</kbd>
+                <span>Discard Invoice</span>
+                <kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 rounded-sm border border-rose-200 dark:border-rose-800">Ctrl+W</kbd>
               </button>
             )}
           </div>
@@ -836,26 +936,19 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               <span>Customer Details</span>
               <kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F4</kbd>
             </span>
-            <span className="text-2xs text-slate-500 dark:text-slate-400">Counter Sale</span>
+            <span className="text-2xs text-slate-500 dark:text-slate-400">{customerId ? 'Khata customer' : 'Counter sale'}</span>
           </div>
 
-          <div className="space-y-2">
-            <input
-              ref={customerNameInputRef}
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomer(null, e.target.value, customerPhone)}
-              placeholder="Customer Name (e.g. Counter Customer) [F4]"
-              className="field-input field-sm w-full"
-            />
-            <input
-              type="text"
-              value={customerPhone}
-              onChange={(e) => setCustomer(null, customerName, e.target.value)}
-              placeholder="Contact Number (Optional)"
-              className="field-input field-sm w-full"
-            />
-          </div>
+          <CustomerPicker
+            customerId={customerId}
+            customerName={customerName}
+            customerPhone={customerPhone}
+            onChange={setCustomer}
+            nameInputRef={customerNameInputRef}
+            canAddCustomer={hasPermission('can_add_customer')}
+            creditAmount={paymentType === 'Credit' ? totals.netTotal : 0}
+            money={money}
+          />
         </div>
 
         {/* Bill Calculations breakdown */}
@@ -924,7 +1017,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           {/* NET PAYABLE */}
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-col space-y-1">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Net Payable Amount</span>
-            <div className="bg-teal-50 dark:from-teal-950/40 dark:to-emerald-950/30 p-3 rounded-xl border border-teal-200 dark:border-teal-800/60 flex items-baseline justify-between">
+            <div className="bg-teal-50 dark:bg-teal-950/40 p-3 rounded-xl border border-teal-200 dark:border-teal-800/60 flex items-baseline justify-between">
               <span className="text-xs font-bold text-teal-700 dark:text-teal-300">TOTAL</span>
               <div className="text-3xl font-extrabold font-mono text-teal-700 dark:text-teal-400 tracking-tight">
                 {money(totals.netTotal)}
@@ -1033,27 +1126,46 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     </div>
 
       {/* Persistent Keyboard Shortcuts Bottom Ribbon */}
-      <div className="bg-slate-900 text-slate-300 dark:bg-[#070b12] border-t border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs select-none shadow-lg shrink-0 z-20">
-        <div className="flex items-center space-x-3 overflow-x-auto py-0.5">
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F2</kbd><span className="text-xs font-medium text-slate-300">New Sale</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F3</kbd><span className="text-xs font-medium text-slate-300">Search</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F4</kbd><span className="text-xs font-medium text-slate-300">Customer</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F6</kbd><span className="text-xs font-medium text-slate-300">Discount</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F8</kbd><span className="text-xs font-medium text-slate-300">Payment</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-emerald-400 rounded-sm border border-slate-700 shadow-2xs">F9</kbd><span className="text-xs font-medium text-slate-300">Save</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-amber-400 rounded-sm border border-slate-700 shadow-2xs">F10</kbd><span className="text-xs font-medium text-slate-300">Print</span></span>
-          <span className="flex items-center space-x-1.5"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-rose-400 rounded-sm border border-slate-700 shadow-2xs">Esc</kbd><span className="text-xs font-medium text-slate-300">Close / Cancel</span></span>
+      <div className="bg-slate-900 text-slate-300 dark:bg-[#070b12] border-t border-slate-800 px-4 py-2 flex items-center justify-between gap-3 text-xs select-none shadow-lg shrink-0 z-20">
+        <div className="flex items-center space-x-3 overflow-x-auto min-w-0 py-0.5">
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F2</kbd><span className="text-xs font-medium text-slate-300">New Invoice</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">Ctrl+←/→</kbd><span className="text-xs font-medium text-slate-300">Switch</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F3</kbd><span className="text-xs font-medium text-slate-300">Search</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F4</kbd><span className="text-xs font-medium text-slate-300">Customer</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F6</kbd><span className="text-xs font-medium text-slate-300">Discount</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F8</kbd><span className="text-xs font-medium text-slate-300">Payment</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-emerald-400 rounded-sm border border-slate-700 shadow-2xs">F9</kbd><span className="text-xs font-medium text-slate-300">Save</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-amber-400 rounded-sm border border-slate-700 shadow-2xs">F10</kbd><span className="text-xs font-medium text-slate-300">Print</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-rose-400 rounded-sm border border-slate-700 shadow-2xs">Esc</kbd><span className="text-xs font-medium text-slate-300">Close</span></span>
         </div>
 
         <button
           type="button"
           onClick={() => setIsShortcutsModalOpen(true)}
-          className="text-teal-400 hover:text-teal-300 font-medium text-xs flex items-center space-x-1 transition-colors px-2 py-0.5 rounded-sm hover:bg-slate-800 cursor-pointer"
+          className="shrink-0 whitespace-nowrap text-teal-400 hover:text-teal-300 font-medium text-xs flex items-center space-x-1 transition-colors px-2 py-0.5 rounded-sm hover:bg-slate-800 cursor-pointer"
         >
           <Keyboard className="w-4 h-4" />
-          <span>Shortcuts Guide</span>
+          <span>All Shortcuts</span>
         </button>
       </div>
+
+      {/* Close an invoice that still has items */}
+      <Modal
+        isOpen={pendingCloseId !== null}
+        onClose={() => setPendingCloseId(null)}
+        title="Close this invoice?"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {pendingCloseTab?.label} has {pendingCloseTab?.draft.cart.length} item(s) that are not saved. Closing it removes them.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setPendingCloseId(null)} className="btn-secondary">Keep Invoice</button>
+            <button type="button" onClick={confirmCloseInvoice} className="btn-danger" autoFocus>Close Invoice</button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Printable Thermal Receipt Modal */}
       <Modal
@@ -1062,13 +1174,15 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         title="Sale Completed - Thermal Receipt"
         maxWidth="max-w-md"
       >
-        {createdInvoice && (
-          <UnifiedInvoice
-            invoice={createdInvoice}
-            settings={settings}
-            onClose={() => setIsReceiptModalOpen(false)}
-          />
-        )}
+        <div ref={receiptContainerRef}>
+          {createdInvoice && (
+            <UnifiedInvoice
+              invoice={createdInvoice}
+              settings={settings}
+              onClose={() => setIsReceiptModalOpen(false)}
+            />
+          )}
+        </div>
       </Modal>
 
       {/* Keyboard Shortcuts Reference Modal */}
@@ -1092,8 +1206,32 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
               <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F2</kbd></span>
-              <span className="w-40 font-bold text-slate-800 dark:text-white">Start New Invoice</span>
-              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Clears cart & customer, resets form, and focuses search input.</span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">New Invoice</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Opens a new invoice tab. The current invoice stays open in its own tab. Ctrl+T does the same.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700 whitespace-nowrap">Ctrl+→</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Next Invoice</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Switches to the invoice tab on the right. Ctrl+Tab does the same.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700 whitespace-nowrap">Ctrl+←</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Previous Invoice</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Switches to the invoice tab on the left. Ctrl+Shift+Tab does the same.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700 whitespace-nowrap">Ctrl+1…9</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Go to Invoice</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Jumps straight to invoice tab 1 to 9.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700 whitespace-nowrap">Ctrl+W</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Close Invoice</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Closes the current invoice tab. Asks first if it has items.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">

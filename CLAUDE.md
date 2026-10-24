@@ -26,6 +26,7 @@ npm run test:phase2      # RBAC, developer settings, audit log
 npm run test:phase3      # thermal-only invoices, protected identity, sale snapshots
 npm run test:phase4      # backup retention, verification, offline scheduler, backup RBAC
 npm run test:phase5      # server sessions, Developer-only admin permissions, Demo/Full license
+npm run test:phase6      # khata customers: unique phone, credit sales need a saved customer, credit limit, credit returns
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -101,10 +102,11 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - `src/components/pos/UnifiedInvoice.tsx` renders three designs (`classic` | `compact` | `detailed`) at `58mm` | `80mm`. `ThermalReceipt.tsx` is a thin wrapper around it.
 - The valid values and normalizers live in `shared/invoice.ts`; `server/invoice/invoiceSettings.ts` only holds the startup migration of legacy values. The server rejects anything else with 400.
 - Each sale stores `store_name_snapshot`, `store_address_snapshot` and `invoice_footer_snapshot`. Receipts prefer these snapshots over current settings, so reprints match the original.
-- Printing uses `window.print()`. `@media print` in `src/index.css` hides everything except `#thermal-receipt-printable`.
+- Printing goes through `src/utils/printReceipt.ts`. With "Print without dialog" on (per computer, `localStorage`), the receipt's HTML plus the app CSS is sent to the `print:thermal` IPC, which prints it silently from a hidden sandboxed window sized to the receipt. Otherwise `window.print()` runs, and `@media print` in `src/index.css` hides everything except `#thermal-receipt-printable`.
 
 **Sales and shifts.**
 - `POST /api/sales` requires an open cashier shift.
+- Customers: a sale may carry `customer_id` (a saved khata customer; the sale then stores that customer's saved name/phone). A Credit sale **requires** one and is blocked past the customer's `credit_limit` (0 = no limit); returning a credit sale lowers the balance. Customers need a phone, unique by digits (`normalizePhone` in `shared/customers.ts`); a duplicate answers 409 with the existing customer. The POS picks customers with `CustomerPicker.tsx` (`GET /api/customers/search`). The Customers page (`src/pages/CustomersPage.tsx`, tab id `khata`) has a Customers tab and a Khata (Udhaar) tab; a customer can be deleted only with no invoices, payments or balance.
 - It generates `INV-YYYYMMDD-NNNN` inside `prisma.$transaction`, with a 5-attempt retry on `SQLITE_BUSY` / unique collisions.
 - Stock is tracked as boxes + loose units (`packing` units per box). Products can forbid loose ("open") sales and set a minimum sale quantity.
 
@@ -135,7 +137,9 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 
 ## Conventions
 
-- Keep the POS keyboard shortcuts working (`F2`–`F10`, `Esc`, `Ctrl+Enter`). `F9` saves and `F10` prints. Submission is guarded by `isSubmittingRef` and `e.repeat` checks against duplicate invoices.
+- Keep the POS keyboard shortcuts working (`F2`–`F10`, `Esc`, `Ctrl+Enter`). `F2`/`Ctrl+T` opens a new invoice tab, `Ctrl+←/→`, `Ctrl+(Shift+)Tab` and `Ctrl+1…9` switch tabs, `Ctrl+W` closes one, `F9` saves and `F10` prints. Submission is guarded by `isSubmittingRef` and `e.repeat` checks against duplicate invoices. The POS keydown handler is attached once and reads the latest state through `keyHandlerRef`.
+- POS invoice tabs live in `src/store/usePosStore.ts`: the top-level draft fields (`cart`, `customerName`, ...) are always the **active** tab, and `invoices[]` holds the others (`getInvoiceTabs()` returns all of them up to date). Existing cart actions act on the active tab only.
+- Print receipts with `printReceipt` / `printReceiptIn` (`src/utils/printReceipt.ts`), never `window.print()` directly: it honours the per-computer printer and "Print without dialog" preference and falls back to the dialog.
 - The UI uses a teal/slate dark theme with Tailwind `dark:` variants, `lucide-react` icons, and system fonts only (nothing is downloaded at runtime).
 - Design system (`src/index.css`): type scale `text-2xs` 12px / `text-xs` 13px / `text-sm` 15px (nothing smaller outside receipts); controls use `field-input` / `field-select` / `field-textarea` (+ `field-sm` in tables) with `field-label` / `field-hint`; buttons use `btn-primary` / `btn-secondary` / `btn-danger` / `btn-print` (+ `btn-sm`). Don't restyle controls inline, and don't use all-caps labels or gradient buttons. The receipt components keep their own paper-tuned pixel sizes.
 - The app icon lives in `build/` (`icon.svg` is the source); `src/components/common/AppLogo.tsx` is the same mark in the UI.

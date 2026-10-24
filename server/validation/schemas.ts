@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Response } from 'express';
+import { CUSTOMER_NAME_MAX, PHONE_MAX_DIGITS, PHONE_MIN_DIGITS, isValidPhone } from '../../shared/customers';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
 // Objects are loose: unknown keys pass through untouched and handlers keep their domain rules.
@@ -108,6 +109,18 @@ const saleItemSchema = z.looseObject({
 
 export const createSaleSchema = z.looseObject({
   items: z.array(saleItemSchema, { error: 'Sale must include at least one item.' }).min(1, { error: 'Sale must include at least one item.' })
+});
+
+const customerPhone = z.string({ error: 'Customer phone number is required' }).trim()
+  .refine(isValidPhone, { error: `Enter a valid phone number (${PHONE_MIN_DIGITS}-${PHONE_MAX_DIGITS} digits)` });
+
+// Khata customers: a name and a unique phone (the phone tells two customers with the same name apart)
+export const customerSchema = z.looseObject({
+  name: requiredText('Customer name is required')
+    .pipe(z.string().min(2, { error: 'Customer name must be at least 2 characters' }).max(CUSTOMER_NAME_MAX, { error: `Customer name cannot exceed ${CUSTOMER_NAME_MAX} characters` })),
+  phone: customerPhone,
+  address: z.string().trim().max(200, { error: 'Address cannot exceed 200 characters' }).nullish(),
+  credit_limit: z.coerce.number({ error: 'Credit limit must be a number' }).min(0, { error: 'Credit limit cannot be negative' }).optional()
 });
 
 /**

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { SaleInvoice, SaleItem, SystemSettings, InvoiceTemplateType, InvoicePaperSize } from '../../types';
 import { Printer, Receipt } from 'lucide-react';
 import {
@@ -8,6 +8,7 @@ import {
 } from '../../../shared/invoice';
 import { moneyFormatter } from '../../utils/format';
 import { composeInvoiceFooter } from '../../../shared/developerProfile';
+import { printReceipt } from '../../utils/printReceipt';
 
 interface UnifiedInvoiceProps {
   invoice: SaleInvoice;
@@ -58,11 +59,12 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
     ? { base: 'text-[10px]', sm: 'text-[9px]', xs: 'text-[8px]', title: 'text-[13px]', net: 'text-[12px]' }
     : { base: 'text-[11px]', sm: 'text-[10px]', xs: 'text-[9px]', title: 'text-[15px]', net: 'text-[13px]' };
 
+  const receiptRef = useRef<HTMLDivElement>(null);
   const handlePrint = () => {
     if (onPrint) {
       onPrint();
     } else {
-      window.print();
+      void printReceipt(receiptRef.current);
     }
   };
 
@@ -313,6 +315,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
       {/* Actual Printable Thermal Receipt */}
       <div
         id="thermal-receipt-printable"
+        ref={receiptRef}
         data-template={template}
         data-paper-size={paperSize}
         className={`bg-white text-black shadow-xl border border-slate-300 rounded-xs transition-all wrap-break-word ${
