@@ -1,6 +1,6 @@
 # NPM Scripts Guide (PharmaCare Pro)
 
-This guide covers every command in the `scripts` section of `package.json`: what it does, when to run it, how to run it and why it exists.
+PharmaCare Pro runs **only as a desktop app**; there is no browser mode. This guide covers every command in the `scripts` section of `package.json`: what it does, when to run it, how to run it and why it exists.
 
 Run every command from the project root folder (where `package.json` is):
 
@@ -17,28 +17,25 @@ npm run <script-name>
 
 | Kaam (task) | Command |
 |---|---|
-| Daily development (UI + API) | `npm run dev` |
+| Open the app while developing | `npm run dev` |
 | Check code for errors | `npm run lint` |
 | Unit tests | `npm test` |
 | Full integration tests | `npm run test:functional` + `test:phase1` … `test:phase5` |
 | After editing `prisma/schema.prisma` | `npm run prisma:generate` |
 | First-time developer key setup | `npm run developer:key` |
-| Run the desktop app in dev | `npm run rebuild:electron` then `npm run dev:electron` |
+| Check that the desktop bundle compiles | `npm run build` |
 | Make a test desktop build | `npm run build:unpack` |
 | Make the Windows installer for the client | `npm run build:win` |
-| Go back to normal dev after Electron | `npm run rebuild:node` |
+| Fix a "NODE_MODULE_VERSION" error | `npm run rebuild` |
 
 ---
 
-## Important background: the better-sqlite3 "ABI" problem
+## Background: the database module (better-sqlite3)
 
-> **Roman Urdu:** Database library (better-sqlite3) ek waqt me sirf ek runtime ke liye compile hoti hai: ya **Node** (dev server/tests) ya **Electron** (desktop app). Galat runtime ke liye compiled ho to app start nahi hoti aur `NODE_MODULE_VERSION` wali error aati hai.
+> **Roman Urdu:** Database library (better-sqlite3) ek native module hai jo ek waqt me sirf ek runtime ke liye compile hota hai. Ab project me sab kuch (app, tests, build) **Electron ke runtime** par chalta hai, is liye library hamesha Electron ke liye build rehti hai, aur Node/Electron ke beech switch karne ki zaroorat nahi.
 
-- `npm run dev`, `npm test` and every `test:*` suite need the **Node** build. Use `npm run rebuild:node`.
-- `npm run dev:electron` needs the **Electron** build. Use `npm run rebuild:electron`.
-- `build:unpack` and `build:win` switch to Electron themselves and switch back to Node when they finish.
-
-If you see an error like `was compiled against a different Node.js version (NODE_MODULE_VERSION ...)`, run the matching rebuild command above.
+- `npm run dev` and the `test:*` suites first check that the library loads in Electron. If it doesn't (for example right after `npm install`, which builds it for plain Node), they run `npm run rebuild` **once** by themselves.
+- So the old `NODE_MODULE_VERSION 137 / 146` error should not come back. If it ever does, run `npm run rebuild`.
 
 ---
 
@@ -46,35 +43,19 @@ If you see an error like `was compiled against a different Node.js version (NODE
 
 ### `npm run dev`
 ```json
-"dev": "concurrently \"npm run dev:server\" \"npm run dev:ui\""
+"dev": "node scripts/electron.mjs dev"
 ```
-- **Kya karti hai:** Starts the API server (port `3001`) and the UI (port `5173`) together in one terminal.
+- **Kya karti hai:** Opens the **PharmaCare Pro desktop window** in development mode.
+  - The API runs inside the app on `127.0.0.1:3001`.
+  - The screens reload instantly when you save a file in `src/`.
+  - The app restarts by itself when you save a file in `server/` or `electron/` (`--watch`).
 - **Kab chalayein:** Every day while working on the project. This is the main command.
-- **Kaise:** Run `npm run dev`, then open `http://localhost:5173` in the browser. Press `Ctrl+C` to stop.
-- **Kyun:** The UI calls `/api/...`, and Vite forwards those calls to the API on port 3001. Both must run together.
+- **Kaise:** `npm run dev`. To stop, close the window or press `Ctrl+C` in the terminal. It works the same in the VS Code terminal (the script removes VS Code's `ELECTRON_RUN_AS_NODE` setting itself).
+- **Kyun:** It lets you see and test the real desktop app, including thermal printing and the backup/restore file dialogs.
 - **Notes:**
-  - It uses the real database in `data/pharmacy.db` and the real `backups/` folder. The backup scheduler also runs, so a backup can appear while you work.
-  - The API restarts by itself whenever you save a server file.
+  - It uses the real development database `data/pharmacy.db` and the `backups/` folder. The backup scheduler also runs, so a backup can appear while you work.
   - With `PHARMACARE_SAMPLE_DATA=true` in `.env`, an empty database gets a demo store, medicines and customers. Remove that line if you want an empty database.
-  - Needs the Node build of better-sqlite3 (`npm run rebuild:node` if you ran Electron before).
-
-### `npm run dev:server`
-```json
-"dev:server": "tsx watch server/api.ts"
-```
-- **Kya karti hai:** Starts **only the API server** on `http://localhost:3001`, restarting on every server file change (`tsx watch`).
-- **Kab chalayein:** When you are working only on backend code, or want the server logs in a separate terminal.
-- **Kaise:** `npm run dev:server`. Use a different port with `PORT=4000 npm run dev:server`.
-- **Kyun:** It is lighter than `dev` when you don't need the UI. `npm run dev` also uses it internally.
-
-### `npm run dev:ui`
-```json
-"dev:ui": "vite"
-```
-- **Kya karti hai:** Starts **only the React UI** (Vite dev server) on `http://localhost:5173`, with instant reload on save.
-- **Kab chalayein:** When the API is already running in another terminal (`dev:server`) and you only want to restart the UI.
-- **Kaise:** `npm run dev:ui`.
-- **Kyun:** The UI on its own cannot load data; without the API every `/api` call fails. Normally just use `npm run dev`.
+  - Run only **one** copy at a time; a second copy cannot use port 3001 and shows "PharmaCare Pro could not start".
 
 ---
 
@@ -84,7 +65,7 @@ If you see an error like `was compiled against a different Node.js version (NODE
 ```json
 "lint": "tsc --noEmit"
 ```
-- **Kya karti hai:** Type-checks all TypeScript code (`src/`, `server/`, `shared/`, `electron/`) without creating any files. Unused imports and variables are also errors.
+- **Kya karti hai:** Type-checks all TypeScript code (`src/`, `shared/`, `server/`, `electron/`, `scripts/`) without creating any files. Unused imports and variables are also errors.
 - **Kab chalayein:**
   - before every commit;
   - after any big change;
@@ -94,15 +75,17 @@ If you see an error like `was compiled against a different Node.js version (NODE
 
 ### `npm run build`
 ```json
-"build": "prisma generate && tsc && vite build"
+"build": "prisma generate && tsc --noEmit && electron-vite build"
 ```
 - **Kya karti hai:** Runs three steps in order:
   1. `prisma generate` creates the database client code;
   2. `tsc` type-checks the code;
-  3. `vite build` builds the production UI into `dist/`.
-- **Kab chalayein:** To check that the web UI builds cleanly in production mode. It is a good final check before a release.
-- **Kaise:** `npm run build`.
-- **Kyun:** It confirms the whole project compiles. **Note:** this is *not* the desktop app; for that use `build:unpack` / `build:win`. The `dist/` folder is only for checking and can be deleted.
+  3. `electron-vite build` compiles the desktop app (main process, preload and screens) into `out/`.
+
+  **It does not make an installer.**
+- **Kab chalayein:** To check that the whole desktop app compiles, as a final check before a release. `build:unpack` and `build:win` run it first anyway.
+- **Kaise:** `npm run build`. It needs `.env.developer` (`npm run developer:key`).
+- **Kyun:** It finds build errors quickly without waiting for packaging.
 
 ---
 
@@ -118,7 +101,7 @@ If you see an error like `was compiled against a different Node.js version (NODE
   - after a fresh `git clone` + `npm install`;
   - when you see errors like "Cannot find module '../generated/prisma/client'".
 - **Kaise:** `npm run prisma:generate`, then restart `npm run dev`.
-- **Kyun:** Server code imports the client from `server/generated/prisma`. If it is missing or old, the server will not compile or will use old columns.
+- **Kyun:** Server code imports the client from `server/generated/prisma`. If it is missing or old, the app will not compile or will use old columns.
 - **Adding a new column (complete checklist):**
   1. add the field to the model in `prisma/schema.prisma`;
   2. add it to the `CREATE TABLE` in `server/database/schema.ts`;
@@ -131,15 +114,13 @@ If you see an error like `was compiled against a different Node.js version (NODE
 
 ## 4. Tests
 
-> **Roman Urdu:** Tests kabhi bhi asli database ya backups ko touch nahi karte. Har test apna naya temporary database banata hai (OS temp folder me), sample data ke sath. Is liye tests safely kabhi bhi chala sakte hain.
->
-> Tests ke liye better-sqlite3 ka **Node** build chahiye (`npm run rebuild:node`).
+> **Roman Urdu:** Tests kabhi bhi asli database ya backups ko touch nahi karte. Har test apna naya temporary database banata hai (OS temp folder me), sample data ke sath. Is liye tests kabhi bhi safely chala sakte hain, chahe app khuli ho.
 
 ### `npm test`
 ```json
 "test": "vitest run"
 ```
-- **Kya karti hai:** Runs all **unit tests** (`*.spec.ts` files in `server/`, `shared/` and `src/`) once and exits. These test pure logic, such as backup schedule math, license days, invoice settings and TOTP.
+- **Kya karti hai:** Runs all **unit tests** (`*.spec.ts` files in `server/`, `shared/` and `src/`) once and exits. These test pure logic, such as backup schedule math, license days, invoice settings and authenticator codes. They don't use the database.
 - **Kab chalayein:** After changing any logic file, and before every commit. It takes a few seconds.
 - **Kaise:**
   - `npm test` runs everything;
@@ -157,15 +138,15 @@ If you see an error like `was compiled against a different Node.js version (NODE
 
 ### Integration suites (`test:functional`, `test:phase1` … `test:phase5`)
 ```json
-"test:functional": "tsx server/tests/functional_test.ts",
-"test:phase1": "tsx server/tests/phase1_test.ts",
+"test:functional": "node scripts/electron.mjs test server/tests/functional_test.ts",
 ...
-"test:phase5": "tsx server/tests/phase5_test.ts"
+"test:phase5": "node scripts/electron.mjs test server/tests/phase5_test.ts"
 ```
 
 **What they do:**
 - Each one starts the real API in-process on a fresh temp database and calls real `/api` routes, checking status codes and responses end to end.
-- They print `✓` / `✗` for each step and exit with an error if anything fails.
+- They run on the desktop app's own runtime, so they use exactly the same database module as the app.
+- They print `✔ PASS` / `✘ FAIL` for each step and exit with an error if anything fails.
 
 **When to run them:**
 - after any backend or route change;
@@ -217,7 +198,7 @@ If you see an error like `was compiled against a different Node.js version (NODE
   - The Developer account signs in with this authenticator code (no password).
   - The setup wizard on every new install needs it.
   - The license is signed with it.
-  - `build:unpack` / `build:win` **refuse to build** without this file, because the key is baked into the build.
+  - `build`, `build:unpack` and `build:win` **refuse to build** without this file, because the key is baked into the app.
 - **Warning:**
   - Never commit `.env.developer` or share it (it is already in `.gitignore`).
   - Keep a copy in a password manager.
@@ -225,41 +206,16 @@ If you see an error like `was compiled against a different Node.js version (NODE
 
 ---
 
-## 6. Desktop app (Electron)
-
-### `npm run dev:electron`
-```json
-"dev:electron": "electron-vite dev"
-```
-- **Kya karti hai:** Opens the real **desktop window** in development mode. The UI reloads live and the API runs inside the desktop app.
-- **Kab chalayein:** When you need to test desktop-only features: thermal printing, backup/restore file dialogs, window behaviour.
-- **Kaise:**
-  ```bash
-  npm run rebuild:electron                      # once, before (switches the DB library to Electron)
-  env -u ELECTRON_RUN_AS_NODE npm run dev:electron
-  ```
-  In the VS Code terminal, use `env -u ELECTRON_RUN_AS_NODE`: VS Code sets that variable, and it makes Electron run like plain Node with no window.
-  When you finish, run `npm run rebuild:node` before going back to `npm run dev` or tests.
-- **Kyun:** The browser (`npm run dev`) cannot test native desktop features.
-
-### `npm run build:electron`
-```json
-"build:electron": "electron-vite build"
-```
-- **Kya karti hai:** Compiles the desktop app code (main process, preload, renderer UI and API) into the `out/` folder. **It does not make an installer.**
-- **Kab chalayein:** Rarely by hand. Use it to check that the desktop bundle compiles. `build:unpack` and `build:win` run this step themselves.
-- **Kaise:** `npm run build:electron` (needs `.env.developer`).
-- **Kyun:** It is the first step of packaging. It is useful on its own to find bundle errors quickly.
+## 6. Packaging (for the client)
 
 ### `npm run build:unpack`
 ```json
-"build:unpack": "electron-vite build && npm run native:reset && electron-builder --dir && npm run rebuild:node"
+"build:unpack": "npm run build && npm run native:reset && electron-builder --dir"
 ```
 - **Kya karti hai:**
-  1. builds the app into `out/`;
+  1. runs `npm run build`;
   2. clears the stale native marker;
-  3. packages it as a **ready-to-run folder** (no installer) in `release/<platform>-unpacked/`;
-  4. switches better-sqlite3 back to Node, so `npm run dev` and the tests keep working.
+  3. packages the app as a **ready-to-run folder** (no installer) in `release/<platform>-unpacked/`.
 - **Kab chalayein:** To test the real packaged app before making the installer: fresh install behaviour, setup wizard, no sample data, printing, backups.
 - **Kaise:**
   ```bash
@@ -267,16 +223,15 @@ If you see an error like `was compiled against a different Node.js version (NODE
   # Linux: run the app
   ./release/linux-unpacked/pharmacy-management-system
   ```
-- **Kyun:** It is faster than a full installer and shows exactly what the client will get.
-- **Needs:** `.env.developer` (`npm run developer:key`).
+- **Kyun:** It is faster than a full installer and shows exactly what the client will get. The packaged app keeps its data in the user's own folder, not in the project's `data/`.
 
 ### `npm run build:win`
 ```json
-"build:win": "electron-vite build && npm run native:reset && electron-builder --win nsis && npm run rebuild:node"
+"build:win": "npm run build && npm run native:reset && electron-builder --win nsis"
 ```
 - **Kya karti hai:** The same steps as `build:unpack`, but makes the **Windows installer** (`.exe`, NSIS) in `release/`. The installer lets the user choose the install folder.
 - **Kab chalayein:** When you are giving a new version to a client (a release).
-- **Kaise:** Run it **on a Windows PC** (the native database library must be built for Windows):
+- **Kaise:** Run it **on a Windows PC** (the native database module must be built for Windows):
   ```bash
   npm run build:win
   ```
@@ -289,38 +244,25 @@ If you see an error like `was compiled against a different Node.js version (NODE
 
 ---
 
-## 7. Native module helpers (better-sqlite3)
+## 7. Native module helpers
 
-### `npm run rebuild:electron`
+### `npm run rebuild`
 ```json
-"rebuild:electron": "npm run native:reset && electron-builder install-app-deps"
+"rebuild": "npm run native:reset && electron-builder install-app-deps"
 ```
-- **Kya karti hai:** Recompiles better-sqlite3 for **Electron**.
-- **Kab chalayein:** Once, before `npm run dev:electron`, or when Electron shows a `NODE_MODULE_VERSION` error.
-- **Kaise:** `npm run rebuild:electron`.
-- **Kyun:** Electron uses a different internal Node version, so the database library must be compiled for it.
-- **After it:** `npm run dev` and the tests **will not work** until you run `npm run rebuild:node`.
-
-### `npm run rebuild:node`
-```json
-"rebuild:node": "npm rebuild better-sqlite3 && npm run native:reset"
-```
-- **Kya karti hai:** Recompiles better-sqlite3 for normal **Node**.
-- **Kab chalayein:**
-  - after using `dev:electron` / `rebuild:electron`;
-  - when `npm run dev` or the tests show a `NODE_MODULE_VERSION` error;
-  - after updating Node.js.
-- **Kaise:** `npm run rebuild:node`.
-- **Kyun:** It brings the dev server and tests back to a working state. `build:unpack` / `build:win` run it automatically at the end.
+- **Kya karti hai:** Recompiles the database module (better-sqlite3) for the desktop app's runtime.
+- **Kab chalayein:** You normally don't need it, because `dev` and the tests run it themselves when needed. Run it by hand if you ever see a `NODE_MODULE_VERSION` / `ERR_DLOPEN_FAILED` error.
+- **Kaise:** `npm run rebuild`.
+- **Kyun:** `npm install` builds native modules for plain Node, but the app runs on Electron's runtime, which needs its own build.
 
 ### `npm run native:reset`
 ```json
 "native:reset": "node -e \"require('fs').rmSync('node_modules/better-sqlite3/build/Release/.forge-meta',{force:true})\""
 ```
 - **Kya karti hai:** Deletes one small marker file (`.forge-meta`) inside better-sqlite3's build folder. It is safe and does nothing if the file isn't there.
-- **Kab chalayein:** You normally don't run it yourself; the rebuild and build scripts call it. Run it by hand only if a packaged app crashes on start with a database library error.
+- **Kab chalayein:** You don't run it yourself; `rebuild`, `build:unpack` and `build:win` call it.
 - **Kaise:** `npm run native:reset`.
-- **Kyun:** If this marker is stale, electron-builder thinks the library is already built for Electron and **skips the rebuild**. The installer then ships the Node version and the app fails on the client's PC.
+- **Kyun:** If this marker is stale, electron-builder thinks the module is already built and **skips the rebuild**. The installer could then ship the wrong build, and the app would fail on the client's PC.
 
 ---
 
@@ -331,7 +273,7 @@ If you see an error like `was compiled against a different Node.js version (NODE
 npm install
 npm run prisma:generate
 npm run developer:key        # first time only, scan the QR
-npm run dev                  # open http://localhost:5173 and complete the setup wizard
+npm run dev                  # the desktop window opens; complete the setup wizard
 ```
 
 **Daily work:**
@@ -346,17 +288,10 @@ npm run lint && npm test
 npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5
 ```
 
-**Testing the desktop app:**
-```bash
-npm run rebuild:electron
-env -u ELECTRON_RUN_AS_NODE npm run dev:electron
-npm run rebuild:node         # when finished
-```
-
 **Client release (on Windows):**
 ```bash
 npm run lint && npm test     # plus all test:* suites
 npm run build:win            # installer in release/
 ```
 
-**Fresh database during development:** stop `npm run dev`, delete `data/pharmacy.db*` (and `backups/*` if wanted), then start `npm run dev` again. The database is recreated empty, with sample data if `PHARMACARE_SAMPLE_DATA=true` is in `.env`.
+**Fresh database during development:** close the app, delete `data/pharmacy.db*` (and `backups/*` if wanted), then run `npm run dev` again. The database is recreated empty, with sample data if `PHARMACARE_SAMPLE_DATA=true` is in `.env`.

@@ -4,7 +4,7 @@ import { app } from './app';
 import { initPrisma } from './database/prisma';
 import { startBackupScheduler } from './backup/scheduler';
 
-// Entry point: `npm run dev:server` runs this file directly; Electron and the test suites import `app` from it.
+// Entry point: Electron (electron/main.ts) and the test suites import `app` from here and call `listen` themselves.
 
 initPrisma().catch(err => {
   console.error('[Prisma] Initialization error:', err);
@@ -16,10 +16,3 @@ if (process.env.NODE_ENV !== 'test' && !process.env.TEST_MODE) {
 }
 
 export { app };
-
-if (process.env.NODE_ENV !== 'test' && !process.env.TEST_MODE && (process.argv[1]?.endsWith('api.ts') || process.argv[1]?.endsWith('api.js'))) {
-  const PORT = process.env.PORT || 3001;
-  app.listen(PORT, () => {
-    console.log(`[PharmaCare Server] Running on http://localhost:${PORT}`);
-  });
-}

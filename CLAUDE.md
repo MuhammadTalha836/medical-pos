@@ -9,18 +9,15 @@ PharmaCare Pro ("100% Offline POS"): an offline pharmacy management and POS desk
 ## Commands
 
 ```bash
-npm run dev              # API (tsx watch server/api.ts, :3001) + Vite UI (:5173, proxies /api -> :3001)
-npm run dev:server       # API only
-npm run dev:ui           # UI only
-npm run lint             # tsc --noEmit over src/, server/ AND electron/ (the only lint/typecheck)
-npm run build            # prisma generate && tsc && vite build
+npm run dev              # desktop app with hot reload (electron-vite dev --watch; API in the Electron main process on :3001)
+npm run lint             # tsc --noEmit over src/, shared/, server/, electron/ and scripts/ (the only lint/typecheck)
+npm run build            # prisma generate && tsc && electron-vite build (into out/)
 npm run prisma:generate  # required after editing prisma/schema.prisma (output: server/generated/prisma, gitignored)
 
 npm test                 # vitest unit tests (*.spec.ts, pure logic only, no DB)
 npx vitest run server/backup/schedule.spec.ts   # a single unit spec
 
-npm run dev:electron     # desktop app in dev (needs `npm run rebuild:electron` first, see below)
-npm run build:unpack     # packaged app in release/<platform>-unpacked, then restores the Node build
+npm run build:unpack     # packaged app in release/<platform>-unpacked
 npm run build:win        # Windows NSIS installer (run on Windows)
 
 npm run test:functional  # end-to-end business flow (15 steps)
@@ -31,21 +28,24 @@ npm run test:phase4      # backup retention, verification, offline scheduler, ba
 npm run test:phase5      # server sessions, Developer-only admin permissions, Demo/Full license
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate
+npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
 ```
 
+There is no browser mode: the app only runs as the desktop app. `scripts/electron.mjs` launches `dev` and the integration suites.
+
 Testing notes:
-- Two kinds of tests. `npm test` runs vitest unit specs next to the code (`server/**/*.spec.ts`, `shared/**/*.spec.ts`, `src/**/*.spec.ts`); keep them free of DB imports (that is why the schedule math lives in `server/backup/schedule.ts`). The `test:*` suites are standalone `tsx` integration scripts that import `app` from `server/api.ts`.
-- Run a single integration suite directly: `npx tsx server/tests/phase3_test.ts`. There is no per-case filter.
+- Two kinds of tests. `npm test` runs vitest unit specs next to the code (`server/**/*.spec.ts`, `shared/**/*.spec.ts`, `src/**/*.spec.ts`); keep them free of DB imports (that is why the schedule math lives in `server/backup/schedule.ts`). The `test:*` suites are standalone integration scripts that import `app` from `server/api.ts`. They run on Electron's own Node runtime (`ELECTRON_RUN_AS_NODE=1 electron --import tsx`), so they use the same better-sqlite3 build as the app.
+- Run a single integration suite: `node scripts/electron.mjs test server/tests/phase3_test.ts`. There is no per-case filter.
 - Every suite imports `./testEnv` **first**. It points `PHARMACARE_DATA_DIR`/`PHARMACARE_BACKUP_DIR` at an OS temp folder (a **fresh** database with the sample catalog, `PHARMACARE_SAMPLE_DATA=true`) and installs a fixed test developer key, so suites never touch real data, backups or the real license. Keep that import first in new suites (ES modules run imports in order).
 - Suites always start an in-process server (sessions live in that process) and authenticate with `authHeaders(user)` / `adminAuthHeaders()` from `server/tests/testAuth.ts`, which mint session tokens directly. Fixtures there: `ensureTestAdmin()` (`admin` / `admin123`, test DB only), `ensureTestDeveloper()`, and `useFullTestLicense()` (marks setup completed and signs a Full license). Pass `{ Authorization: '' }` to send a request with no session.
 - The backup scheduler does not start when `TEST_MODE` is set, so the suites exit on their own.
-- A running `npm run dev` (tsx watch) reloads on every edit and keeps using the real database and backups folder (it may run scheduled backups while you work).
+- A running `npm run dev` restarts the app when main/server files change, hot-reloads the UI, and keeps using the real database and backups folder (it may run scheduled backups while you work).
 - `PHARMACARE_SAMPLE_DATA=true` (set in `.env` for development and by `testEnv.ts`) seeds a demo store, medicines and khata customers into an empty database (`server/database/sampleData.ts`). The packaged app never sets it, so a real install starts empty.
 
 ## Architecture
 
 **Server layout.**
-- `server/api.ts` is the entry point (Prisma init, backup scheduler, `listen` when run directly) and re-exports `app` for Electron and the tests.
+- `server/api.ts` is the entry point (Prisma init, backup scheduler) and re-exports `app`; Electron and the tests call `listen` themselves.
 - `server/app.ts` builds the Express app: JSON body parser, the session/license gate, `PUBLIC_API_ROUTES`, the routers and a JSON error handler. No CORS: the UI is always same-origin (Vite proxy in dev, served by the API when packaged).
 - `server/routes/*.ts`: one `Router` per area (`setup`, `auth`, `users`, `developer`, `license`, `developerAdmin`, `roles`, `companies`, `customers`, `products`, `sales`, `purchases`, `reports`, `utilities`, `shifts`, `settings`, `dashboard`). Routes keep their full `/api/...` paths.
 - `server/http/context.ts`: `getActingUser`, `sessionIdentity`, `hasRolePermission`, `requirePermission(req, res, key, message)`, `isSetupLocked`, and `sendError(res, error, status?)`. Always answer failures with `sendError`: our own `Error` messages pass through, while database/driver errors become a plain message (and are logged), so internals never reach the screen.
@@ -125,10 +125,10 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - Main dynamically imports `server/api.ts` after setting `PHARMACARE_DATA_DIR` / `PHARMACARE_BACKUP_DIR` to the per-user folder (packaged only), and listens on `127.0.0.1:${PHARMACARE_API_PORT || 3001}`.
 - Packaged: the same Express app serves `out/renderer`, so the window loads `http://127.0.0.1:3001` and relative `/api` calls work. Dev: the window loads electron-vite's dev server, which proxies `/api`.
 - Hardened when packaged: no menu, no DevTools, reload/inspector keys blocked, navigation locked. Exposes `window.electronAPI` (thermal print, backup/restore file dialogs) via a CommonJS preload.
-- **Native module ABI:** better-sqlite3 is compiled for one runtime at a time. `rebuild:electron` before `dev:electron`; `rebuild:node` before `npm run dev` / tests. `build:unpack`/`build:win` restore the Node build automatically. All of these clear `node_modules/better-sqlite3/build/Release/.forge-meta` (`native:reset`); a stale marker makes electron-builder skip its rebuild and ship the Node binary.
+- **Native module ABI:** better-sqlite3 is compiled for one runtime at a time, and everything (dev, integration suites, builds) runs on Electron's runtime, so it always stays the Electron build. `scripts/electron.mjs` probes it and runs `npm run rebuild` once if it does not load (e.g. after `npm install`, which builds it for plain Node). `rebuild`/`build:unpack`/`build:win` clear `node_modules/better-sqlite3/build/Release/.forge-meta` (`native:reset`); a stale marker makes electron-builder skip its rebuild and ship the Node binary.
 - `build:unpack`/`build:win` need `.env.developer`; the key ends up inside the build, so never share a build made with a test key.
 - **Electron is pinned to 42**: the newest better-sqlite3 on npm accepted by the Prisma adapter (12.11.1) has no binaries for newer Electron. Upgrade once better-sqlite3 12.12+ is published.
-- VS Code terminals export `ELECTRON_RUN_AS_NODE=1`, which makes Electron run as plain Node. Run the app with `env -u ELECTRON_RUN_AS_NODE`.
+- VS Code terminals export `ELECTRON_RUN_AS_NODE=1`, which makes Electron run as plain Node; `scripts/electron.mjs dev` removes it before launching.
 - `appId` (`com.pharmacarepro.desktop`) must never change after the first client release.
 
 ## Conventions

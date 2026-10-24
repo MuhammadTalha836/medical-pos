@@ -179,8 +179,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 ├── index.html                  # HTML entry (no external resources)
 ├── electron.vite.config.ts     # Desktop build (bakes in the developer key)
 ├── electron-builder.yml        # Installer config (appId never changes)
-├── tsconfig.json               # Strict, noUnusedLocals/Parameters on
-└── vite.config.ts              # Vite dev server with /api proxy to :3001
+└── tsconfig.json               # Strict, noUnusedLocals/Parameters on
 ```
 
 ### Naming Conventions:
@@ -246,13 +245,11 @@ When modifying or extending this project, you **MUST** follow these strict rules
 ## 5. Development Workflow & Commands
 
 ### Running Development Mode
-Run both backend API and Vite UI concurrently:
+The app runs only as a desktop app (there is no browser mode):
 ```bash
 npm run dev
 ```
-Or run individually:
-- **Backend API**: `npm run dev:server` (runs on `http://localhost:3001` with `tsx watch`)
-- **Frontend UI**: `npm run dev:ui` (runs on `http://localhost:5173`)
+This opens the desktop window with hot reload. The API runs inside the app on `127.0.0.1:3001`; edits to `server/` or `electron/` restart it.
 
 ### Automated Functional Testing
 Execute the complete end-to-end integration test suite (15 core tests covering auth, shifts, dual-unit sales, open-sale rules, returns, khata, purchases, P&L, backups, anti-duplicate concurrency, and invoice settings):
@@ -268,7 +265,7 @@ npm run test:phase3   # Thermal-only templates, protected identity, footer, sale
 npm run test:phase4   # Backup retention, verification, offline scheduler, backup RBAC
 npm run test:phase5   # Server sessions, Developer-only admin permissions, Demo/Full license
 ```
-*(All suites run on a temporary copy of `data/pharmacy.db` with a test developer key; see `server/tests/testEnv.ts`.)*
+*(All suites run on a fresh temporary database with a test developer key, using the desktop app's runtime; see `server/tests/testEnv.ts` and `scripts/electron.mjs`.)*
 
 ### Type Checking & Linting
 ```bash
@@ -280,22 +277,15 @@ npm run lint
 ```bash
 npm run build
 ```
-*(Executes `prisma generate`, `tsc` type-checking, and builds production bundles into `dist/`)*
-
-### Starting Electron Desktop App
-```bash
-npm run rebuild:electron   # compile better-sqlite3 for Electron
-npm run dev:electron       # desktop app with hot reload
-npm run rebuild:node       # switch better-sqlite3 back before npm run dev / tests
-```
+*(Executes `prisma generate`, `tsc` type-checking, and builds the desktop bundles into `out/`; needs `.env.developer`)*
 
 ### Packaging
 ```bash
 npm run developer:key  # once: create the developer master key (required for packaging)
-npm run build:unpack   # unpacked app in release/ (restores the Node build afterwards)
+npm run build:unpack   # unpacked app in release/
 npm run build:win      # Windows NSIS installer (run on Windows)
 ```
-*(Electron is pinned to 42 until better-sqlite3 12.12+ with newer Electron binaries is published on npm. In VS Code terminals, unset `ELECTRON_RUN_AS_NODE` before launching the app.)*
+*(Electron is pinned to 42 until better-sqlite3 12.12+ with newer Electron binaries is published on npm.)*
 
 ### Unit Tests
 ```bash
