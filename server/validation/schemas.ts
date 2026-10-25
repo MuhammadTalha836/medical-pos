@@ -156,6 +156,20 @@ export const supplierPaymentSchema = z.looseObject({
   notes: z.string().trim().max(200, { error: 'Notes cannot exceed 200 characters' }).nullish()
 });
 
+export const createPurchaseReturnSchema = z.looseObject({
+  company_id: z.coerce.number({ error: 'Choose the supplier' }).int().positive({ error: 'Choose the supplier' }),
+  purchase_id: z.coerce.number().int().positive().nullish(),
+  return_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Return date must be a valid date' }).optional(),
+  reason: z.string().trim().max(300, { error: 'Reason cannot exceed 300 characters' }).nullish(),
+  is_expiry_claim: z.boolean().optional(),
+  items: z.array(z.looseObject({
+    product_id: z.coerce.number({ error: 'Each line needs a medicine' }).int().positive({ error: 'Each line needs a medicine' }),
+    quantity_boxes: z.coerce.number({ error: 'Each line needs a quantity' }).int({ error: 'Return whole boxes only' }).min(1, { error: 'Each line needs at least 1 box' }),
+    purchase_item_id: z.coerce.number().int().positive().nullish(),
+    batch_no: z.string().trim().max(60, { error: 'Batch number is too long' }).nullish()
+  }), { error: 'Add at least one medicine to return.' }).min(1, { error: 'Add at least one medicine to return.' })
+});
+
 const customerPhone = z.string({ error: 'Customer phone number is required' }).trim()
   .refine(isValidPhone, { error: `Enter a valid phone number (${PHONE_MIN_DIGITS}-${PHONE_MAX_DIGITS} digits)` });
 

@@ -61,7 +61,9 @@ export const SupplierStatementModal: React.FC<SupplierStatementModalProps> = ({ 
                 { label: 'Total bought', value: ledger.totals.purchased },
                 { label: 'Total paid', value: ledger.totals.paid },
                 { label: 'Returns credit', value: ledger.totals.returned },
-                { label: 'Balance owed', value: ledger.totals.balance }
+                ledger.totals.balance < -0.005
+                  ? { label: 'They owe you', value: -ledger.totals.balance }
+                  : { label: 'Balance owed', value: ledger.totals.balance }
               ].map(card => (
                 <div key={card.label} className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-surface-inset-dark">
                   <div className="text-2xs text-slate-500 dark:text-slate-400">{card.label}</div>

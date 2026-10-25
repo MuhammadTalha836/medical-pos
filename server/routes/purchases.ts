@@ -32,6 +32,58 @@ router.get('/api/purchases', async (req: Request, res: Response) => {
   }
 });
 
+// One purchase with its lines; each line says how many boxes can still go back to the supplier
+router.get('/api/purchases/:id', async (req: Request, res: Response) => {
+  try {
+    if (!(await requirePermission(req, res, 'purchases', 'You do not have access to purchases.'))) return;
+    const purchase = await prisma.purchase.findUnique({
+      where: { id: Number(req.params.id) || 0 },
+      include: { items: { include: { returnItems: { select: { quantityBoxes: true } } }, orderBy: { id: 'asc' } }, company: { select: { code: true } } }
+    });
+    if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
+    const due = (await loadSupplierLedger(purchase.companyId)).dues.find(d => d.id === purchase.id);
+    res.json({
+      id: purchase.id,
+      invoice_no: purchase.invoiceNo,
+      supplier_invoice_no: purchase.supplierInvoiceNo,
+      company_id: purchase.companyId,
+      company_name: purchase.companyName,
+      company_code: purchase.company.code,
+      purchase_date: purchase.purchaseDate,
+      total_gross: purchase.totalGross,
+      discount_amount: purchase.discountAmount,
+      tax_amount: purchase.taxAmount,
+      net_total: purchase.netTotal,
+      paid_amount: purchase.paidAmount,
+      payment_status: due?.status ?? purchase.paymentStatus,
+      amount_due: due?.due ?? 0,
+      notes: purchase.notes,
+      created_at: purchase.createdAt,
+      items: purchase.items.map(item => {
+        const returned = item.returnItems.reduce((sum, r) => sum + r.quantityBoxes, 0);
+        return {
+          id: item.id,
+          purchase_id: item.purchaseId,
+          product_id: item.productId,
+          product_name: item.productName,
+          batch_no: item.batchNo,
+          expiry_date: item.expiryDate,
+          quantity_boxes: item.quantityBoxes,
+          bonus_boxes: item.bonusBoxes,
+          box_cost_price: item.boxCostPrice,
+          box_retail_price: item.boxRetailPrice,
+          discount_pct: item.discountPct,
+          total_cost: item.totalCost,
+          returned_boxes: returned,
+          returnable_boxes: Math.max(0, item.quantityBoxes + item.bonusBoxes - returned)
+        };
+      })
+    });
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
 router.post('/api/purchases', async (req: Request, res: Response) => {
   try {
     if (!(await requirePermission(req, res, 'can_add_purchase', 'You do not have permission to record purchases.'))) return;

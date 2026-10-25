@@ -23,7 +23,11 @@ import {
   DeveloperSettingsPayload,
   SupplierSummary,
   SupplierLedger,
-  SupplierPaymentMethod
+  SupplierPaymentMethod,
+  PurchaseReturnSummary,
+  PurchaseReturnDetails,
+  ExpiryCandidate,
+  PurchaseReturnLineInput
 } from '../types';
 
 const API_BASE = '/api';
@@ -159,6 +163,14 @@ export const api = {
 
   // Purchases
   getPurchases: () => get<PurchaseInvoice[]>('/purchases'),
+  getPurchaseById: (id: number) => get<PurchaseInvoice>(`/purchases/${id}`),
+
+  // Returns to suppliers and expiry claims
+  getPurchaseReturns: () => get<PurchaseReturnSummary[]>('/purchase-returns'),
+  getPurchaseReturn: (id: number) => get<PurchaseReturnDetails>(`/purchase-returns/${id}`),
+  getExpiryCandidates: (days: number) => get<ExpiryCandidate[]>('/purchase-returns/expiry-candidates', { days }),
+  createPurchaseReturn: (data: { company_id: number; purchase_id?: number | null; reason?: string; is_expiry_claim?: boolean; items: PurchaseReturnLineInput[] }) =>
+    post<{ success: boolean; id: number; returnNo: string; totalCredit: number }>('/purchase-returns', data),
   createPurchase: (data: unknown) => post<{ success: boolean; purchaseId: number; invoiceNo: string; netTotal: number; paidAmount: number }>('/purchases', data),
 
   // Suppliers (payables)

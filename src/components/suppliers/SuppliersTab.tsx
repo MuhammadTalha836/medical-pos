@@ -139,8 +139,9 @@ export const SuppliersTab: React.FC<SuppliersTabProps> = ({ settings, money, cur
                   <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300">{s.phone || '-'}</td>
                   <td className="py-3 px-4 text-right font-mono text-slate-600 dark:text-slate-300">{money(s.total_purchased)}</td>
                   <td className="py-3 px-4 text-right font-mono text-emerald-600 dark:text-emerald-400">{money(s.total_paid + s.total_returned)}</td>
-                  <td className={`py-3 px-4 text-right font-mono font-bold text-sm ${s.balance > 0.005 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                    {money(s.balance)}
+                  <td className={`py-3 px-4 text-right font-mono font-bold text-sm ${s.balance > 0.005 ? 'text-amber-600 dark:text-amber-400' : s.balance < -0.005 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                    {money(Math.abs(s.balance))}
+                    {s.balance < -0.005 && <div className="text-2xs font-sans font-semibold">They owe you</div>}
                   </td>
                   <td className="py-3 px-4 text-center font-mono">{s.unpaid_bills || '-'}</td>
                   <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300">{s.last_purchase_date || '-'}</td>

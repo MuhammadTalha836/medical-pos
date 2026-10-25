@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/apiService';
 import { PurchaseInvoice, Company, Product, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
@@ -10,13 +10,16 @@ import {
   CheckCircle2,
   Printer,
   ClipboardList,
-  Wallet
+  Wallet,
+  PackageX
 } from 'lucide-react';
 import { currencySymbol, moneyFormatter } from '../utils/format';
 import { useAuthStore } from '../store/useAuthStore';
+import { printDocument } from '../utils/printDocument';
 import { SuppliersTab } from '../components/suppliers/SuppliersTab';
+import { PurchaseReturnsTab } from '../components/purchaseReturns/PurchaseReturnsTab';
 
-type PurchasesTabKey = 'purchases' | 'suppliers';
+type PurchasesTabKey = 'purchases' | 'suppliers' | 'returns';
 type PaymentChoice = 'full' | 'credit' | 'part';
 
 const PAYMENT_BADGE: Record<string, string> = { Paid: 'badge-success', Partial: 'badge-warning', Pending: 'badge-danger' };
@@ -67,7 +70,20 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
   const [lineRetail, setLineRetail] = useState(120);
 
   // View Modal
-  const [viewInvoice, setViewInvoice] = useState<any | null>(null);
+  const [viewInvoice, setViewInvoice] = useState<PurchaseInvoice | null>(null);
+  const voucherRef = useRef<HTMLDivElement>(null);
+
+  // The list row shows at once; the lines load from the purchase details
+  const openVoucher = async (purchase: PurchaseInvoice) => {
+    setViewInvoice({ ...purchase, items: undefined });
+    try {
+      const details = await api.getPurchaseById(purchase.id);
+      setViewInvoice(current => (current?.id === purchase.id ? details : current));
+    } catch (err: any) {
+      setViewInvoice(null);
+      alert('The purchase could not be opened: ' + err.message);
+    }
+  };
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const money = moneyFormatter(settings);
@@ -239,7 +255,8 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800" role="tablist">
         {([
           { key: 'purchases', label: 'Purchases', icon: ClipboardList },
-          { key: 'suppliers', label: 'Suppliers (payables)', icon: Wallet }
+          { key: 'suppliers', label: 'Suppliers (payables)', icon: Wallet },
+          { key: 'returns', label: 'Returns to Supplier', icon: PackageX }
         ] as const).map(t => (
           <button
             key={t.key}
@@ -266,6 +283,21 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           currency={currency}
           canPay={hasPermission('can_pay_supplier')}
           refreshKey={suppliersRefreshKey}
+        />
+      )}
+
+      {tab === 'returns' && (
+        <PurchaseReturnsTab
+          settings={settings}
+          companies={companies}
+          products={products}
+          purchases={purchases}
+          money={money}
+          canReturn={hasPermission('can_return_purchase')}
+          onChanged={() => {
+            loadData();
+            setSuppliersRefreshKey(k => k + 1);
+          }}
         />
       )}
 
@@ -344,7 +376,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                     </td>
                     <td className="py-3 px-4 text-center">
                       <button
-                        onClick={() => setViewInvoice(pur)}
+                        onClick={() => openVoucher(pur)}
                         className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#162032] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors inline-flex items-center space-x-1"
                       >
                         <Eye className="w-4 h-4 text-teal-600 dark:text-teal-400" />
@@ -619,35 +651,64 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       <Modal
         isOpen={!!viewInvoice}
         onClose={() => setViewInvoice(null)}
-        title={`Purchase Inward Voucher - ${viewInvoice?.invoice_no}`}
-        maxWidth="max-w-md"
+        title={`Purchase Voucher - ${viewInvoice?.invoice_no ?? ''}`}
+        maxWidth="max-w-3xl"
       >
         {viewInvoice && (
           <div className="space-y-4 text-xs">
-            <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2">
-              <div className="flex justify-between font-bold text-slate-900 dark:text-white">
-                <span>{viewInvoice.company_name}</span>
-                <span className="text-teal-600 dark:text-teal-400">{viewInvoice.invoice_no}</span>
+            <div ref={voucherRef} className="space-y-3 text-slate-800 dark:text-slate-200">
+              <div className="bg-slate-50 dark:bg-surface-inset-dark p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+                <h1 className="text-base font-extrabold text-slate-900 dark:text-white">{settings?.store_name || 'Purchase voucher'}</h1>
+                <p><strong>{viewInvoice.company_name}</strong>, purchase {viewInvoice.invoice_no}</p>
+                <p className="muted text-slate-500 dark:text-slate-400">Date {viewInvoice.purchase_date}, supplier bill {viewInvoice.supplier_invoice_no || '-'}</p>
+                <p>
+                  Status <strong>{viewInvoice.payment_status}</strong>
+                  {(viewInvoice.amount_due ?? 0) > 0.005 && <>, due <strong>{money(viewInvoice.amount_due ?? 0)}</strong></>}
+                </p>
               </div>
-              <div className="flex justify-between text-slate-500 dark:text-slate-400 text-xs">
-                <span>Date: {viewInvoice.purchase_date}</span>
-                <span>Supplier Bill: {viewInvoice.supplier_invoice_no || '-'}</span>
-              </div>
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Total Net Amount:</span>
-                <span className="font-extrabold font-mono text-teal-600 dark:text-teal-400">{money(viewInvoice.net_total)}</span>
-              </div>
+
+              {!viewInvoice.items ? (
+                <p className="py-4 text-center text-slate-500 dark:text-slate-400">Loading lines…</p>
+              ) : (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300">
+                    <tr>
+                      <th className="py-2 px-3">Medicine</th>
+                      <th className="py-2 px-3">Batch / expiry</th>
+                      <th className="py-2 px-3 text-right num">Boxes</th>
+                      <th className="py-2 px-3 text-right num">Cost</th>
+                      <th className="py-2 px-3 text-right num">Disc %</th>
+                      <th className="py-2 px-3 text-right num">Total</th>
+                      <th className="py-2 px-3 text-right num">Returned</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {viewInvoice.items.map(item => (
+                      <tr key={item.id}>
+                        <td className="py-2 px-3">{item.product_name}</td>
+                        <td className="py-2 px-3 font-mono">{item.batch_no}{item.expiry_date ? `, ${item.expiry_date}` : ''}</td>
+                        <td className="py-2 px-3 text-right font-mono num">{item.quantity_boxes}{item.bonus_boxes > 0 ? ` + ${item.bonus_boxes}` : ''}</td>
+                        <td className="py-2 px-3 text-right font-mono num">{money(item.box_cost_price)}</td>
+                        <td className="py-2 px-3 text-right font-mono num">{item.discount_pct || 0}</td>
+                        <td className="py-2 px-3 text-right font-mono num">{money(item.total_cost)}</td>
+                        <td className="py-2 px-3 text-right font-mono num">{item.returned_boxes || '-'}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td colSpan={5} className="py-2 px-3 text-right font-bold">Net total</td>
+                      <td className="py-2 px-3 text-right font-mono font-bold num">{money(viewInvoice.net_total)}</td>
+                      <td />
+                    </tr>
+                  </tbody>
+                </table>
+              )}
             </div>
 
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setViewInvoice(null)} className="btn-secondary">Close</button>
               <button
-                onClick={() => setViewInvoice(null)}
-                className="btn-secondary"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => window.print()}
+                onClick={() => printDocument(voucherRef.current, `Purchase ${viewInvoice.invoice_no}`)}
+                disabled={!viewInvoice.items}
                 className="btn-print"
               >
                 <Printer className="w-4 h-4" />

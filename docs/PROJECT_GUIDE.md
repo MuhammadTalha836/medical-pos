@@ -83,6 +83,11 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - Expiry tracking via `product_batches`.
    - Lines are costed on the server (`createPurchaseSchema`): whole boxes, no negative prices, unknown medicines stop the purchase. Payment is Paid in full, On credit or Part paid now (`paid_amount`).
    - **Suppliers (payables) tab (`src/components/suppliers/`)**: what the store owes each company (supplier), from `buildSupplierLedger` (`server/suppliers/ledgerMath.ts`). The balance is worked out every time from purchases, `supplier_payments` and purchase-return credits, never stored. **Pay** (`can_pay_supplier`) records cash/bank/cheque/online payments that settle the oldest bill first and cannot exceed what is owed. **Statement** lists unpaid bills and every entry with a running balance, printed on A4 by `printDocument`. Supplier payments are not part of a shift's drawer cash.
+   - **Returns to Supplier tab (`src/components/purchaseReturns/`)**: returns of goods and expiry claims (`server/routes/purchaseReturns.ts`, rules in `returnMath.ts`, `can_return_purchase`).
+     - Boxes come back from a purchase line (up to bought + bonus − earlier returns, credited at its cost after discount) or from the supplier's stock (credited at trade price), never more than `stock_boxes`.
+     - Stock and the named batch go down, and the credit lowers the supplier balance; a negative balance shows as "They owe you".
+     - The **Expiry claims** panel lists expired and near-expiry batches by supplier, capped by stock until FEFO (M4); "Create claim" fills the form.
+     - Each return prints a return note. The purchase voucher (`GET /api/purchases/:id`) lists its lines with returned boxes.
 
 9. **Reports & Financial Intelligence (`ReportsPage.tsx`)**:
    - Available Stock Valuation (evaluated at both T-Price cost and MRP retail).

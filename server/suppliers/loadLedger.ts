@@ -21,6 +21,6 @@ export async function loadSupplierLedger(companyId: number, db: Db = prisma): Pr
       paidAtPurchase: paidAtPurchase(p.paymentStatus, p.netTotal, p.paidAmount)
     })),
     payments.map(p => ({ id: p.id, date: p.paymentDate, amount: p.amount, method: p.paymentMethod, reference: p.reference, notes: p.notes })),
-    returns.map(r => ({ id: r.id, returnNo: r.returnNo, date: r.returnDate, amount: r.totalRefund }))
+    returns.map(r => ({ id: r.id, returnNo: r.returnNo, date: r.returnDate, amount: r.totalRefund, isExpiryClaim: r.isExpiryClaim === 1 }))
   );
 }

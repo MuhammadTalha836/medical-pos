@@ -12,8 +12,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 
 | Phase | Module | Status |
 |---|---|---|
-| M1 | Supplier / distributor ledger (payables) | ✅ built and tested; waiting for the owner's check |
-| M2 | Purchase returns and expiry claims | ⬜ |
+| M1 | Supplier / distributor ledger (payables) | ✅ |
+| M2 | Purchase returns and expiry claims | ✅ built and tested; waiting for the owner's check |
 | M3 | Reorder / short list | ⬜ |
 | M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ⬜ |
 | M5 | Prescription and controlled-medicine register | ⬜ |
@@ -124,6 +124,26 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 **UI.**
 - Purchases → **Returns** tab with a new return form: pick the supplier, then the purchase or medicine.
 - An **Expiry claim** list of expired and near-expiry batches, grouped by supplier, that can be added to a return in one click.
+
+**Built (2026-10-24):**
+- `server/purchaseReturns/returnMath.ts` (pure, with spec);
+- `server/routes/purchaseReturns.ts`:
+  - list;
+  - details;
+  - `expiry-candidates`;
+  - create.
+- `GET /api/purchases/:id` (lines with `returned_boxes` / `returnable_boxes`);
+- new columns:
+  - `purchase_returns.is_expiry_claim` / `user_id` / `user_name`;
+  - `purchase_return_items.product_name` / `purchase_item_id` / `batch_no`.
+- Purchases → **Returns to Supplier** tab (`PurchaseReturnsTab`, `PurchaseReturnModal`), with a printable return note;
+- the purchase voucher now lists its lines and prints.
+
+**Credit rate:**
+- A line linked to a purchase is credited at its cost after the line discount, bonus boxes included.
+- Unlinked stock is credited at the current trade price.
+
+**Until M4:** batches are not reduced by sales, so the expiry list never offers more than the stock in boxes.
 
 **Tests (`test:m2`):**
 - stock goes down;

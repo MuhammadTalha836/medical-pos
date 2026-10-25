@@ -289,6 +289,7 @@ model PurchaseItem {
 
   purchase       Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product        Product  @relation(fields: [productId], references: [id])
+  returnItems    PurchaseReturnItem[]
 
   @@map("purchase_items")
 }
@@ -302,6 +303,9 @@ model PurchaseReturn {
   returnDate  String               @map("return_date")
   totalRefund Float                @default(0.0) @map("total_refund")
   reason      String?
+  isExpiryClaim Int                @default(0) @map("is_expiry_claim")
+  userId      Int?                 @map("user_id")
+  userName    String?              @map("user_name")
   createdAt   DateTime             @default(now()) @map("created_at")
 
   purchase    Purchase?            @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
@@ -315,12 +319,16 @@ model PurchaseReturnItem {
   id               Int            @id @default(autoincrement())
   purchaseReturnId Int            @map("purchase_return_id")
   productId        Int            @map("product_id")
+  productName      String?        @map("product_name")
+  purchaseItemId   Int?           @map("purchase_item_id")
+  batchNo          String?        @map("batch_no")
   quantityBoxes    Int            @map("quantity_boxes")
   boxCostPrice     Float          @map("box_cost_price")
   totalRefund      Float          @map("total_refund")
 
   purchaseReturn   PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
   product          Product        @relation(fields: [productId], references: [id])
+  purchaseItem     PurchaseItem?  @relation(fields: [purchaseItemId], references: [id])
 
   @@map("purchase_return_items")
 }

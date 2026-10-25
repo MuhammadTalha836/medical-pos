@@ -27,6 +27,7 @@ export interface LedgerCredit {
   returnNo: string;
   date: string;
   amount: number;
+  isExpiryClaim?: boolean;
 }
 
 export type PurchaseStatus = 'Paid' | 'Partial' | 'Pending';
@@ -109,7 +110,7 @@ export function buildSupplierLedger(purchases: LedgerPurchase[], payments: Ledge
     rows.push({ date: pay.date, order: 2, kind: 'payment', reference: `PAY-${pay.id}`, details: pay.notes ? `${how}: ${pay.notes}` : how, debit: 0, credit: round2(pay.amount) });
   }
   for (const c of credits) {
-    rows.push({ date: c.date, order: 3, kind: 'return', reference: c.returnNo, details: 'Goods returned', debit: 0, credit: round2(c.amount) });
+    rows.push({ date: c.date, order: 3, kind: 'return', reference: c.returnNo, details: c.isExpiryClaim ? 'Expiry claim' : 'Goods returned', debit: 0, credit: round2(c.amount) });
   }
   rows.sort((a, b) => byDate(a, b) || a.order - b.order);
 

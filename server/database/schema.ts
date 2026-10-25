@@ -226,6 +226,9 @@ CREATE TABLE IF NOT EXISTS purchase_returns (
   return_date DATE NOT NULL,
   total_refund REAL NOT NULL DEFAULT 0.0,
   reason TEXT,
+  is_expiry_claim INTEGER NOT NULL DEFAULT 0,
+  user_id INTEGER,
+  user_name TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -234,6 +237,9 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   purchase_return_id INTEGER NOT NULL REFERENCES purchase_returns(id) ON DELETE CASCADE,
   product_id INTEGER NOT NULL REFERENCES products(id),
+  product_name TEXT,
+  purchase_item_id INTEGER REFERENCES purchase_items(id),
+  batch_no TEXT,
   quantity_boxes INTEGER NOT NULL,
   box_cost_price REAL NOT NULL,
   total_refund REAL NOT NULL
@@ -381,5 +387,11 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definitio
   { table: 'backup_history', column: 'cloud_status', definition: 'TEXT' },
   { table: 'backup_history', column: 'cloud_file_id', definition: 'TEXT' },
   { table: 'backup_history', column: 'cloud_uploaded_at', definition: 'DATETIME' },
-  { table: 'backup_history', column: 'cloud_error', definition: 'TEXT' }
+  { table: 'backup_history', column: 'cloud_error', definition: 'TEXT' },
+  { table: 'purchase_returns', column: 'is_expiry_claim', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'purchase_returns', column: 'user_id', definition: 'INTEGER' },
+  { table: 'purchase_returns', column: 'user_name', definition: 'TEXT' },
+  { table: 'purchase_return_items', column: 'product_name', definition: 'TEXT' },
+  { table: 'purchase_return_items', column: 'purchase_item_id', definition: 'INTEGER REFERENCES purchase_items(id)' },
+  { table: 'purchase_return_items', column: 'batch_no', definition: 'TEXT' }
 ];

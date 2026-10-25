@@ -30,6 +30,7 @@ npm run test:phase6      # khata customers: unique phone, credit sales need a sa
 npm run test:phase7      # online backup to Google Drive (Google faked by a fetch stub): mode, sign-in, encrypted upload, retry, restore
 npm run test:phase8      # server-side sale pricing, oversell/cash checks, returns, shift cash, khata payments, role escalation, login lockout
 npm run test:m1          # supplier ledger: purchases costed on the server, paid now, payments, statement (docs/FEATURE_ROADMAP.md)
+npm run test:m2          # returns to supplier and expiry claims: stock, batch and balance go down, over-return checks
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -124,6 +125,11 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - `GET /api/purchases` shows each bill's derived status and `amount_due`.
 - Routes: `GET /api/suppliers`, `GET /api/suppliers/:id/ledger` and `POST /api/suppliers/:id/payments` (`can_pay_supplier`, checked inside the transaction).
 - `POST /api/purchases` validates with `createPurchaseSchema` and costs every line itself.
+- `GET /api/purchases/:id` returns the lines with `returned_boxes` / `returnable_boxes`.
+- **Returns to suppliers** (`server/routes/purchaseReturns.ts`, rules in `server/purchaseReturns/returnMath.ts`, `can_return_purchase`) work in whole boxes.
+  - A line linked to a purchase is limited to bought + bonus − earlier returns, and credited at its cost after the line discount. Unlinked stock is limited to the supplier's own medicines and credited at the trade price.
+  - Every line is capped by `stock_boxes`. A return lowers stock and the named batch, and its `total_refund` is a credit in the supplier ledger.
+  - `GET /api/purchase-returns/expiry-candidates?days=` lists claimable batches, capped by stock until FEFO (M4).
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**

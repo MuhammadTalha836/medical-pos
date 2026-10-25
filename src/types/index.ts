@@ -237,6 +237,9 @@ export interface PurchaseItem {
   box_retail_price: number;
   discount_pct: number;
   total_cost: number;
+  /** Purchase details only: boxes already sent back, and still returnable (bought + bonus − returned) */
+  returned_boxes?: number;
+  returnable_boxes?: number;
 }
 
 export interface PurchaseInvoice {
@@ -274,6 +277,52 @@ export interface SupplierSummary {
   balance: number;
   unpaid_bills: number;
   last_purchase_date: string | null;
+}
+
+/** A return of goods to a supplier (or an expiry claim) */
+export interface PurchaseReturnSummary {
+  id: number;
+  return_no: string;
+  company_id: number;
+  company_name: string;
+  purchase_invoice_no: string | null;
+  return_date: string;
+  total_credit: number;
+  reason: string | null;
+  is_expiry_claim: boolean;
+  items_count: number;
+  user_name: string | null;
+}
+
+export interface PurchaseReturnDetails extends Omit<PurchaseReturnSummary, 'items_count'> {
+  company_code: string;
+  company_phone: string | null;
+  supplier_invoice_no: string | null;
+  items: Array<{ id: number; product_id: number; product_name: string; p_code: string; batch_no: string | null; quantity_boxes: number; rate: number; credit: number }>;
+}
+
+/** Expired or near-expiry stock that can be claimed back from its supplier */
+export interface ExpiryCandidate {
+  batch_id: number;
+  product_id: number;
+  product_name: string;
+  company_id: number;
+  company_name: string;
+  batch_no: string;
+  expiry_date: string;
+  expired: boolean;
+  days_left: number;
+  boxes: number;
+  purchase_item_id: number | null;
+  rate: number;
+  credit: number;
+}
+
+export interface PurchaseReturnLineInput {
+  product_id: number;
+  quantity_boxes: number;
+  purchase_item_id?: number | null;
+  batch_no?: string | null;
 }
 
 export type SupplierPaymentMethod = 'cash' | 'bank' | 'cheque' | 'online';

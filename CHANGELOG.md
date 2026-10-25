@@ -14,6 +14,16 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M2: returns to supplier and expiry claims)
+- Purchases → **Returns to Supplier** tab.
+  - **Expiry claims** lists expired and soon-expiring stock (30/60/90/180 days) by supplier; **Create claim** fills a claim with those boxes in one click.
+  - **New Return** sends boxes back from one of the supplier's purchases (credited at what was paid, after the line discount) or from any of its medicines in stock (credited at the trade price).
+  - Stock and the batch go down, and the credit lowers what is owed to that supplier. When credits pass what is owed, the Suppliers tab shows "They owe you".
+  - You cannot return more than was bought (bonus included) minus earlier returns, more than is in stock, or another supplier's medicine.
+  - Every return has a printable return note.
+- New permission "Return Goods to Supplier" (`can_return_purchase`): Admin yes, Cashier no.
+- The purchase voucher now lists its medicines, batches, discounts and returned boxes, and prints on A4 (it printed a blank page before).
+
 ### Added (M1: supplier ledger, see docs/FEATURE_ROADMAP.md)
 - Purchases → **Suppliers (payables)** tab: what the store owes each distributor, total owed, a search box and an "only suppliers I owe" filter. **Pay** records a cash, bank, cheque or online payment (with a cheque or transaction number); it settles the oldest unpaid bill first and cannot be more than what is owed. **Statement** shows the unpaid bills and every purchase, payment and return with a running balance, and prints on A4.
 - New purchase: **Payment** is now Paid in full / On credit / Part paid now (with the amount). The purchase list shows each bill's real status (Paid, Partial, Pending) and the amount still due, including later payments.
