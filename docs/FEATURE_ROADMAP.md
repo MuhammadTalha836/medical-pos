@@ -16,8 +16,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | M2 | Purchase returns and expiry claims | ✅ |
 | M3 | Reorder / short list | ✅ |
 | M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ✅ |
-| M5 | Prescription and controlled-medicine register | ✅ built and tested; waiting for the owner's check |
-| M6 | Generic / substitute search | ⬜ |
+| M5 | Prescription and controlled-medicine register | ✅ |
+| M6 | Generic / substitute search | ✅ built and tested; waiting for the owner's check |
 | M7 | WhatsApp receipts and khata reminders | ⬜ |
 | M8 | Expenses and day close (cash book) | ⬜ |
 | M9 | Physical stock count and stock adjustment | ⬜ |
@@ -269,7 +269,20 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - POS search shows a "Substitutes" button on out-of-stock results, and on `F7` for the highlighted medicine.
 - Medicines form: a generic name field with suggestions.
 
-**Tests:** matching and ordering.
+**Built (2026-10-25):**
+- `shared/generic.ts` (+ spec): `genericKey` and `rankSubstitutes`.
+  - The key ignores case, extra spaces and ingredient order (split on `+`, `,`, `&`, "and"). "500 mg" counts as "500mg".
+  - A different strength is not a substitute. `/` is not a separator, because strengths use it (120mg/5ml).
+  - Order: in stock first, then same unit type, then more stock, then name.
+- `GET /api/products/:id/substitutes` and `GET /api/products/generics?q=`, both login only.
+- POS:
+  - `SubstitutesModal`;
+  - a **Substitutes** button on out-of-stock results and **Alternatives** on the others;
+  - **F7** for the highlighted result or the newest cart line.
+- Medicines form: formula suggestions, and a count of other medicines with the same formula.
+- No schema change.
+
+**Tests:** matching and ordering (`test:m6`).
 
 ## M7: WhatsApp receipts and khata reminders
 **Goal.** Send the receipt or the udhaar balance on WhatsApp, with no paid service.

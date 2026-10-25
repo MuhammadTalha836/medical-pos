@@ -8,6 +8,7 @@ import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { InvoiceTabs } from '../components/pos/InvoiceTabs';
 import { CustomerPicker } from '../components/pos/CustomerPicker';
 import { PrescriptionModal } from '../components/pos/PrescriptionModal';
+import { SubstitutesModal } from '../components/pos/SubstitutesModal';
 import { ScheduleBadge } from '../components/common/ScheduleBadge';
 import { isCounterCustomer } from '../../shared/customers';
 import { missingPrescriptionFields, normalizeSchedule } from '../../shared/schedule';
@@ -155,6 +156,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   const [pendingCloseId, setPendingCloseId] = useState<string | null>(null);
   // Set while the prescription form is open; remembers whether the sale was to be printed (F10) or not (F9)
   const [prescriptionPrompt, setPrescriptionPrompt] = useState<{ shouldPrint: boolean } | null>(null);
+  // The medicine whose same-formula substitutes are shown (F7 or the Substitutes button)
+  const [substitutesFor, setSubstitutesFor] = useState<Product | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const tenderedInputRef = useRef<HTMLInputElement>(null);
@@ -243,12 +246,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   }, []);
 
   keyHandlerRef.current = (e: KeyboardEvent) => {
-      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null || prescriptionPrompt !== null;
+      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null || prescriptionPrompt !== null || substitutesFor !== null;
       const ctrl = e.ctrlKey || e.metaKey;
       // The close-invoice question takes Enter/Esc itself; no other shortcut runs behind it
       if (pendingCloseId !== null && e.key !== 'Escape') return;
       // The prescription form takes the keyboard (its own Esc closes it); no shortcut runs behind it
       if (prescriptionPrompt !== null) return;
+      // The substitutes list takes the arrows, Enter and Esc itself
+      if (substitutesFor !== null) return;
 
       // Invoice tabs: Ctrl+T new, Ctrl+W close, Ctrl+←/→ or Ctrl+(Shift+)Tab switch, Ctrl+1…9 jump
       if (ctrl && !e.altKey) {
@@ -288,6 +293,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         e.preventDefault();
         customerNameInputRef.current?.focus();
         customerNameInputRef.current?.select();
+      }
+      // F7: Substitutes (same formula) for the highlighted search result, else the newest cart line
+      else if (e.key === 'F7') {
+        e.preventDefault();
+        if (e.repeat) return;
+        const target = searchResults[selectedResultIdx] ?? cart[0]?.product;
+        if (target) openSubstitutes(target);
+        else setErrorMessage('Search for a medicine first, then press F7 to see substitutes with the same formula.');
       }
       // 4. F6: Apply a discount, subject to permissions
       else if (e.key === 'F6') {
@@ -383,6 +396,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     setSearchQuery('');
     setSearchResults([]);
     searchInputRef.current?.focus();
+  };
+
+  const openSubstitutes = (product: Product) => {
+    // Focus leaves the search box so its own Enter handler does not add the searched medicine
+    (document.activeElement as HTMLElement | null)?.blur();
+    setSubstitutesFor(product);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
@@ -661,6 +680,19 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                         const canOpen = prod.allow_open_sale !== false && prod.allow_open_sale !== 0;
                         return (
                           <div className="flex items-center space-x-1">
+                            {prod.generic_name && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openSubstitutes(prod);
+                                }}
+                                title="Medicines with the same formula [F7]"
+                                className={isOut ? 'btn-primary btn-sm' : 'btn-secondary btn-sm'}
+                              >
+                                {isOut ? 'Substitutes' : 'Alternatives'}
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1124,6 +1156,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F3</kbd><span className="text-xs font-medium text-slate-300">Search</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F4</kbd><span className="text-xs font-medium text-slate-300">Customer</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F6</kbd><span className="text-xs font-medium text-slate-300">Discount</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F7</kbd><span className="text-xs font-medium text-slate-300">Substitutes</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F8</kbd><span className="text-xs font-medium text-slate-300">Payment</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-emerald-400 rounded-sm border border-slate-700 shadow-2xs">F9</kbd><span className="text-xs font-medium text-slate-300">Save</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-amber-400 rounded-sm border border-slate-700 shadow-2xs">F10</kbd><span className="text-xs font-medium text-slate-300">Print</span></span>
@@ -1157,6 +1190,20 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           </div>
         </div>
       </Modal>
+
+      {/* Same-formula substitutes for an out-of-stock (or any) medicine */}
+      <SubstitutesModal
+        product={substitutesFor}
+        money={money}
+        onAdd={(prod, isLoose) => {
+          setSubstitutesFor(null);
+          handleSelectProduct(prod, isLoose);
+        }}
+        onClose={() => {
+          setSubstitutesFor(null);
+          searchInputRef.current?.focus();
+        }}
+      />
 
       {/* Prescription details for controlled medicines (drug-law register) */}
       <PrescriptionModal
@@ -1255,6 +1302,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F6</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Apply Bill Discount</span>
               <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Focuses discount % input. Restricted to authorized cashiers/admins.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F7</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Substitutes</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Medicines with the same formula for the highlighted result (or the newest cart line), in stock first.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">

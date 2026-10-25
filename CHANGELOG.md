@@ -14,6 +14,14 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M6: substitutes by generic formula)
+- **POS Substitutes:**
+  - An out-of-stock search result shows **Substitutes**; other results show **Alternatives**.
+  - **F7** opens the same list for the highlighted result, or for the newest cart line.
+  - The list shows medicines with the same formula, in stock first, with stock, rack and prices. It has + Box and + Loose buttons. ↑/↓ choose, Enter adds a box, Esc closes.
+- **Formula matching:** case, spacing and ingredient order are ignored, so "Paracetamol + Caffeine" = "caffeine, paracetamol" and "500 mg" = "500mg". A different strength is not a substitute.
+- **Medicines → Generic Formula:** suggests formulas already in use and says how many other medicines share the typed formula.
+
 ### Added (M5: prescriptions and controlled-medicine register)
 - **Medicines → Schedule:** each medicine is None, **Prescription (Rx)** or **Controlled** (psychotropic / narcotic). The medicine list shows an Rx or Controlled tag.
 - **POS:**

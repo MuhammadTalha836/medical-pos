@@ -34,6 +34,7 @@ npm run test:m2          # returns to supplier and expiry claims: stock, batch a
 npm run test:m3          # reorder list: below minimum / running out by 30-day sales speed, cover days, filters
 npm run test:m4          # batches: FEFO sales, splits, returns to batch, expired never sold, opening batch, reconcile
 npm run test:m5          # controlled medicines: prescription required, register rows per line, Rx-only free, register filter/returns/access
+npm run test:m6          # substitutes: formula matching (case/spacing/order/strength), in-stock first, exclusions, generics list, login
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -148,6 +149,9 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - `POST /api/sales` takes an optional `prescription` object (one per invoice). A controlled line without patient, doctor and prescription number is refused. Each controlled line gets a `prescription_records` row.
   - The POS keeps the draft prescription per invoice tab (`usePosStore.prescription`) and asks for it in `PrescriptionModal` on F9/F10.
   - `GET /api/reports/controlled-register?date_from=&date_to=` (`reports` permission) lists the rows with the returned quantity (`src/components/reports/ControlledRegister.tsx`).
+- **Substitutes (M6).** `shared/generic.ts`: `genericKey` (case, spacing and ingredient order ignored, strengths kept) and `rankSubstitutes` (in stock first, then same unit type, then stock, then name).
+  - `GET /api/products/:id/substitutes` and `GET /api/products/generics?q=` (login only). They are registered before `/api/products/:id`.
+  - In the POS, `SubstitutesModal` opens on F7 or the Substitutes button.
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**
@@ -198,7 +202,7 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 
 ## Conventions
 
-- Keep the POS keyboard shortcuts working (`F2`–`F10`, `Esc`, `Ctrl+Enter`). `F2`/`Ctrl+T` opens a new invoice tab, `Ctrl+←/→`, `Ctrl+(Shift+)Tab` and `Ctrl+1…9` switch tabs, `Ctrl+W` closes one, `F9` saves and `F10` prints. Submission is guarded by `isSubmittingRef` and `e.repeat` checks against duplicate invoices. The POS keydown handler is attached once and reads the latest state through `keyHandlerRef`.
+- Keep the POS keyboard shortcuts working (`F2`–`F10`, `Esc`, `Ctrl+Enter`). `F2`/`Ctrl+T` opens a new invoice tab, `Ctrl+←/→`, `Ctrl+(Shift+)Tab` and `Ctrl+1…9` switch tabs, `Ctrl+W` closes one, `F7` shows same-formula substitutes, `F9` saves and `F10` prints. Submission is guarded by `isSubmittingRef` and `e.repeat` checks against duplicate invoices. The POS keydown handler is attached once and reads the latest state through `keyHandlerRef`.
 - POS invoice tabs live in `src/store/usePosStore.ts`: the top-level draft fields (`cart`, `customerName`, ...) are always the **active** tab, and `invoices[]` holds the others (`getInvoiceTabs()` returns all of them up to date). Existing cart actions act on the active tab only.
 - Print receipts with `printReceipt` / `printReceiptIn` (`src/utils/printReceipt.ts`), never `window.print()` directly: it honours the per-computer printer and "Print without dialog" preference and falls back to the dialog.
 - The UI uses a teal/slate dark theme with Tailwind `dark:` variants, `lucide-react` icons, and system fonts only (nothing is downloaded at runtime).

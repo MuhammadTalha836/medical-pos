@@ -16,6 +16,7 @@ import {
 import { moneyFormatter } from '../utils/format';
 import { BatchListModal } from '../components/masters/BatchListModal';
 import { ScheduleBadge } from '../components/common/ScheduleBadge';
+import { genericKey } from '../../shared/generic';
 import { MEDICINE_SCHEDULES, MedicineSchedule, SCHEDULE_LABELS, normalizeSchedule } from '../../shared/schedule';
 
 interface MastersPageProps {
@@ -71,6 +72,25 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
 
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const money = moneyFormatter(settings);
+
+  // Formula suggestions while typing the generic name, so the same formula is written the same way
+  const [genericOptions, setGenericOptions] = useState<{ generic_name: string; uses: number }[]>([]);
+  useEffect(() => {
+    if (!isProductModalOpen) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api.getGenericNames(productForm.generic_name.trim() || undefined)
+        .then(rows => { if (!cancelled) setGenericOptions(rows); })
+        .catch(() => { if (!cancelled) setGenericOptions([]); });
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [isProductModalOpen, productForm.generic_name]);
+
+  const formulaKey = genericKey(productForm.generic_name);
+  const sameFormulaCount = formulaKey
+    ? genericOptions.filter(g => genericKey(g.generic_name) === formulaKey).reduce((sum, g) => sum + g.uses, 0)
+      - (editingProduct && genericKey(editingProduct.generic_name) === formulaKey ? 1 : 0)
+    : 0;
 
   const loadData = async () => {
     try {
@@ -621,14 +641,25 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Generic Formula</label>
+              <label htmlFor="product-generic" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Generic Formula</label>
               <input
+                id="product-generic"
                 type="text"
+                list="product-generic-options"
+                autoComplete="off"
                 value={productForm.generic_name}
                 onChange={(e) => setProductForm(prev => ({ ...prev, generic_name: e.target.value }))}
                 placeholder="e.g. Paracetamol + Caffeine"
                 className="field-input w-full"
               />
+              <datalist id="product-generic-options">
+                {genericOptions.map(g => <option key={g.generic_name} value={g.generic_name} />)}
+              </datalist>
+              <p className="field-hint mt-1">
+                {sameFormulaCount > 0
+                  ? `${sameFormulaCount} other ${sameFormulaCount === 1 ? 'medicine has' : 'medicines have'} this formula. The counter offers them as substitutes [F7].`
+                  : 'Pick a suggestion when it matches, so substitutes are found at the counter.'}
+              </p>
             </div>
           </div>
 

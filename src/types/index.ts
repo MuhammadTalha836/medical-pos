@@ -165,6 +165,11 @@ export interface Product {
   updated_at?: string;
 }
 
+export interface SubstitutesResult {
+  product: { id: number; name: string; generic_name: string | null };
+  substitutes: Product[];
+}
+
 export interface ControlledRegisterRow {
   id: number;
   sale_id: number;

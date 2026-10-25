@@ -76,6 +76,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 7. **Coding & Masters (`MastersPage.tsx`)**:
    - Pharmaceutical Company Management (distributors/manufacturers with unique **C-Codes**).
    - Medicine Master with linked C-Code, P-Code (SKU/Barcode), unit type, packaging size, Box Trade Price (T-Price), Box Retail Price (MRP), calculated Per-Unit Price (PP Unit), discount rules, shelf rack locations (`Loc`), and low stock thresholds.
+   - **Generic Formula (M6):** the field suggests formulas already in use (`GET /api/products/generics`) and shows how many other medicines share the typed one (`genericKey` in `shared/generic.ts`).
    - **Schedule (M5):** None, Prescription (Rx) or Controlled (`products.schedule`, `shared/schedule.ts`).
      - Controlled medicines need a prescription at the POS (`PrescriptionModal`: patient, doctor and prescription number required; phone, CNIC, doctor reg. no. and notes optional), once per invoice. The server refuses the sale without it and writes one `prescription_records` row per controlled line.
      - Rx medicines only show a reminder on the cart line.

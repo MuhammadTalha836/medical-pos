@@ -1,6 +1,7 @@
 import {
   BackupStatus,
   ControlledRegisterRow,
+  SubstitutesResult,
   CloudBackupFile,
   CloudBackupStatus,
   CloudConnectProgress,
@@ -144,6 +145,8 @@ export const api = {
   // Products
   getProducts: (params?: { q?: string; company_id?: number; low_stock?: boolean }) => get<Product[]>('/products', params),
   searchProducts: (q: string) => get<Product[]>('/products/search', { q }),
+  getSubstitutes: (id: number) => get<SubstitutesResult>(`/products/${id}/substitutes`),
+  getGenericNames: (q?: string) => get<{ generic_name: string; uses: number }[]>('/products/generics', q ? { q } : undefined),
   createProduct: (data: Partial<Product>) => post<{ success: boolean; id: number }>('/products', data),
   updateProduct: (id: number, data: Partial<Product>) => put<Success>(`/products/${id}`, data),
   deleteProduct: (id: number) => del<Success>(`/products/${id}`),

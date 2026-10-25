@@ -8,6 +8,7 @@ import { syncProductBatches } from '../stock/batchStock';
 import { fefoOrder, isExpired, toUnits } from '../stock/batchMath';
 import { localDateString } from '../../shared/dates';
 import { isMedicineSchedule, MEDICINE_SCHEDULES } from '../../shared/schedule';
+import { genericKey, rankSubstitutes } from '../../shared/generic';
 
 const NEAR_EXPIRY_DAYS = 90;
 const SCHEDULE_ERROR = `Schedule must be one of: ${MEDICINE_SCHEDULES.join(', ')}.`;
@@ -60,6 +61,25 @@ router.get('/api/products', async (req: Request, res: Response) => {
   }
 });
 
+// Generic formulas already in use (most used first), as suggestions for the Medicines form
+router.get('/api/products/generics', async (req: Request, res: Response) => {
+  try {
+    const q = String(req.query.q ?? '').trim();
+    const rows = await prisma.$queryRaw<{ generic_name: string; uses: number }[]>`
+      SELECT TRIM(generic_name) AS generic_name, COUNT(*) AS uses
+      FROM products
+      WHERE generic_name IS NOT NULL AND TRIM(generic_name) != ''
+        ${q ? Prisma.sql`AND generic_name LIKE ${`%${q}%`}` : Prisma.empty}
+      GROUP BY LOWER(TRIM(generic_name))
+      ORDER BY uses DESC, generic_name ASC
+      LIMIT 50
+    `;
+    res.json(rows.map(r => ({ generic_name: r.generic_name, uses: Number(r.uses) })));
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
 router.get('/api/products/search', async (req: Request, res: Response) => {
   try {
     const { q } = req.query;
@@ -89,6 +109,38 @@ router.get('/api/products/search', async (req: Request, res: Response) => {
     `;
 
     res.json(products);
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+// Other medicines with the same generic formula (in stock first), for an out-of-stock brand at the counter
+router.get('/api/products/:id/substitutes', async (req: Request, res: Response) => {
+  try {
+    const target = await prisma.product.findUnique({
+      where: { id: Number(req.params.id) || 0 },
+      select: { id: true, name: true, genericName: true, unitType: true, packing: true, stockBoxes: true, stockLoose: true }
+    });
+    if (!target) return res.status(404).json({ error: 'Medicine not found' });
+    const product = { id: target.id, name: target.name, generic_name: target.genericName };
+    if (!genericKey(target.genericName)) return res.json({ product, substitutes: [] });
+
+    const candidates = await prisma.$queryRaw<any[]>`
+      SELECT p.id, p.company_id, p.c_code, p.p_code, p.barcode, p.name, p.generic_name,
+             p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
+             p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
+             p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
+             p.allow_open_sale, p.min_sale_qty, p.schedule,
+             p.status, p.created_at, p.updated_at, c.name as company_name
+      FROM products p
+      LEFT JOIN companies c ON p.company_id = c.id
+      WHERE p.status = 'active' AND p.generic_name IS NOT NULL AND TRIM(p.generic_name) != ''
+    `;
+    const substitutes = rankSubstitutes(
+      { id: target.id, name: target.name, generic_name: target.genericName, unit_type: target.unitType, packing: target.packing, stock_boxes: target.stockBoxes, stock_loose: target.stockLoose },
+      candidates
+    );
+    res.json({ product, substitutes });
   } catch (error: unknown) {
     sendError(res, error);
   }
