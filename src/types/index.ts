@@ -1,3 +1,5 @@
+import type { MedicineSchedule } from '../../shared/schedule';
+export type { MedicineSchedule, PrescriptionInput } from '../../shared/schedule';
 import type { RolePermissions } from '../../shared/permissions';
 import type { InvoiceTemplate as InvoiceTemplateType, InvoicePaperSize } from '../../shared/invoice';
 import type { BackupMode } from '../../shared/backup';
@@ -156,10 +158,33 @@ export interface Product {
   min_stock_alert: number;
   allow_open_sale?: boolean | number;
   min_sale_qty?: number;
+  schedule?: MedicineSchedule;
   status: 'active' | 'inactive';
   company_name?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface ControlledRegisterRow {
+  id: number;
+  sale_id: number;
+  invoice_no: string;
+  sale_date: string;
+  sale_status: string;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  is_loose: boolean;
+  returned_qty: number;
+  patient_name: string;
+  patient_phone: string | null;
+  patient_cnic: string | null;
+  doctor_name: string;
+  doctor_reg_no: string | null;
+  prescription_no: string;
+  notes: string | null;
+  user_name: string | null;
+  created_at: string;
 }
 
 export interface CartItem {

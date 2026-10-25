@@ -7,6 +7,9 @@ import { localDateString } from '../../shared/dates';
 // Stock, profit/loss and sales reports
 const router = Router();
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const isDateParam = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+
 // Available Stock with valuation
 router.get('/api/reports/stock/available', async (req: Request, res: Response) => {
   try {
@@ -191,6 +194,67 @@ router.get('/api/reports/sales/company-wise', async (req: Request, res: Response
       ORDER BY total_revenue DESC
     `;
     res.json(list);
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+
+// Controlled-medicine register: every controlled sale line with its prescription, newest first
+router.get('/api/reports/controlled-register', async (req: Request, res: Response) => {
+  try {
+    if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
+    const { date_from, date_to } = req.query;
+    // Local calendar days, like the rest of the app (date_to includes the whole day)
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (isDateParam(date_from)) createdAt.gte = new Date(`${date_from}T00:00:00`);
+    if (isDateParam(date_to)) createdAt.lt = new Date(new Date(`${date_to}T00:00:00`).getTime() + DAY_MS);
+
+    const records = await prisma.prescriptionRecord.findMany({
+      where: Object.keys(createdAt).length ? { createdAt } : {},
+      include: { sale: { select: { invoiceNo: true, saleDate: true, status: true, customerName: true } } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+    });
+
+    // Returned quantity per register line: a sale's returns matched by medicine + unit, oldest line first
+    const saleIds = [...new Set(records.map(r => r.saleId))];
+    const returned = saleIds.length
+      ? await prisma.saleReturnItem.findMany({ where: { saleReturn: { saleId: { in: saleIds } } }, include: { saleReturn: { select: { saleId: true } } } })
+      : [];
+    const left = new Map<string, number>();
+    for (const r of returned) {
+      const key = `${r.saleReturn.saleId}:${r.productId}:${r.isLoose ? 1 : 0}`;
+      left.set(key, (left.get(key) ?? 0) + r.quantity);
+    }
+    const returnedQty = new Map<number, number>();
+    for (const r of [...records].sort((a, b) => a.saleItemId - b.saleItemId)) {
+      const key = `${r.saleId}:${r.productId}:${r.isLoose ? 1 : 0}`;
+      const taken = Math.min(r.quantity, left.get(key) ?? 0);
+      left.set(key, (left.get(key) ?? 0) - taken);
+      returnedQty.set(r.id, taken);
+    }
+
+    res.json(records.map(r => ({
+      id: r.id,
+      sale_id: r.saleId,
+      invoice_no: r.sale.invoiceNo,
+      sale_date: r.sale.saleDate,
+      sale_status: r.sale.status,
+      product_id: r.productId,
+      product_name: r.productName,
+      quantity: r.quantity,
+      is_loose: r.isLoose === 1,
+      returned_qty: returnedQty.get(r.id) ?? 0,
+      patient_name: r.patientName,
+      patient_phone: r.patientPhone,
+      patient_cnic: r.patientCnic,
+      doctor_name: r.doctorName,
+      doctor_reg_no: r.doctorRegNo,
+      prescription_no: r.prescriptionNo,
+      notes: r.notes,
+      user_name: r.userName,
+      created_at: r.createdAt
+    })));
   } catch (error: unknown) {
     sendError(res, error);
   }

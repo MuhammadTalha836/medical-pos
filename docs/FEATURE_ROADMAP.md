@@ -15,8 +15,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | M1 | Supplier / distributor ledger (payables) | ✅ |
 | M2 | Purchase returns and expiry claims | ✅ |
 | M3 | Reorder / short list | ✅ |
-| M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ✅ built and tested; waiting for the owner's check |
-| M5 | Prescription and controlled-medicine register | ⬜ |
+| M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ✅ |
+| M5 | Prescription and controlled-medicine register | ✅ built and tested; waiting for the owner's check |
 | M6 | Generic / substitute search | ⬜ |
 | M7 | WhatsApp receipts and khata reminders | ⬜ |
 | M8 | Expenses and day close (cash book) | ⬜ |
@@ -237,7 +237,23 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - POS asks for the details in a modal before saving.
 - Reports → **Controlled register** with a date filter and Print.
 
-**Tests:**
+**Built (2026-10-25):**
+- `shared/schedule.ts` (+ spec): the schedule values and labels, plus `missingPrescriptionFields` and `isValidCnic`.
+- Data: column `products.schedule` and table `prescription_records`.
+- `POST /api/sales` takes one `prescription` per invoice and writes a register row for each controlled line.
+- `GET /api/reports/controlled-register`.
+- UI:
+  - the Medicines form Schedule select, with an Rx / Controlled tag;
+  - POS `PrescriptionModal`, with the draft kept per invoice tab;
+  - Reports → **Controlled Register** with a date filter and Print.
+
+**Choices:**
+- One prescription per invoice.
+- The register uses the `reports` permission.
+- Returns do not delete register rows; the register shows the returned quantity.
+- The prescription is not printed on the receipt.
+
+**Tests (`test:m5`):**
 - refused without details;
 - saved with details;
 - the register lists them.

@@ -1,5 +1,6 @@
 import {
   BackupStatus,
+  ControlledRegisterRow,
   CloudBackupFile,
   CloudBackupStatus,
   CloudConnectProgress,
@@ -194,6 +195,7 @@ export const api = {
   getInvoicePnlReport: (params?: DateRange) => get<any[]>('/reports/financial/invoice-pnl', params),
   getProductWiseSalesReport: () => get<any[]>('/reports/sales/product-wise'),
   getCompanyWiseSalesReport: () => get<any[]>('/reports/sales/company-wise'),
+  getControlledRegister: (params?: DateRange) => get<ControlledRegisterRow[]>('/reports/controlled-register', params),
 
   // Backups & utilities (backups always go to the saved primary/secondary folders)
   getBackupList: () => get<any>('/utilities/backups'),

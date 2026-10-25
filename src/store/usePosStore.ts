@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { Product, CartItem, SaleInvoice } from '../types';
+import { Product, CartItem, SaleInvoice, PrescriptionInput } from '../types';
 
 export type PaymentType = 'Cash' | 'Card' | 'Credit' | 'Online';
 
@@ -15,6 +15,8 @@ export interface InvoiceDraft {
   cashTendered: number;
   paymentType: PaymentType;
   notes: string;
+  /** Prescription details for controlled medicines on this invoice */
+  prescription: PrescriptionInput | null;
 }
 
 export interface InvoiceTab {
@@ -36,7 +38,8 @@ const emptyDraft = (): InvoiceDraft => ({
   billDiscountAmt: 0,
   cashTendered: 0,
   paymentType: 'Cash',
-  notes: ''
+  notes: '',
+  prescription: null
 });
 
 const pickDraft = (state: InvoiceDraft): InvoiceDraft => ({
@@ -48,7 +51,8 @@ const pickDraft = (state: InvoiceDraft): InvoiceDraft => ({
   billDiscountAmt: state.billDiscountAmt,
   cashTendered: state.cashTendered,
   paymentType: state.paymentType,
-  notes: state.notes
+  notes: state.notes,
+  prescription: state.prescription
 });
 
 let tabCounter = 0;
@@ -94,6 +98,7 @@ interface PosState extends InvoiceDraft {
   setCashTendered: (amt: number) => void;
   setPaymentType: (type: PaymentType) => void;
   setNotes: (notes: string) => void;
+  setPrescription: (prescription: PrescriptionInput | null) => void;
 
   // Computations
   getTotals: () => {
@@ -374,6 +379,7 @@ export const usePosStore = create<PosState>()(persist((set, get) => ({
   setCashTendered: (amt: number) => set({ cashTendered: Math.max(0, amt) }),
   setPaymentType: (type: PaymentType) => set({ paymentType: type }),
   setNotes: (notes: string) => set({ notes }),
+  setPrescription: (prescription: PrescriptionInput | null) => set({ prescription }),
 
   getTotals: () => {
     const { cart, billDiscountAmt, cashTendered } = get();
@@ -415,7 +421,10 @@ export const usePosStore = create<PosState>()(persist((set, get) => ({
   }),
   merge: (persisted, current) => {
     const saved = persisted as Partial<PosState> | undefined;
-    const invoices = Array.isArray(saved?.invoices) ? saved.invoices.filter(isValidTab).slice(0, MAX_OPEN_INVOICES) : [];
+    // Drafts saved by an older version lack newer fields: fill them with the empty defaults
+    const invoices = Array.isArray(saved?.invoices)
+      ? saved.invoices.filter(isValidTab).slice(0, MAX_OPEN_INVOICES).map(tab => ({ ...tab, draft: { ...emptyDraft(), ...tab.draft } }))
+      : [];
     if (invoices.length === 0) return current;
     const active = invoices.find(tab => tab.id === saved?.activeId) ?? invoices[0];
     return {
@@ -424,7 +433,7 @@ export const usePosStore = create<PosState>()(persist((set, get) => ({
       activeId: active.id,
       nextNumber: Number.isInteger(saved?.nextNumber) ? saved!.nextNumber! : invoices.length + 1,
       ownerId: typeof saved?.ownerId === 'number' ? saved.ownerId : null,
-      ...{ ...emptyDraft(), ...active.draft }
+      ...active.draft
     };
   }
 }));

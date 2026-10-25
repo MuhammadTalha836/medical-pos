@@ -81,6 +81,7 @@ model Product {
   minStockAlert       Int                  @default(10) @map("min_stock_alert")
   allowOpenSale       Int                  @default(1) @map("allow_open_sale")
   minSaleQty          Int                  @default(1) @map("min_sale_qty")
+  schedule            String               @default("none")
   status              String               @default("active")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
@@ -180,6 +181,7 @@ model Sale {
   shift             CashierShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
   items             SaleItem[]
   returns           SaleReturn[]
+  prescriptions     PrescriptionRecord[]
 
   @@index([invoiceNo], name: "idx_sales_invoice_no")
   @@index([saleDate], name: "idx_sales_date")
@@ -209,6 +211,7 @@ model SaleItem {
   product        Product       @relation(fields: [productId], references: [id])
   batch          ProductBatch? @relation(fields: [batchId], references: [id])
   batchAllocations SaleItemBatch[]
+  prescriptions  PrescriptionRecord[]
 
   @@map("sale_items")
 }
@@ -347,6 +350,33 @@ model SaleItemBatch {
 
   @@index([saleItemId], name: "idx_sale_item_batches_item")
   @@map("sale_item_batches")
+}
+
+model PrescriptionRecord {
+  id             Int      @id @default(autoincrement())
+  saleId         Int      @map("sale_id")
+  saleItemId     Int      @map("sale_item_id")
+  productId      Int      @map("product_id")
+  productName    String   @map("product_name")
+  quantity       Float
+  isLoose        Int      @default(0) @map("is_loose")
+  patientName    String   @map("patient_name")
+  patientPhone   String?  @map("patient_phone")
+  patientCnic    String?  @map("patient_cnic")
+  doctorName     String   @map("doctor_name")
+  doctorRegNo    String?  @map("doctor_reg_no")
+  prescriptionNo String   @map("prescription_no")
+  notes          String?
+  userId         Int?     @map("user_id")
+  userName       String?  @map("user_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sale           Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  saleItem       SaleItem @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+
+  @@index([saleId], name: "idx_prescription_records_sale")
+  @@index([createdAt], name: "idx_prescription_records_created")
+  @@map("prescription_records")
 }
 
 model SupplierPayment {

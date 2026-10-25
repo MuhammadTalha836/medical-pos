@@ -9,6 +9,7 @@ import { DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
 import { priceReturn, priceSaleLine, settleCash, totalSale } from '../sales/saleMath';
 import { localDateKey } from '../../shared/dates';
 import { returnUnits, syncProductBatches, takeUnits } from '../stock/batchStock';
+import { missingPrescriptionFields, normalizeSchedule } from '../../shared/schedule';
 
 // Counter sales (POS), sales history and returns
 const router = Router();
@@ -36,7 +37,9 @@ router.post('/api/sales', async (req: Request, res: Response) => {
     const actor = await getActingUser(req);
     const { user_id, user_name } = await sessionIdentity(req);
 
-    if (!parseBody(createSaleSchema, req.body, res)) return;
+    const body = parseBody(createSaleSchema, req.body, res);
+    if (!body) return;
+    const prescription = body.prescription ?? null;
     const paymentType = PAYMENT_TYPES.includes(payment_type) ? payment_type : 'Cash';
 
     // Strict shift lock: the sale always goes to the signed-in user's own open shift
@@ -94,8 +97,17 @@ router.post('/api/sales', async (req: Request, res: Response) => {
             throw new Error(`Minimum sale quantity for "${prod.name}" is ${minQty} ${unitLabel}. (Requested: ${quantity})`);
           }
 
+          // Controlled medicines need the prescription details for the register (drug-law record)
+          const controlled = normalizeSchedule(prod.schedule) === 'controlled';
+          if (controlled) {
+            const missing = missingPrescriptionFields(prescription);
+            if (missing.length > 0) {
+              throw new Error(`"${prod.name}" is a controlled medicine. Enter the ${missing.join(', ')} from the prescription.`);
+            }
+          }
+
           const priced = priceSaleLine(prod, isLoose, quantity, { unitPrice: item.unit_price, discountPct: item.discount_pct }, rules);
-          pricedItems.push({ prod, isLoose, quantity, priced, batchId: item.batch_id ? Number(item.batch_id) : null });
+          pricedItems.push({ prod, isLoose, quantity, priced, controlled, batchId: item.batch_id ? Number(item.batch_id) : null });
         }
 
         const totals = totalSale(pricedItems.map(i => i.priced), bill_discount_pct, rules);
@@ -158,7 +170,7 @@ router.post('/api/sales', async (req: Request, res: Response) => {
         });
 
         // 2. Save the lines and deduct stock (boxes + loose units, never below what is on the shelf)
-        for (const { prod: listed, isLoose, quantity, priced, batchId } of pricedItems) {
+        for (const { prod: listed, isLoose, quantity, priced, controlled, batchId } of pricedItems) {
           // Re-read: an earlier line of the same medicine may already have taken stock
           const prod = (await tx.product.findUnique({ where: { id: listed.id } }))!;
           const packing = prod.packing || 1;
@@ -193,6 +205,27 @@ router.post('/api/sales', async (req: Request, res: Response) => {
           await tx.saleItemBatch.createMany({
             data: allocations.map(a => ({ saleItemId: saleItem.id, batchId: a.batchId, units: a.units }))
           });
+          if (controlled && prescription) {
+            await tx.prescriptionRecord.create({
+              data: {
+                saleId: sale.id,
+                saleItemId: saleItem.id,
+                productId: prod.id,
+                productName: prod.name,
+                quantity,
+                isLoose: isLoose ? 1 : 0,
+                patientName: prescription.patient_name!.trim(),
+                patientPhone: prescription.patient_phone?.trim() || null,
+                patientCnic: prescription.patient_cnic?.trim() || null,
+                doctorName: prescription.doctor_name!.trim(),
+                doctorRegNo: prescription.doctor_reg_no?.trim() || null,
+                prescriptionNo: prescription.prescription_no!.trim(),
+                notes: prescription.notes?.trim() || null,
+                userId: user_id ? Number(user_id) : null,
+                userName: user_name || 'Cashier'
+              }
+            });
+          }
 
           const remaining = available - unitsToDeduct;
           await tx.product.update({

@@ -2,11 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { usePosStore } from '../store/usePosStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { api } from '../services/apiService';
-import { Product, SaleInvoice, SystemSettings } from '../types';
+import { PrescriptionInput, Product, SaleInvoice, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { InvoiceTabs } from '../components/pos/InvoiceTabs';
 import { CustomerPicker } from '../components/pos/CustomerPicker';
+import { PrescriptionModal } from '../components/pos/PrescriptionModal';
+import { ScheduleBadge } from '../components/common/ScheduleBadge';
+import { isCounterCustomer } from '../../shared/customers';
+import { missingPrescriptionFields, normalizeSchedule } from '../../shared/schedule';
 import { MAX_OPEN_INVOICES } from '../store/usePosStore';
 import { loadPrintPrefs, printReceiptIn } from '../utils/printReceipt';
 import { useShiftStore } from '../store/useShiftStore';
@@ -102,6 +106,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     cashTendered,
     paymentType,
     notes,
+    prescription,
+    setPrescription,
     addItem,
     updateQuantity,
     updateDiscountPct,
@@ -147,6 +153,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Tab waiting for "close invoice with items?" confirmation
   const [pendingCloseId, setPendingCloseId] = useState<string | null>(null);
+  // Set while the prescription form is open; remembers whether the sale was to be printed (F10) or not (F9)
+  const [prescriptionPrompt, setPrescriptionPrompt] = useState<{ shouldPrint: boolean } | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const tenderedInputRef = useRef<HTMLInputElement>(null);
@@ -235,10 +243,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   }, []);
 
   keyHandlerRef.current = (e: KeyboardEvent) => {
-      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null;
+      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null || prescriptionPrompt !== null;
       const ctrl = e.ctrlKey || e.metaKey;
       // The close-invoice question takes Enter/Esc itself; no other shortcut runs behind it
       if (pendingCloseId !== null && e.key !== 'Escape') return;
+      // The prescription form takes the keyboard (its own Esc closes it); no shortcut runs behind it
+      if (prescriptionPrompt !== null) return;
 
       // Invoice tabs: Ctrl+T new, Ctrl+W close, Ctrl+←/→ or Ctrl+(Shift+)Tab switch, Ctrl+1…9 jump
       if (ctrl && !e.altKey) {
@@ -393,7 +403,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     }
   };
 
-  const handleCompleteSale = async (shouldPrint = true) => {
+  const controlledNames = [...new Set(cart.filter(item => normalizeSchedule(item.product.schedule) === 'controlled').map(item => item.product.name))];
+
+  const handleCompleteSale = async (shouldPrint = true, prescriptionOverride?: PrescriptionInput) => {
     if (isSubmittingRef.current || loadingSale) {
       return;
     }
@@ -430,6 +442,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       return;
     }
 
+    // Controlled medicines: the prescription details are entered before the sale is saved
+    const rx = prescriptionOverride ?? prescription;
+    if (controlledNames.length > 0 && missingPrescriptionFields(rx).length > 0) {
+      setErrorMessage(null);
+      setPrescriptionPrompt({ shouldPrint });
+      return;
+    }
+
     try {
       isSubmittingRef.current = true;
       setLoadingSale(true);
@@ -462,7 +482,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         cash_tendered: cashTendered,
         change_due: totals.changeDue,
         payment_type: paymentType,
-        notes: notes || null
+        notes: notes || null,
+        prescription: controlledNames.length > 0 ? rx : null
       };
 
       const result = await api.createSale(salePayload);
@@ -737,6 +758,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                         <td className="py-2.5 px-3">
                           <div className="font-bold text-slate-900 dark:text-white flex items-center space-x-1.5">
                             <span>{item.product.name}</span>
+                            <ScheduleBadge schedule={item.product.schedule} />
                             {isOverStock && (
                               <span title="Quantity exceeds stock on hand" className="text-amber-500">
                                 <AlertTriangle className="w-4 h-4 inline" />
@@ -747,6 +769,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                             <span>{item.product.unit_type}</span>
                             {item.product.location_rack && (
                               <span className="text-amber-600 dark:text-amber-400 font-mono font-semibold">[{item.product.location_rack}]</span>
+                            )}
+                            {normalizeSchedule(item.product.schedule) === 'rx' && (
+                              <span className="text-amber-700 dark:text-amber-400 font-semibold">Check the prescription</span>
                             )}
                           </div>
                         </td>
@@ -1132,6 +1157,20 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           </div>
         </div>
       </Modal>
+
+      {/* Prescription details for controlled medicines (drug-law register) */}
+      <PrescriptionModal
+        isOpen={prescriptionPrompt !== null}
+        medicines={controlledNames}
+        initial={prescription ?? (isCounterCustomer(customerName) ? {} : { patient_name: customerName, patient_phone: customerPhone })}
+        onCancel={() => setPrescriptionPrompt(null)}
+        onSave={rx => {
+          const shouldPrint = prescriptionPrompt?.shouldPrint ?? true;
+          setPrescription(rx);
+          setPrescriptionPrompt(null);
+          void handleCompleteSale(shouldPrint, rx);
+        }}
+      />
 
       {/* Printable Thermal Receipt Modal */}
       <Modal

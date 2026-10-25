@@ -14,6 +14,15 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M5: prescriptions and controlled-medicine register)
+- **Medicines → Schedule:** each medicine is None, **Prescription (Rx)** or **Controlled** (psychotropic / narcotic). The medicine list shows an Rx or Controlled tag.
+- **POS:**
+  - Controlled medicines in the cart open a **Prescription Details** form on F9/F10: patient name, phone, CNIC, doctor name, registration number, prescription number and notes. Patient, doctor and prescription number are required.
+  - The details are asked once per invoice.
+  - Rx medicines show "Check the prescription" on the cart line; the sale is not blocked.
+- **The server refuses** a sale of a controlled medicine without the patient, doctor and prescription number. It also refuses a CNIC that is not 13 digits.
+- **Reports → Controlled Register:** every controlled sale with date, invoice, medicine, quantity (and how much came back), patient, CNIC, doctor and prescription number. It has a date filter, prints on A4 and exports to CSV.
+
 ### Added (M4: batches, first-expiry-first, expiry alerts)
 - **Sales use the earliest expiry first.** A sale line can come from several batches. Expired stock is never sold: the POS says how much is expired and where to send it back (Purchases → Returns to Supplier).
 - **Returns go back into the batch they came from.**

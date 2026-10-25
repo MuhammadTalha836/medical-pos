@@ -76,6 +76,9 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 7. **Coding & Masters (`MastersPage.tsx`)**:
    - Pharmaceutical Company Management (distributors/manufacturers with unique **C-Codes**).
    - Medicine Master with linked C-Code, P-Code (SKU/Barcode), unit type, packaging size, Box Trade Price (T-Price), Box Retail Price (MRP), calculated Per-Unit Price (PP Unit), discount rules, shelf rack locations (`Loc`), and low stock thresholds.
+   - **Schedule (M5):** None, Prescription (Rx) or Controlled (`products.schedule`, `shared/schedule.ts`).
+     - Controlled medicines need a prescription at the POS (`PrescriptionModal`: patient, doctor and prescription number required; phone, CNIC, doctor reg. no. and notes optional), once per invoice. The server refuses the sale without it and writes one `prescription_records` row per controlled line.
+     - Rx medicines only show a reminder on the cart line.
 
 8. **Purchase & Stock Inward (`PurchasesPage.tsx`)**:
    - Supplier purchase invoice recording with batch numbers, expiry dates, purchase cost, bonus boxes, and retail rates.
@@ -103,6 +106,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - Profit & Loss (P&L) Summary Report ($\text{Gross Profit} = \text{Revenue} - \text{COGS} - \text{Discounts}$).
    - Invoice-Wise Profit & Loss (individual invoice margin %, cost basis, net profit).
    - Product-Wise and Company-Wise sales analytics.
+   - **Controlled Register (M5)** (`GET /api/reports/controlled-register`): controlled sales with patient, CNIC, doctor, prescription number and the quantity returned since. It has a date filter (this month by default) and an A4 print via `printDocument`.
    - CSV export for all reports.
 
 10. **Multi-Destination Backup, Vault & Disaster Recovery (`UtilitiesPage.tsx`, `backup.ts`, `docs/DISASTER_RECOVERY_GUIDE.md`)**:

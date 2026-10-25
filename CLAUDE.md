@@ -33,6 +33,7 @@ npm run test:m1          # supplier ledger: purchases costed on the server, paid
 npm run test:m2          # returns to supplier and expiry claims: stock, batch and balance go down, over-return checks
 npm run test:m3          # reorder list: below minimum / running out by 30-day sales speed, cover days, filters
 npm run test:m4          # batches: FEFO sales, splits, returns to batch, expired never sold, opening batch, reconcile
+npm run test:m5          # controlled medicines: prescription required, register rows per line, Rx-only free, register filter/returns/access
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -142,6 +143,11 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - Route: `GET /api/reorder?cover_days=&company_id=` (`purchases` permission).
   - Rules: `suggestReorder` in `server/reorder/reorderMath.ts`. A medicine is listed at or below `min_stock_alert`, or when its stock lasts fewer than the cover days at the last 30 days' units sold. Invoices count when `completed` or `partially_returned`, minus returns.
   - Cover days default to the setting `reorder_cover_days`.
+- **Controlled medicines (M5).**
+  - `products.schedule` is `none` | `rx` | `controlled` (`shared/schedule.ts`: values, labels, `missingPrescriptionFields`, `isValidCnic`). The product `$queryRaw` lists include it.
+  - `POST /api/sales` takes an optional `prescription` object (one per invoice). A controlled line without patient, doctor and prescription number is refused. Each controlled line gets a `prescription_records` row.
+  - The POS keeps the draft prescription per invoice tab (`usePosStore.prescription`) and asks for it in `PrescriptionModal` on F9/F10.
+  - `GET /api/reports/controlled-register?date_from=&date_to=` (`reports` permission) lists the rows with the returned quantity (`src/components/reports/ControlledRegister.tsx`).
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**

@@ -148,6 +148,7 @@ npm run <script-name>
 "test:m2": "node scripts/electron.mjs test server/tests/m2_test.ts"
 "test:m3": "node scripts/electron.mjs test server/tests/m3_test.ts"
 "test:m4": "node scripts/electron.mjs test server/tests/m4_test.ts"
+"test:m5": "node scripts/electron.mjs test server/tests/m5_test.ts"
 ```
 
 **What they do:**
@@ -165,7 +166,7 @@ npm run <script-name>
 - `npm run test:phase3` runs one suite.
 - To run all of them:
   ```bash
-  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4
+  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4 && npm run test:m5
   ```
 
 **Why:** These prove that the real business flows still work (sale, stock, shifts, permissions, license, backups) and not just single functions.
@@ -184,6 +185,7 @@ npm run <script-name>
 | `test:m2` | Returns to supplier and expiry claims: stock, batch and supplier balance go down, credit at purchase cost or trade price, over-return/stock/supplier checks, expiry list, permissions |
 | `test:m3` | Reorder list: below-minimum and running-out medicines from real sales and returns, cover days, supplier filter, permissions |
 | `test:m4` | Batches: first-expiry-first sales and splits, loose units, returns back to their batch, expired never sold, opening batch and trims, batch edits, expired report, start-up reconcile |
+| `test:m5` | Controlled medicines: schedule saved, sale refused without a full prescription or with a bad CNIC, one register row per controlled line, Rx-only sells freely, register date filter, returned quantity, reports permission |
 | `test:phase8` | Server as the money/security control: server-side sale pricing, oversell and cash shortfall, returns per unit type with the bill discount, partial returns, shift cash with credit refunds, khata payments, role escalation, inventory/report permissions, shift close ownership, staff login lockout |
 
 ---
@@ -301,7 +303,7 @@ npm run lint && npm test
 
 **Before a commit:**
 ```bash
-npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4
+npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4 && npm run test:m5
 ```
 
 **Client release (on Windows):**

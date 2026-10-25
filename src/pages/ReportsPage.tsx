@@ -10,9 +10,11 @@ import {
   DollarSign,
   TrendingUp,
   Building2,
-  Printer
+  Printer,
+  ClipboardList
 } from 'lucide-react';
 import { moneyFormatter } from '../utils/format';
+import { ControlledRegister } from '../components/reports/ControlledRegister';
 
 interface ReportsPageProps {
   settings?: SystemSettings | null;
@@ -25,7 +27,8 @@ type ReportType =
   | 'pnl_summary'
   | 'invoice_pnl'
   | 'product_sales'
-  | 'company_sales';
+  | 'company_sales'
+  | 'controlled_register';
 
 export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
   const [currentReport, setCurrentReport] = useState<ReportType>('available_stock');
@@ -60,6 +63,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
       } else if (currentReport === 'company_sales') {
         const data = await api.getCompanyWiseSalesReport();
         setReportData(data);
+      } else if (currentReport === 'controlled_register') {
+        // ControlledRegister loads its own rows (with its own date range) and hands them back for CSV
+        setReportData([]);
       }
     } catch (err) {
       console.error('Failed to load report:', err);
@@ -94,6 +100,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
     { id: 'invoice_pnl' as ReportType, label: 'Invoice-wise P&L', icon: TrendingUp },
     { id: 'product_sales' as ReportType, label: 'Product-wise Sales', icon: BarChart3 },
     { id: 'company_sales' as ReportType, label: 'Company-wise Sales', icon: Building2 },
+    { id: 'controlled_register' as ReportType, label: 'Controlled Register', icon: ClipboardList },
   ];
 
   return (
@@ -262,6 +269,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
           </div>
         </div>
       )}
+
+      {currentReport === 'controlled_register' && <ControlledRegister settings={settings} onData={setReportData} />}
 
       {/* 2. EXPIRED & NEAR-EXPIRY REPORT */}
       {currentReport === 'expired_stock' && (

@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { CUSTOMER_NAME_MAX, PHONE_MAX_DIGITS, PHONE_MIN_DIGITS, isValidPhone } from '../../shared/customers';
 import { BACKUP_MODES } from '../../shared/backup';
 import { PASSWORD_MIN, PASSWORD_MIN_MESSAGE } from '../../shared/passwords';
+import { PRESCRIPTION_NOTES_MAX, PRESCRIPTION_TEXT_MAX, isValidCnic } from '../../shared/schedule';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
 // Objects are loose: unknown keys pass through untouched and handlers keep their domain rules.
@@ -113,8 +114,23 @@ const saleItemSchema = z.looseObject({
     .positive({ error: 'Each sale item needs a quantity greater than zero' })
 });
 
+const prescriptionText = (label: string, max = PRESCRIPTION_TEXT_MAX) =>
+  z.string({ error: `${label} must be text` }).trim().max(max, { error: `${label} cannot exceed ${max} characters` }).nullish();
+
+// Prescription details for controlled medicines; which fields are required is checked by the sale route
+const prescriptionSchema = z.looseObject({
+  patient_name: prescriptionText('Patient name'),
+  patient_phone: prescriptionText('Patient phone', 20),
+  patient_cnic: prescriptionText('CNIC', 20).refine(v => isValidCnic(v), { error: 'CNIC must be 13 digits (e.g. 35202-1234567-1)' }),
+  doctor_name: prescriptionText('Doctor name'),
+  doctor_reg_no: prescriptionText('Doctor registration number'),
+  prescription_no: prescriptionText('Prescription number'),
+  notes: prescriptionText('Notes', PRESCRIPTION_NOTES_MAX)
+}, { error: 'Prescription details are not valid' });
+
 export const createSaleSchema = z.looseObject({
-  items: z.array(saleItemSchema, { error: 'Sale must include at least one item.' }).min(1, { error: 'Sale must include at least one item.' })
+  items: z.array(saleItemSchema, { error: 'Sale must include at least one item.' }).min(1, { error: 'Sale must include at least one item.' }),
+  prescription: prescriptionSchema.nullish()
 });
 
 export const saleReturnSchema = z.looseObject({

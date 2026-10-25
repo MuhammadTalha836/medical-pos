@@ -23,6 +23,7 @@
     "test:m2": "node scripts/electron.mjs test server/tests/m2_test.ts",
     "test:m3": "node scripts/electron.mjs test server/tests/m3_test.ts",
     "test:m4": "node scripts/electron.mjs test server/tests/m4_test.ts",
+    "test:m5": "node scripts/electron.mjs test server/tests/m5_test.ts",
     "prisma:generate": "prisma generate",
     "developer:key": "tsx scripts/developer-key.ts",
     "build": "prisma generate && tsc --noEmit && electron-vite build",

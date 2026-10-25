@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS products (
   min_stock_alert INTEGER NOT NULL DEFAULT 10, -- Low stock alert threshold
   allow_open_sale INTEGER NOT NULL DEFAULT 1, -- 1 = Yes (Allow loose unit sales), 0 = No (Full pack only)
   min_sale_qty INTEGER NOT NULL DEFAULT 1, -- Smallest quantity permitted per sale
+  schedule TEXT NOT NULL DEFAULT 'none', -- 'none' | 'rx' (prescription reminder) | 'controlled' (register required)
   status TEXT NOT NULL DEFAULT 'active',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -254,6 +255,27 @@ CREATE TABLE IF NOT EXISTS sale_item_batches (
   returned_units INTEGER NOT NULL DEFAULT 0
 );
 
+-- Controlled-medicine register: one row per controlled sale line, with the prescription details
+CREATE TABLE IF NOT EXISTS prescription_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+  sale_item_id INTEGER NOT NULL REFERENCES sale_items(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL,
+  product_name TEXT NOT NULL,
+  quantity REAL NOT NULL,
+  is_loose INTEGER NOT NULL DEFAULT 0,
+  patient_name TEXT NOT NULL,
+  patient_phone TEXT,
+  patient_cnic TEXT,
+  doctor_name TEXT NOT NULL,
+  doctor_reg_no TEXT,
+  prescription_no TEXT NOT NULL,
+  notes TEXT,
+  user_id INTEGER,
+  user_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Payments to suppliers (distributors) against what the store owes them
 CREATE TABLE IF NOT EXISTS supplier_payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -368,6 +390,8 @@ CREATE INDEX IF NOT EXISTS idx_shifts_shift_no ON cashier_shifts(shift_no);
 CREATE INDEX IF NOT EXISTS idx_shifts_start_time ON cashier_shifts(start_time);
 CREATE INDEX IF NOT EXISTS idx_supplier_payments_company ON supplier_payments(company_id);
 CREATE INDEX IF NOT EXISTS idx_sale_item_batches_item ON sale_item_batches(sale_item_id);
+CREATE INDEX IF NOT EXISTS idx_prescription_records_sale ON prescription_records(sale_id);
+CREATE INDEX IF NOT EXISTS idx_prescription_records_created ON prescription_records(created_at);
 `;
 
 /**
@@ -403,5 +427,6 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definitio
   { table: 'purchase_returns', column: 'user_name', definition: 'TEXT' },
   { table: 'purchase_return_items', column: 'product_name', definition: 'TEXT' },
   { table: 'purchase_return_items', column: 'purchase_item_id', definition: 'INTEGER REFERENCES purchase_items(id)' },
-  { table: 'purchase_return_items', column: 'batch_no', definition: 'TEXT' }
+  { table: 'purchase_return_items', column: 'batch_no', definition: 'TEXT' },
+  { table: 'products', column: 'schedule', definition: "TEXT NOT NULL DEFAULT 'none'" }
 ];

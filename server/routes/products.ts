@@ -7,8 +7,17 @@ import { logSecurityAudit } from '../security/audit';
 import { syncProductBatches } from '../stock/batchStock';
 import { fefoOrder, isExpired, toUnits } from '../stock/batchMath';
 import { localDateString } from '../../shared/dates';
+import { isMedicineSchedule, MEDICINE_SCHEDULES } from '../../shared/schedule';
 
 const NEAR_EXPIRY_DAYS = 90;
+const SCHEDULE_ERROR = `Schedule must be one of: ${MEDICINE_SCHEDULES.join(', ')}.`;
+
+/** The schedule from a request body: undefined when not sent, null when invalid */
+function readSchedule(value: unknown) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const v = String(value).trim().toLowerCase();
+  return isMedicineSchedule(v) ? v : null;
+}
 
 // Products master
 const router = Router();
@@ -38,7 +47,7 @@ router.get('/api/products', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
-             p.allow_open_sale, p.min_sale_qty,
+             p.allow_open_sale, p.min_sale_qty, p.schedule,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -64,7 +73,7 @@ router.get('/api/products/search', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
-             p.allow_open_sale, p.min_sale_qty,
+             p.allow_open_sale, p.min_sale_qty, p.schedule,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -93,7 +102,7 @@ router.get('/api/products/:id', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
-             p.allow_open_sale, p.min_sale_qty,
+             p.allow_open_sale, p.min_sale_qty, p.schedule,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -118,6 +127,8 @@ router.post('/api/products', async (req: Request, res: Response) => {
       default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert,
       allow_open_sale, min_sale_qty
     } = req.body;
+    const schedule = readSchedule(req.body.schedule);
+    if (schedule === null) return res.status(400).json({ error: SCHEDULE_ERROR });
 
     const newProd = await prisma.$transaction(async (tx) => {
       const created = await tx.product.create({
@@ -141,6 +152,7 @@ router.post('/api/products', async (req: Request, res: Response) => {
         minStockAlert: parseInt(min_stock_alert) || 10,
         allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
         minSaleQty: parseInt(min_sale_qty) || 1,
+        schedule: schedule ?? 'none',
         status: 'active'
       }
       });
@@ -165,6 +177,8 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
       default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert, status,
       allow_open_sale, min_sale_qty
     } = req.body;
+    const schedule = readSchedule(req.body.schedule);
+    if (schedule === null) return res.status(400).json({ error: SCHEDULE_ERROR });
 
     await prisma.$transaction(async (tx) => {
       await tx.product.update({
@@ -189,6 +203,7 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
         minStockAlert: parseInt(min_stock_alert) || 10,
         allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
         minSaleQty: parseInt(min_sale_qty) || 1,
+        ...(schedule ? { schedule } : {}),
         status: status || 'active'
       }
       });

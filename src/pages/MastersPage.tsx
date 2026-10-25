@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { moneyFormatter } from '../utils/format';
 import { BatchListModal } from '../components/masters/BatchListModal';
+import { ScheduleBadge } from '../components/common/ScheduleBadge';
+import { MEDICINE_SCHEDULES, MedicineSchedule, SCHEDULE_LABELS, normalizeSchedule } from '../../shared/schedule';
 
 interface MastersPageProps {
   settings?: SystemSettings | null;
@@ -52,7 +54,8 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
     stock_loose: 0,
     min_stock_alert: 10,
     allow_open_sale: true,
-    min_sale_qty: 1
+    min_sale_qty: 1,
+    schedule: 'none' as MedicineSchedule
   });
 
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -134,7 +137,8 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       stock_loose: 0,
       min_stock_alert: 10,
       allow_open_sale: true,
-      min_sale_qty: 1
+      min_sale_qty: 1,
+      schedule: 'none'
     });
     setIsProductModalOpen(true);
   };
@@ -160,7 +164,8 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       stock_loose: prod.stock_loose,
       min_stock_alert: prod.min_stock_alert,
       allow_open_sale: prod.allow_open_sale === undefined ? true : (prod.allow_open_sale === 1 || prod.allow_open_sale === true),
-      min_sale_qty: prod.min_sale_qty || 1
+      min_sale_qty: prod.min_sale_qty || 1,
+      schedule: normalizeSchedule(prod.schedule)
     });
     setIsProductModalOpen(true);
   };
@@ -416,6 +421,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                                   Open Sale: Yes{prod.min_sale_qty && prod.min_sale_qty > 1 ? ` (Min ${prod.min_sale_qty})` : ''}
                                 </span>
                               )}
+                              <ScheduleBadge schedule={prod.schedule} />
                             </div>
                           </td>
                           <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
@@ -727,6 +733,32 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   placeholder="1"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
+              <div>
+                <label htmlFor="product-schedule" className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Schedule
+                </label>
+                <select
+                  id="product-schedule"
+                  value={productForm.schedule}
+                  disabled={!(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product'))}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, schedule: normalizeSchedule(e.target.value) }))}
+                  className="field-select w-full"
+                >
+                  {MEDICINE_SCHEDULES.map(value => (
+                    <option key={value} value={value}>{SCHEDULE_LABELS[value]}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="field-hint sm:col-span-3 sm:pt-6">
+                {productForm.schedule === 'controlled'
+                  ? 'Psychotropic or narcotic medicine. The counter must enter the patient, doctor and prescription number, and every sale goes into the controlled register.'
+                  : productForm.schedule === 'rx'
+                    ? 'The counter is reminded to check the prescription. The sale is not blocked.'
+                    : 'Sold freely over the counter.'}
+              </p>
             </div>
 
             {/* Interactive Stock Conversion & Inventory Impact Card */}
