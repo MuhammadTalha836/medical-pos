@@ -1,14 +1,15 @@
 /**
  * PharmaCare Pro - M7 Test Suite (docs/FEATURE_ROADMAP.md)
  * Covers the WhatsApp message settings: default templates, saving, the settings permission and the length
- * limit, plus the supplier phone on the reorder list. Phone and message formatting is in shared/whatsapp.spec.ts.
+ * limit, the Developer-only WhatsApp developer line, plus the supplier phone on the reorder list. Phone and message formatting is in shared/whatsapp.spec.ts.
  * Runs on a fresh test database (see testEnv.ts).
  */
 
 import './testEnv';
 import http from 'http';
 import { app } from '../api';
-import { authHeaders, ensureTestAdmin, useFullTestLicense } from './testAuth';
+import { authHeaders, ensureTestAdmin, ensureTestDeveloper, useFullTestLicense } from './testAuth';
+import { composeWhatsAppCredit } from '../../shared/developerProfile';
 import { prisma } from '../database/prisma';
 import { DEFAULT_WHATSAPP_RECEIPT_TEMPLATE, DEFAULT_WHATSAPP_REMINDER_TEMPLATE, WHATSAPP_TEMPLATE_MAX } from '../../shared/whatsapp';
 
@@ -107,6 +108,29 @@ async function runM7Tests() {
       assert(res.status === 400 && /WhatsApp/.test(res.body.error), `Status ${res.status} ${JSON.stringify(res.body)}`);
       const ok = await save(adminHeaders, { whatsapp_receipt_template: 'x'.repeat(WHATSAPP_TEMPLATE_MAX) });
       assert(ok.status === 200, `Exactly the limit is allowed, got ${ok.status}`);
+    });
+
+    await test('Only the Developer controls the WhatsApp developer line', async () => {
+      const dev = await ensureTestDeveloper();
+      const devHeaders = authHeaders(dev);
+      const putDev = (body: Record<string, string>) =>
+        request('/developer/settings', devHeaders, { method: 'PUT', body: JSON.stringify(body) });
+      const set = await putDev({ developer_name: 'Muhammad Talha', developer_phone: '03068646827', developer_info_whatsapp: 'name,phone', developer_whatsapp_lead: 'Software built and developed by' });
+      assert(set.status === 200, `Developer save ${set.status} ${JSON.stringify(set.body)}`);
+
+      const hide = await save(adminHeaders, { developer_info_whatsapp: '', developer_whatsapp_lead: 'Hidden' });
+      assert(hide.status === 200, `Admin save ${hide.status}`);
+      const after = await request('/settings', adminHeaders);
+      assert(after.body.developer_info_whatsapp === 'name,phone', `Admin could not hide it: ${after.body.developer_info_whatsapp}`);
+      assert(after.body.developer_whatsapp_lead === 'Software built and developed by', `Lead unchanged: ${after.body.developer_whatsapp_lead}`);
+      assert(composeWhatsAppCredit(after.body) === 'Software built and developed by Muhammad Talha • 03068646827', `Line ${composeWhatsAppCredit(after.body)}`);
+
+      const tooLong = await putDev({ developer_whatsapp_lead: 'x'.repeat(61) });
+      assert(tooLong.status === 400, `Long lead refused, got ${tooLong.status}`);
+      assert((await putDev({ developer_info_whatsapp: 'name,password' })).status === 400, 'Unknown detail refused');
+      const off = await putDev({ developer_info_whatsapp: '' });
+      assert(off.status === 200, `Developer hides it ${off.status}`);
+      assert(composeWhatsAppCredit((await request('/settings', adminHeaders)).body) === '', 'Hidden by the Developer');
     });
 
     await test('The reorder list carries the supplier phone', async () => {

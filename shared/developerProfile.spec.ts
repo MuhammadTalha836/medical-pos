@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DEVELOPER_PROFILE_SETTINGS,
   composeInvoiceFooter,
+  composeWhatsAppCredit,
   developerInfoFor,
   formatDeveloperLine,
   isValidInfoFields,
@@ -40,6 +41,13 @@ describe('developer profile', () => {
     expect(formatDeveloperLine(developerInfoFor(profile, 'invoice'))).toBe('Software by Talha Tech • 0300-1234567');
     expect(formatDeveloperLine(developerInfoFor({ ...profile, developer_info_invoice: 'phone' }, 'invoice'))).toBe('0300-1234567');
     expect(formatDeveloperLine([])).toBe('');
+  });
+
+  it('composes the WhatsApp line with its lead text, or nothing when no detail is chosen', () => {
+    expect(composeWhatsAppCredit(profile)).toBe('Software built and developed by Talha Tech • 0300-1234567');
+    expect(composeWhatsAppCredit({ ...profile, developer_whatsapp_lead: 'Powered by', developer_info_whatsapp: 'name' })).toBe('Powered by Talha Tech');
+    expect(composeWhatsAppCredit({ ...profile, developer_whatsapp_lead: '' })).toBe('Talha Tech • 0300-1234567');
+    expect(composeWhatsAppCredit({ ...profile, developer_info_whatsapp: '' })).toBe('');
   });
 
   it('composes the receipt footer from the footer text and the receipt line', () => {

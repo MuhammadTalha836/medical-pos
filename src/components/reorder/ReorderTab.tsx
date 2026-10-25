@@ -5,6 +5,7 @@ import { ReorderItem, SystemSettings } from '../../types';
 import { printDocument } from '../../utils/printDocument';
 import { copyText } from '../../utils/copyText';
 import { WhatsAppButton } from '../common/WhatsAppButton';
+import { withDeveloperCredit } from '../../../shared/whatsapp';
 
 export interface ReorderPurchaseLine {
   product_id: number;
@@ -88,7 +89,7 @@ export const ReorderTab: React.FC<ReorderTabProps> = ({ settings, money, canCrea
   const orderText = (name: string, rows: ReorderItem[]) => {
     const lines = orderedRows(rows).map(r => `- ${r.name}: ${boxesFor(r)} box${boxesFor(r) === 1 ? '' : 'es'}`);
     const header = settings?.store_name ? `Order for ${name} from ${settings.store_name}` : `Order for ${name}`;
-    return [header, '', ...lines].join('\n');
+    return withDeveloperCredit([header, '', ...lines].join('\n'), settings);
   };
 
   const copyGroup = async (name: string, rows: ReorderItem[]) => {

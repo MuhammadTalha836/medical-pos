@@ -312,6 +312,12 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
   - Khata (**Send reminder**);
   - the Reorder List (**Send on WhatsApp** to the supplier; the list now carries `company_phone`).
 - Settings → Store → **WhatsApp Messages** editor.
+- **Developer line:** every message ends with the developer's details. Developer → Developer Profile → **WhatsApp Advertising** sets:
+  - the lead text (`developer_whatsapp_lead`, max 60);
+  - the details (`developer_info_whatsapp`);
+  - with a preview.
+
+  Staff cannot change or remove it.
 - No schema change.
 
 **Choices:**

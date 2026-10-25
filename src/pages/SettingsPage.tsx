@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/apiService';
 import { SystemSettings, User, Role, InvoiceTemplateType, InvoicePaperSize, SaleInvoice } from '../types';
+import { composeWhatsAppCredit } from '../../shared/developerProfile';
 import { DEFAULT_DEVELOPER_FOOTER, INVOICE_PAPER_SIZES, TEMPLATE_LABELS, normalizePaperSize, normalizeTemplate } from '../../shared/invoice';
 import { useThemeStore } from '../store/useThemeStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -603,6 +604,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
               <p className="field-hint">
                 The text that opens in WhatsApp when you send a receipt or a khata reminder. Words in braces are filled in for each customer.
               </p>
+              {composeWhatsAppCredit(formData) && (
+                <p className="field-hint">
+                  Every message also ends with the software line: <span className="font-semibold">{composeWhatsAppCredit(formData)}</span>
+                </p>
+              )}
               {([
                 { key: 'whatsapp_receipt_template', label: 'Receipt message', fallback: DEFAULT_WHATSAPP_RECEIPT_TEMPLATE, placeholders: RECEIPT_PLACEHOLDERS },
                 { key: 'whatsapp_reminder_template', label: 'Khata reminder message', fallback: DEFAULT_WHATSAPP_REMINDER_TEMPLATE, placeholders: REMINDER_PLACEHOLDERS }

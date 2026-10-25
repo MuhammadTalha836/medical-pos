@@ -189,7 +189,7 @@ npm run <script-name>
 | `test:m4` | Batches: first-expiry-first sales and splits, loose units, returns back to their batch, expired never sold, opening batch and trims, batch edits, expired report, start-up reconcile |
 | `test:m5` | Controlled medicines: schedule saved, sale refused without a full prescription or with a bad CNIC, one register row per controlled line, Rx-only sells freely, register date filter, returned quantity, reports permission |
 | `test:m6` | Substitutes: formula matching however it is written (case, spacing, order), other strengths and inactive medicines left out, in-stock first, unknown/no-formula medicines, generics suggestions, login needed |
-| `test:m7` | WhatsApp messages: default templates, Admin saves a template, cashier refused (403), template length limit (400), supplier phone on the reorder list |
+| `test:m7` | WhatsApp messages: default templates, Admin saves a template, cashier refused (403), template length limit (400), Developer-only WhatsApp developer line, supplier phone on the reorder list |
 | `test:phase8` | Server as the money/security control: server-side sale pricing, oversell and cash shortfall, returns per unit type with the bill discount, partial returns, shift cash with credit refunds, khata payments, role escalation, inventory/report permissions, shift close ownership, staff login lockout |
 
 ---

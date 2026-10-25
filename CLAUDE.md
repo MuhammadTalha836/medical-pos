@@ -157,6 +157,7 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - `WhatsAppButton` (`src/components/common/`) opens the link through the `whatsapp:open` IPC, which allows only `https://wa.me/<digits>`. It copies the text when that fails.
   - Used on the POS receipt, the invoice reprint, Khata (Send reminder) and the Reorder List (supplier `company_phone`).
   - Texts: settings `whatsapp_receipt_template` / `whatsapp_reminder_template` (max 1000 characters, blank = default), edited in Settings → Store.
+  - Every message (receipts, reminders, supplier orders) ends with `withDeveloperCredit` → `composeWhatsAppCredit` (`shared/developerProfile.ts`). It uses the developer placement `whatsapp` (`developer_info_whatsapp`) plus `developer_whatsapp_lead`, both Developer-only keys. They are edited in the Developer Profile's WhatsApp Advertising section, not in the placement table.
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**

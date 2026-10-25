@@ -1,6 +1,7 @@
 /** WhatsApp messages (receipts, khata reminders, supplier orders) opened through a wa.me link. Pure, shared by the UI and the specs. */
 import { normalizePhone } from './customers';
 import { localDateString } from './dates';
+import { composeWhatsAppCredit } from './developerProfile';
 
 export const WHATSAPP_TEMPLATE_MAX = 1000;
 /** Receipt lines listed before "...and N more", so the link stays short */
@@ -56,6 +57,9 @@ interface MessageSettings {
   store_phone?: string | null;
   whatsapp_receipt_template?: string | null;
   whatsapp_reminder_template?: string | null;
+  /** Developer Profile → WhatsApp (the line staff cannot remove) */
+  developer_info_whatsapp?: string | null;
+  developer_whatsapp_lead?: string | null;
 }
 
 interface ReceiptSale {
@@ -69,6 +73,12 @@ interface ReceiptSale {
 }
 
 const tidy = (text: string) => text.replace(/[ \t]+$/gm, '').trim();
+
+/** Adds the developer's line (Developer Profile → WhatsApp) under a message; staff cannot turn it off */
+export function withDeveloperCredit(text: string, settings: object | null | undefined): string {
+  const credit = composeWhatsAppCredit(settings);
+  return credit ? `${text}\n\n${credit}` : text;
+}
 
 const showDate = (value: string) => {
   const d = new Date(value);
@@ -87,7 +97,7 @@ export function receiptItemLines(items: ReceiptSale['items'], money: Money): str
 
 export function receiptMessage(sale: ReceiptSale, settings: MessageSettings | null | undefined, money: Money): string {
   const template = settings?.whatsapp_receipt_template?.trim() || DEFAULT_WHATSAPP_RECEIPT_TEMPLATE;
-  return tidy(fillTemplate(template, {
+  return withDeveloperCredit(tidy(fillTemplate(template, {
     customer: sale.customer_name?.trim() || 'Customer',
     store: sale.store_name_snapshot || settings?.store_name || '',
     store_phone: settings?.store_phone || '',
@@ -96,7 +106,7 @@ export function receiptMessage(sale: ReceiptSale, settings: MessageSettings | nu
     items: receiptItemLines(sale.items, money),
     total: money(Number(sale.net_total) || 0),
     payment: sale.payment_type
-  }));
+  })), settings);
 }
 
 export function reminderMessage(
@@ -105,10 +115,10 @@ export function reminderMessage(
   money: Money
 ): string {
   const template = settings?.whatsapp_reminder_template?.trim() || DEFAULT_WHATSAPP_REMINDER_TEMPLATE;
-  return tidy(fillTemplate(template, {
+  return withDeveloperCredit(tidy(fillTemplate(template, {
     customer: customer.name,
     store: settings?.store_name || '',
     store_phone: settings?.store_phone || '',
     balance: money(Number(customer.current_balance) || 0)
-  }));
+  })), settings);
 }

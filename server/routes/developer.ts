@@ -22,6 +22,8 @@ import {
   DEVELOPER_INFO_PLACEMENTS,
   DEVELOPER_PROFILE_FIELDS,
   DEVELOPER_PROFILE_SETTING_KEYS,
+  WHATSAPP_CREDIT_LEAD_MAX,
+  WHATSAPP_CREDIT_LEAD_SETTING,
   isValidInfoFields,
   parseInfoFields
 } from '../../shared/developerProfile';
@@ -144,6 +146,12 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
       updates[field.setting] = updates[field.setting].trim();
       if (updates[field.setting].length > field.maxLength) {
         return res.status(400).json({ error: `Developer ${field.label.toLowerCase()} cannot exceed ${field.maxLength} characters` });
+      }
+    }
+    if (updates[WHATSAPP_CREDIT_LEAD_SETTING] !== undefined) {
+      updates[WHATSAPP_CREDIT_LEAD_SETTING] = updates[WHATSAPP_CREDIT_LEAD_SETTING].trim();
+      if (updates[WHATSAPP_CREDIT_LEAD_SETTING].length > WHATSAPP_CREDIT_LEAD_MAX) {
+        return res.status(400).json({ error: `The WhatsApp line text cannot exceed ${WHATSAPP_CREDIT_LEAD_MAX} characters` });
       }
     }
     for (const placement of DEVELOPER_INFO_PLACEMENTS) {

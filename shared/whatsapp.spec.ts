@@ -6,7 +6,8 @@ import {
   reminderMessage,
   whatsappLink,
   whatsappPhone,
-  whatsappPhoneWarning
+  whatsappPhoneWarning,
+  withDeveloperCredit
 } from './whatsapp';
 
 const money = (n: number) => `Rs. ${n.toFixed(2)}`;
@@ -72,6 +73,19 @@ describe('receiptMessage', () => {
     expect(text.split('\n')).toHaveLength(26);
     expect(text).toContain('- Med 0 x 1 Unit = Rs. 1.00');
     expect(text.endsWith('...and 5 more')).toBe(true);
+  });
+});
+
+describe('developer line', () => {
+  const developer = { developer_name: 'Muhammad Talha', developer_phone: '0306-8646827', developer_info_whatsapp: 'name,phone' };
+
+  it('ends every message, even with a staff template, until the Developer unticks it', () => {
+    const sale = { invoice_no: 'INV-1', sale_date: '2026-10-25T10:30:00', net_total: 10, payment_type: 'Cash', items: [] };
+    const receipt = receiptMessage(sale, { ...developer, whatsapp_receipt_template: 'Only {invoice_no}' }, money);
+    expect(receipt).toBe('Only INV-1\n\nSoftware built and developed by Muhammad Talha • 0306-8646827');
+    const reminder = reminderMessage({ name: 'Sara', current_balance: 5 }, developer, money);
+    expect(reminder.endsWith('Software built and developed by Muhammad Talha • 0306-8646827')).toBe(true);
+    expect(withDeveloperCredit('Order', { ...developer, developer_info_whatsapp: '' })).toBe('Order');
   });
 });
 

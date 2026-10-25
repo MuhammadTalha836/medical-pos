@@ -22,6 +22,7 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - Phones are turned into the international form (0300-1234567 → 923001234567). The button sits next to Print Invoice. For a number that cannot be on WhatsApp (e.g. a mobile number missing a digit), it is disabled with the reason, and the customer form and POS phone field warn about it.
 - **Settings → Store → WhatsApp Messages:** edit the receipt and reminder text, with fill-in words such as {customer}, {total} and {balance}, and Reset to default.
 - If WhatsApp cannot be opened, the message is copied so it can be pasted.
+- **Developer line on WhatsApp:** every message ends with the developer's details, e.g. "Software built and developed by Muhammad Talha • 0306-8646827". The Developer sets it in Developer → Developer Profile → **WhatsApp Advertising**: the text before the details, which details to add, and a preview. Store staff cannot edit or remove it; the Developer hides it by unticking every detail.
 
 ### Added (M6: substitutes by generic formula)
 - **POS Substitutes:**

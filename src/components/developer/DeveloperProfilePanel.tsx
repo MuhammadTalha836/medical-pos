@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Megaphone, Save } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Megaphone, MessageCircle, Save } from 'lucide-react';
 import { api } from '../../services/apiService';
 import {
   DEFAULT_DEVELOPER_PROFILE_SETTINGS,
   DEVELOPER_INFO_PLACEMENTS,
   DEVELOPER_PROFILE_FIELDS,
   DEVELOPER_PROFILE_SETTING_KEYS,
+  WHATSAPP_CREDIT_LEAD_MAX,
+  WHATSAPP_CREDIT_LEAD_SETTING,
   composeInvoiceFooter,
+  composeWhatsAppCredit,
   developerInfoFor,
   parseInfoFields,
   type DeveloperField
@@ -22,6 +25,10 @@ const PLACEHOLDERS: Record<DeveloperField, string> = {
   website: 'e.g. www.example.com',
   tagline: 'e.g. Custom software for pharmacies & shops'
 };
+
+// The WhatsApp placement has its own section below the table
+const TABLE_PLACEMENTS = DEVELOPER_INFO_PLACEMENTS.filter(p => p.key !== 'whatsapp');
+const WHATSAPP_PLACEMENT = DEVELOPER_INFO_PLACEMENTS.find(p => p.key === 'whatsapp')!;
 
 interface DeveloperProfilePanelProps {
   /** Reloads the app-wide settings so the sidebar, receipts and Support window update at once */
@@ -69,6 +76,8 @@ export const DeveloperProfilePanel: React.FC<DeveloperProfilePanelProps> = ({ on
 
   const receiptLines = composeInvoiceFooter(profile).split('\n').slice(1);
   const supportItems = developerInfoFor(profile, 'about');
+  const whatsappCredit = composeWhatsAppCredit(profile);
+  const whatsappFields = parseInfoFields(profile[WHATSAPP_PLACEMENT.setting]);
 
   return (
     <form onSubmit={save} className="space-y-6">
@@ -118,7 +127,7 @@ export const DeveloperProfilePanel: React.FC<DeveloperProfilePanelProps> = ({ on
               <thead className="bg-slate-50 dark:bg-[#0d131f] text-slate-600 dark:text-slate-300">
                 <tr>
                   <th className="text-left px-4 py-2.5 font-semibold">Detail</th>
-                  {DEVELOPER_INFO_PLACEMENTS.map(p => (
+                  {TABLE_PLACEMENTS.map(p => (
                     <th key={p.key} className="px-4 py-2.5 font-semibold text-center">{p.label}</th>
                   ))}
                 </tr>
@@ -127,7 +136,7 @@ export const DeveloperProfilePanel: React.FC<DeveloperProfilePanelProps> = ({ on
                 {DEVELOPER_PROFILE_FIELDS.map(field => (
                   <tr key={field.key}>
                     <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-200">{field.label}</td>
-                    {DEVELOPER_INFO_PLACEMENTS.map(p => (
+                    {TABLE_PLACEMENTS.map(p => (
                       <td key={p.key} className="px-4 py-2.5 text-center">
                         <input
                           type="checkbox"
@@ -142,6 +151,53 @@ export const DeveloperProfilePanel: React.FC<DeveloperProfilePanelProps> = ({ on
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* WhatsApp advertising */}
+        <div className="card-surface p-4 space-y-4">
+          <div>
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              <span>WhatsApp Advertising</span>
+            </h4>
+            <p className="field-hint">
+              Added as the last line of every WhatsApp message the store sends (receipts, khata reminders, supplier orders).
+              Store staff cannot edit or remove it. Untick every detail to stop it.
+            </p>
+          </div>
+          <label className="block">
+            <span className="field-label">Text before your details</span>
+            <input
+              type="text"
+              maxLength={WHATSAPP_CREDIT_LEAD_MAX}
+              value={profile[WHATSAPP_CREDIT_LEAD_SETTING] ?? ''}
+              placeholder="e.g. Software built and developed by"
+              onChange={e => setValue(WHATSAPP_CREDIT_LEAD_SETTING, e.target.value)}
+              className="field-input w-full"
+            />
+          </label>
+          <div>
+            <span className="field-label">Details to add</span>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {DEVELOPER_PROFILE_FIELDS.map(field => (
+                <label key={field.key} className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={whatsappFields.includes(field.key)}
+                    onChange={() => togglePlacement(WHATSAPP_PLACEMENT.setting, field.key)}
+                    className="w-5 h-5 accent-teal-600 cursor-pointer"
+                  />
+                  {field.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="field-label">Preview (end of a message)</span>
+            <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2">
+              {whatsappCredit || <span className="text-slate-400">Nothing added. Fill in your details above and tick at least one.</span>}
+            </div>
           </div>
         </div>
 
