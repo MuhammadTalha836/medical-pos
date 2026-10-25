@@ -27,7 +27,8 @@ import {
   PurchaseReturnSummary,
   PurchaseReturnDetails,
   ExpiryCandidate,
-  PurchaseReturnLineInput
+  PurchaseReturnLineInput,
+  ReorderList
 } from '../types';
 
 const API_BASE = '/api';
@@ -164,6 +165,8 @@ export const api = {
   // Purchases
   getPurchases: () => get<PurchaseInvoice[]>('/purchases'),
   getPurchaseById: (id: number) => get<PurchaseInvoice>(`/purchases/${id}`),
+
+  getReorderList: (coverDays?: number) => get<ReorderList>('/reorder', { cover_days: coverDays }),
 
   // Returns to suppliers and expiry claims
   getPurchaseReturns: () => get<PurchaseReturnSummary[]>('/purchase-returns'),

@@ -14,6 +14,17 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M3: reorder list)
+- Purchases → **Reorder List** tab: a short list for every supplier.
+  - **What is listed:** medicines at or below their minimum stock, and medicines that will run out within 7/15/30 days at the last 30 days' sales speed. Returns are taken off the sales speed.
+  - **Suggested boxes:** shown for each medicine and editable.
+  - **Each supplier group has three actions:**
+    - **Print order list**, an A4 sheet for the salesman;
+    - **Copy as text**, to paste into WhatsApp;
+    - **Create purchase**, which opens New Purchase filled in.
+  - **Default period:** the number of days is a store setting, "Save as default" for users with Settings access.
+- New Purchase: batch, expiry and boxes can be edited on each line, and every line needs a batch and an expiry before posting. The made-up batch and expiry defaults are gone.
+
 ### Added (M2: returns to supplier and expiry claims)
 - Purchases → **Returns to Supplier** tab.
   - **Expiry claims** lists expired and soon-expiring stock (30/60/90/180 days) by supplier; **Create claim** fills a claim with those boxes in one click.

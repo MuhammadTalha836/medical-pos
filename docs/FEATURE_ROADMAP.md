@@ -13,8 +13,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | Phase | Module | Status |
 |---|---|---|
 | M1 | Supplier / distributor ledger (payables) | ✅ |
-| M2 | Purchase returns and expiry claims | ✅ built and tested; waiting for the owner's check |
-| M3 | Reorder / short list | ⬜ |
+| M2 | Purchase returns and expiry claims | ✅ |
+| M3 | Reorder / short list | ✅ built and tested; waiting for the owner's check |
 | M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ⬜ |
 | M5 | Prescription and controlled-medicine register | ⬜ |
 | M6 | Generic / substitute search | ⬜ |
@@ -167,7 +167,20 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - "Send on WhatsApp" opens a `wa.me` link with the list text (uses the M7 helper; until M7 exists, Copy text);
 - "Create purchase" fills a new purchase draft.
 
-**Tests:** suggestion maths (unit spec) and the list API.
+**Built (2026-10-25):**
+- `server/reorder/reorderMath.ts` (pure, with spec);
+- `server/routes/reorder.ts` (`GET /api/reorder`, `purchases` permission);
+- setting `reorder_cover_days`;
+- Purchases → **Reorder List** tab (`src/components/reorder/ReorderTab.tsx`):
+  - editable boxes;
+  - Print order list;
+  - Copy as text (pasted into WhatsApp by hand until M7);
+  - Create purchase.
+- New Purchase draft lines now have editable batch, expiry and boxes. Posting needs a batch and an expiry on every line; the fake `B-xxxx` / `2027-12-31` defaults are gone.
+
+**How a medicine gets listed.** It is listed when stock is at or below `min_stock_alert`, or when it will run out within the cover days at the last 30 days' sales speed (returns taken off). The quantity is max(minimum × 2 − stock, sales × cover days − stock), rounded up in boxes.
+
+**Tests:** suggestion maths (unit spec) and the list API (`test:m3`).
 
 ## M4: Batch-wise expiry (FEFO) and near-expiry alerts
 **Goal.** Sell the batch that expires first. Correct expired and near-expiry reports.

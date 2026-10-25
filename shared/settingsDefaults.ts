@@ -66,6 +66,7 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   auto_backup_enabled: 'true',
   low_stock_threshold: '10',
   max_bill_discount_pct: '14',
+  reorder_cover_days: '7',
   ...DEFAULT_INVOICE_SETTINGS,
   setup_completed: 'false',
   developer_email: '',

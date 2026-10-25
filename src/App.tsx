@@ -144,7 +144,7 @@ export const App: React.FC = () => {
             <MastersPage settings={settings} />
           )}
           {currentTab === 'purchases' && (
-            <PurchasesPage settings={settings} />
+            <PurchasesPage settings={settings} onRefreshSettings={loadSettings} />
           )}
           {currentTab === 'reports' && (
             <ReportsPage settings={settings} />

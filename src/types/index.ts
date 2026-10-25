@@ -279,6 +279,34 @@ export interface SupplierSummary {
   last_purchase_date: string | null;
 }
 
+/** One medicine on the reorder (short) list */
+export interface ReorderItem {
+  product_id: number;
+  name: string;
+  generic_name: string | null;
+  company_id: number | null;
+  company_name: string;
+  packing: number;
+  unit_type: string;
+  stock_boxes: number;
+  stock_loose: number;
+  min_stock_alert: number;
+  sold_30d_units: number;
+  avg_daily_units: number;
+  days_left: number | null;
+  reason: 'below_minimum' | 'running_out';
+  suggested_boxes: number;
+  box_trade_price: number;
+  box_retail_price: number;
+  estimated_cost: number;
+}
+
+export interface ReorderList {
+  cover_days: number;
+  generated_at: string;
+  items: ReorderItem[];
+}
+
 /** A return of goods to a supplier (or an expiry claim) */
 export interface PurchaseReturnSummary {
   id: number;
@@ -369,6 +397,8 @@ export interface SystemSettings {
   low_stock_threshold: string;
   paper_width: string;
   max_bill_discount_pct?: string;
+  /** Days of sales a reorder should cover (Purchases → Reorder) */
+  reorder_cover_days?: string;
 
   // Requirement 9: Advanced Invoice Settings
   default_invoice_template?: InvoiceTemplateType;

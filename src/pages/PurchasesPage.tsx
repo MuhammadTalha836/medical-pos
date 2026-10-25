@@ -11,24 +11,27 @@ import {
   Printer,
   ClipboardList,
   Wallet,
-  PackageX
+  PackageX,
+  ListChecks
 } from 'lucide-react';
 import { currencySymbol, moneyFormatter } from '../utils/format';
 import { useAuthStore } from '../store/useAuthStore';
 import { printDocument } from '../utils/printDocument';
 import { SuppliersTab } from '../components/suppliers/SuppliersTab';
 import { PurchaseReturnsTab } from '../components/purchaseReturns/PurchaseReturnsTab';
+import { ReorderTab, type ReorderPurchaseLine } from '../components/reorder/ReorderTab';
 
-type PurchasesTabKey = 'purchases' | 'suppliers' | 'returns';
+type PurchasesTabKey = 'purchases' | 'reorder' | 'suppliers' | 'returns';
 type PaymentChoice = 'full' | 'credit' | 'part';
 
 const PAYMENT_BADGE: Record<string, string> = { Paid: 'badge-success', Partial: 'badge-warning', Pending: 'badge-danger' };
 
 interface PurchasesPageProps {
   settings?: SystemSettings | null;
+  onRefreshSettings?: () => void;
 }
 
-export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
+export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings, onRefreshSettings }) => {
   const { hasPermission } = useAuthStore();
   const [tab, setTab] = useState<PurchasesTabKey>('purchases');
   const [suppliersRefreshKey, setSuppliersRefreshKey] = useState(0);
@@ -146,8 +149,8 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       {
         product_id: prod.id,
         product_name: prod.name,
-        batch_no: lineBatchNo || `B-${Date.now().toString().slice(-4)}`,
-        expiry_date: lineExpiry || '2027-12-31',
+        batch_no: lineBatchNo.trim(),
+        expiry_date: lineExpiry,
         quantity_boxes: lineBoxes,
         bonus_boxes: lineBonus,
         box_cost_price: lineCost,
@@ -163,6 +166,36 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
     setLineBonus(0);
   };
 
+  // Batch, expiry and boxes can be corrected on the draft (lines from the reorder list start without a batch)
+  const updateDraftItem = (index: number, change: Partial<(typeof draftItems)[number]>) => {
+    setDraftItems(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      const next = { ...item, ...change };
+      return { ...next, total_cost: next.quantity_boxes * next.box_cost_price * (1 - (next.discount_pct || 0) / 100) };
+    }));
+  };
+
+  // Reorder list → New Purchase form with that supplier and the chosen boxes
+  const startPurchaseFromReorder = (companyId: number, lines: ReorderPurchaseLine[]) => {
+    setSelectedCompanyId(String(companyId));
+    setSupplierInvoiceNo('');
+    setPaymentChoice('full');
+    setPaidNow('');
+    setDraftItems(lines.map(line => ({
+      product_id: line.product_id,
+      product_name: line.product_name,
+      batch_no: '',
+      expiry_date: '',
+      quantity_boxes: line.boxes,
+      bonus_boxes: 0,
+      box_cost_price: line.box_cost_price,
+      box_retail_price: line.box_retail_price,
+      discount_pct: 0,
+      total_cost: line.boxes * line.box_cost_price
+    })));
+    setIsNewPurchaseModalOpen(true);
+  };
+
   const handleRemoveDraftItem = (index: number) => {
     setDraftItems(prev => prev.filter((_, idx) => idx !== index));
   };
@@ -176,6 +209,11 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
     if (saving) return;
     if (draftItems.length === 0) {
       alert('Please add at least one line item to the purchase invoice.');
+      return;
+    }
+    const missing = draftItems.find(item => !item.batch_no.trim() || !item.expiry_date);
+    if (missing) {
+      alert(`Enter the batch number and expiry date for "${missing.product_name}" (from the supplier's bill).`);
       return;
     }
     const partAmount = Number(paidNow);
@@ -255,6 +293,7 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
       <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800" role="tablist">
         {([
           { key: 'purchases', label: 'Purchases', icon: ClipboardList },
+          { key: 'reorder', label: 'Reorder List', icon: ListChecks },
           { key: 'suppliers', label: 'Suppliers (payables)', icon: Wallet },
           { key: 'returns', label: 'Returns to Supplier', icon: PackageX }
         ] as const).map(t => (
@@ -283,6 +322,17 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
           currency={currency}
           canPay={hasPermission('can_pay_supplier')}
           refreshKey={suppliersRefreshKey}
+        />
+      )}
+
+      {tab === 'reorder' && (
+        <ReorderTab
+          settings={settings}
+          money={money}
+          canCreatePurchase={hasPermission('can_add_purchase')}
+          canSaveDefault={hasPermission('settings')}
+          onCreatePurchase={startPurchaseFromReorder}
+          onSavedDefault={onRefreshSettings}
         />
       )}
 
@@ -588,11 +638,35 @@ export const PurchasesPage: React.FC<PurchasesPageProps> = ({ settings }) => {
                   draftItems.map((item, idx) => (
                     <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#162032]/50">
                       <td className="py-2 px-3 font-medium text-slate-900 dark:text-white">{item.product_name}</td>
-                      <td className="py-2 px-3 font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {item.batch_no} (Exp: {item.expiry_date})
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={item.batch_no}
+                            onChange={e => updateDraftItem(idx, { batch_no: e.target.value })}
+                            placeholder="Batch"
+                            aria-label={`Batch of ${item.product_name}`}
+                            className={`field-input field-sm w-24 font-mono ${item.batch_no.trim() ? '' : 'border-amber-400'}`}
+                          />
+                          <input
+                            type="date"
+                            value={item.expiry_date}
+                            onChange={e => updateDraftItem(idx, { expiry_date: e.target.value })}
+                            aria-label={`Expiry of ${item.product_name}`}
+                            className={`field-input field-sm w-36 ${item.expiry_date ? '' : 'border-amber-400'}`}
+                          />
+                        </div>
                       </td>
                       <td className="py-2 px-3 text-center font-mono">
-                        <span className="font-bold text-slate-900 dark:text-white">{item.quantity_boxes}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={item.quantity_boxes}
+                          onChange={e => updateDraftItem(idx, { quantity_boxes: Math.max(1, Math.floor(Number(e.target.value) || 1)) })}
+                          aria-label={`Boxes of ${item.product_name}`}
+                          className="field-input field-sm w-16 text-center font-mono"
+                        />
                         {item.bonus_boxes > 0 && <span className="text-emerald-600 dark:text-emerald-400 text-2xs ml-1">(+{item.bonus_boxes})</span>}
                       </td>
                       <td className="py-2 px-3 text-right font-mono text-slate-700 dark:text-slate-300">{money(item.box_cost_price)}</td>

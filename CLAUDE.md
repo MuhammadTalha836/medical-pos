@@ -31,6 +31,7 @@ npm run test:phase7      # online backup to Google Drive (Google faked by a fetc
 npm run test:phase8      # server-side sale pricing, oversell/cash checks, returns, shift cash, khata payments, role escalation, login lockout
 npm run test:m1          # supplier ledger: purchases costed on the server, paid now, payments, statement (docs/FEATURE_ROADMAP.md)
 npm run test:m2          # returns to supplier and expiry claims: stock, batch and balance go down, over-return checks
+npm run test:m3          # reorder list: below minimum / running out by 30-day sales speed, cover days, filters
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -130,6 +131,10 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - A line linked to a purchase is limited to bought + bonus − earlier returns, and credited at its cost after the line discount. Unlinked stock is limited to the supplier's own medicines and credited at the trade price.
   - Every line is capped by `stock_boxes`. A return lowers stock and the named batch, and its `total_refund` is a credit in the supplier ledger.
   - `GET /api/purchase-returns/expiry-candidates?days=` lists claimable batches, capped by stock until FEFO (M4).
+- **Reorder list.**
+  - Route: `GET /api/reorder?cover_days=&company_id=` (`purchases` permission).
+  - Rules: `suggestReorder` in `server/reorder/reorderMath.ts`. A medicine is listed at or below `min_stock_alert`, or when its stock lasts fewer than the cover days at the last 30 days' units sold. Invoices count when `completed` or `partially_returned`, minus returns.
+  - Cover days default to the setting `reorder_cover_days`.
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**
