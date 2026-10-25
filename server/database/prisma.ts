@@ -31,6 +31,16 @@ export async function initPrisma(): Promise<void> {
       console.error('[Prisma] Backup frequency migration failed:', err);
     }
 
+    // M4: every unit of stock belongs to a batch (opening batch for uncovered stock, trims for over-counted batches)
+    try {
+      // Loaded here: the stock helpers import this module
+      const { reconcileAllProductBatches } = await import('../stock/batchStock');
+      const fixed = await reconcileAllProductBatches();
+      if (fixed > 0) console.log(`[Prisma] Batches brought in line with stock for ${fixed} product(s)`);
+    } catch (err) {
+      console.error('[Prisma] Batch reconcile failed:', err);
+    }
+
     // Phase 3: move legacy A4/A5 paper sizes and sheet templates onto thermal equivalents
     try { await migrateLegacyInvoiceSettings(prisma); } catch (err) {
       console.error('[Prisma] Invoice settings migration failed:', err);

@@ -279,6 +279,19 @@ export interface SupplierSummary {
   last_purchase_date: string | null;
 }
 
+/** One batch of a medicine (Medicines → Batches) */
+export interface ProductBatchRow {
+  id: number;
+  batch_no: string;
+  expiry_date: string;
+  quantity_boxes: number;
+  quantity_loose: number;
+  units: number;
+  purchase_cost: number;
+  status: 'expired' | 'near' | 'ok' | 'no_expiry';
+  created_at: string;
+}
+
 /** One medicine on the reorder (short) list */
 export interface ReorderItem {
   product_id: number;

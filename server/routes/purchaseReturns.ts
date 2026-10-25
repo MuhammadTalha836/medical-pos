@@ -6,6 +6,7 @@ import { logSecurityAudit } from '../security/audit';
 import { lineCostRate, pricePurchaseReturn, type ReturnPurchaseLine } from '../purchaseReturns/returnMath';
 import { round2 } from '../suppliers/ledgerMath';
 import { localDateKey, localDateString } from '../../shared/dates';
+import { takeUnitsFromBatch } from '../stock/batchStock';
 
 // Returns to suppliers (damaged or expired goods) and expiry claims. A return lowers stock and is a credit
 // against what the store owes that supplier (see server/suppliers/ledgerMath.ts).
@@ -79,7 +80,7 @@ router.get('/api/purchase-returns/expiry-candidates', async (req: Request, res: 
     });
     const returned = await returnedBoxesByLine(lines.map(l => l.id));
 
-    // Batches are not reduced by sales yet (FEFO comes in M4), so never offer more than is on the shelf
+    // Sales take batches first-expiry-first, so batches match the shelf; the stock cap is only a safety net
     const stockLeft = new Map<number, number>();
     const result = [];
     for (const b of batches) {
@@ -226,22 +227,11 @@ router.post('/api/purchase-returns', async (req: Request, res: Response) => {
             totalRefund: line.credit
           }
         });
+        // The named batch goes down first (so the expiry list stops offering it), then the earliest expiry
+        const product = products.find(p => p.id === line.productId)!;
+        const packing = Math.max(1, product.packing || 1);
+        await takeUnitsFromBatch(tx, { id: product.id, name: product.name, packing, unitType: product.unitType }, line.quantityBoxes * packing, line.batchNo);
         await tx.product.update({ where: { id: line.productId }, data: { stockBoxes: { decrement: line.quantityBoxes } } });
-
-        // The batch the boxes came from goes down too, so the expiry list stops offering them
-        if (line.batchNo) {
-          let left = line.quantityBoxes;
-          const batches = await tx.productBatch.findMany({
-            where: { productId: line.productId, batchNo: line.batchNo, quantityBoxes: { gt: 0 } },
-            orderBy: [{ expiryDate: 'asc' }, { id: 'asc' }]
-          });
-          for (const batch of batches) {
-            if (left <= 0) break;
-            const take = Math.min(left, batch.quantityBoxes);
-            await tx.productBatch.update({ where: { id: batch.id }, data: { quantityBoxes: { decrement: take } } });
-            left -= take;
-          }
-        }
       }
       return { id: created.id, returnNo, totalCredit: priced.totalCredit, boxes: priced.lines.reduce((s, l) => s + l.quantityBoxes, 0) };
     });

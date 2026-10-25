@@ -302,9 +302,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
                       </td>
                       <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">{b.company_name}</td>
                       <td className="py-2.5 px-3 font-mono font-bold text-slate-700 dark:text-slate-200">{b.batch_no}</td>
-                      <td className="py-2.5 px-3 font-mono font-bold text-rose-600 dark:text-rose-400">{b.expiry_date}</td>
+                      <td className={`py-2.5 px-3 font-mono font-bold ${b.expired ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                        {b.expiry_date}
+                        <div className="text-2xs font-sans font-semibold">{b.expired ? 'Expired' : 'Expiring soon'}</div>
+                      </td>
                       <td className="py-2.5 px-3 text-center font-mono text-amber-600 dark:text-amber-400 font-semibold">{b.location_rack || '-'}</td>
-                      <td className="py-2.5 px-3 text-center font-mono text-slate-900 dark:text-white">{b.quantity_boxes} Boxes</td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-900 dark:text-white">{b.quantity_boxes} Boxes{Number(b.quantity_loose) > 0 ? ` + ${b.quantity_loose} ${b.unit_type}` : ''}</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
                         {money(Number(b.loss_valuation))}
                       </td>

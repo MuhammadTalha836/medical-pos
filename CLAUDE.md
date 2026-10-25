@@ -32,6 +32,7 @@ npm run test:phase8      # server-side sale pricing, oversell/cash checks, retur
 npm run test:m1          # supplier ledger: purchases costed on the server, paid now, payments, statement (docs/FEATURE_ROADMAP.md)
 npm run test:m2          # returns to supplier and expiry claims: stock, batch and balance go down, over-return checks
 npm run test:m3          # reorder list: below minimum / running out by 30-day sales speed, cover days, filters
+npm run test:m4          # batches: FEFO sales, splits, returns to batch, expired never sold, opening batch, reconcile
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -120,6 +121,12 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - Customers: a sale may carry `customer_id` (a saved khata customer; the sale then stores that customer's saved name/phone). A Credit sale **requires** one and is blocked past the customer's `credit_limit` (0 = no limit); returning a credit sale lowers the balance. Customers need a phone, unique by digits (`normalizePhone` in `shared/customers.ts`); a duplicate answers 409 with the existing customer. The POS picks customers with `CustomerPicker.tsx` (`GET /api/customers/search`). The Customers page (`src/pages/CustomersPage.tsx`, tab id `khata`) has a Customers tab and a Khata (Udhaar) tab; a customer can be deleted only with no invoices, payments or balance.
 - It generates `INV-YYYYMMDD-NNNN` inside `prisma.$transaction`, with a 5-attempt retry on `SQLITE_BUSY` / unique collisions.
 - Stock is tracked as boxes + loose units (`packing` units per box). Products can forbid loose ("open") sales and set a minimum sale quantity.
+- **Batches (FEFO).** Invariant: a product's batch units add up to its stock. Rules are in `server/stock/batchMath.ts`; DB helpers in `server/stock/batchStock.ts`, always called inside the caller's transaction.
+  - Sales call `takeUnits(..., includeExpired: false)` (expired stock is never sold) and record `sale_item_batches`. Sale returns put units back into those rows (`returned_units`).
+  - Supplier returns use `takeUnitsFromBatch` (the named batch, then the earliest expiry).
+  - Product create/edit calls `syncProductBatches`: uncovered stock goes to the `OPENING` batch, and an excess is trimmed by earliest expiry.
+  - `reconcileAllProductBatches` runs at start-up.
+  - **Any new code that changes `stock_boxes` / `stock_loose` must also move batches,** or call `syncProductBatches`.
 
 **Suppliers (payables).** Companies are the suppliers.
 - The balance owed is never stored: `buildSupplierLedger` (`server/suppliers/ledgerMath.ts`) works it out from purchases (`paid_amount`; rows marked Paid count as fully paid), `supplier_payments` and purchase-return credits. Payments settle the oldest bill first.

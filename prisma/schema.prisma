@@ -112,6 +112,7 @@ model ProductBatch {
 
   product       Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   saleItems     SaleItem[]
+  saleAllocations SaleItemBatch[]
 
   @@index([expiryDate], name: "idx_batches_expiry")
   @@map("product_batches")
@@ -207,6 +208,7 @@ model SaleItem {
   sale           Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product        Product       @relation(fields: [productId], references: [id])
   batch          ProductBatch? @relation(fields: [batchId], references: [id])
+  batchAllocations SaleItemBatch[]
 
   @@map("sale_items")
 }
@@ -331,6 +333,20 @@ model PurchaseReturnItem {
   purchaseItem     PurchaseItem?  @relation(fields: [purchaseItemId], references: [id])
 
   @@map("purchase_return_items")
+}
+
+model SaleItemBatch {
+  id            Int          @id @default(autoincrement())
+  saleItemId    Int          @map("sale_item_id")
+  batchId       Int          @map("batch_id")
+  units         Int
+  returnedUnits Int          @default(0) @map("returned_units")
+
+  saleItem      SaleItem     @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  batch         ProductBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([saleItemId], name: "idx_sale_item_batches_item")
+  @@map("sale_item_batches")
 }
 
 model SupplierPayment {

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { requirePermission, sendError } from '../http/context';
+import { localDateString } from '../../shared/dates';
 
 // Stock, profit/loss and sales reports
 const router = Router();
@@ -33,25 +34,26 @@ router.get('/api/reports/stock/available', async (req: Request, res: Response) =
 router.get('/api/reports/stock/expired', async (req: Request, res: Response) => {
   try {
     if (!(await requirePermission(req, res, 'reports', 'You do not have access to reports.'))) return;
-    const days = req.query.days ? String(req.query.days) : '0';
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + Number(days));
-    const targetStr = targetDate.toISOString().split('T')[0];
+    const days = Math.min(365, Math.max(0, Math.floor(Number(req.query.days ?? 0)) || 0));
+    const today = localDateString();
+    const targetStr = localDateString(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
 
     const expired = await prisma.$queryRaw<any[]>`
       SELECT 
         b.id as batch_id, b.batch_no, b.expiry_date, b.quantity_boxes, b.quantity_loose,
         p.id as product_id, p.c_code, p.p_code, p.name as product_name, p.unit_type, p.location_rack,
-        p.box_trade_price, (b.quantity_boxes * p.box_trade_price) as loss_valuation,
+        p.packing, p.box_trade_price,
+        ((b.quantity_boxes * p.box_trade_price) + (b.quantity_loose * p.box_trade_price / MAX(p.packing, 1))) as loss_valuation,
         c.name as company_name
       FROM product_batches b
       JOIN products p ON b.product_id = p.id
       LEFT JOIN companies c ON p.company_id = c.id
-      WHERE b.expiry_date <= ${targetStr} AND (b.quantity_boxes > 0 OR b.quantity_loose > 0)
+      WHERE b.expiry_date != '' AND b.expiry_date <= ${targetStr} AND (b.quantity_boxes > 0 OR b.quantity_loose > 0)
       ORDER BY b.expiry_date ASC
     `;
 
-    res.json(expired);
+    // Batches follow every sale (FEFO), so these are the quantities really on the shelf
+    res.json(expired.map(row => ({ ...row, expired: row.expiry_date <= today })));
   } catch (error: unknown) {
     sendError(res, error);
   }

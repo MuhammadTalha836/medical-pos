@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
 import { hasRolePermission, requirePermission, sendError } from '../http/context';
+import { localDateString } from '../../shared/dates';
 
 // Health check and dashboard KPIs
 const router = Router();
@@ -53,15 +54,21 @@ router.get('/api/dashboard/stats', async (req: Request, res: Response) => {
       where: { stockBoxes: 0, stockLoose: 0, status: 'active' }
     });
 
-    const expiredCount = await prisma.productBatch.count({
+    // Batches with stock left (sales take the earliest expiry first, so these are real quantities)
+    const localToday = localDateString();
+    const dayAhead = (days: number) => localDateString(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
+    const batchesUntil = (until: string, after?: string) => prisma.productBatch.count({
       where: {
-        expiryDate: { lte: today },
-        OR: [
-          { quantityBoxes: { gt: 0 } },
-          { quantityLoose: { gt: 0 } }
-        ]
+        expiryDate: after ? { gt: after, lte: until } : { not: '', lte: until },
+        OR: [{ quantityBoxes: { gt: 0 } }, { quantityLoose: { gt: 0 } }]
       }
     });
+    const [expiredCount, d30, d60, d90] = await Promise.all([
+      batchesUntil(localToday),
+      batchesUntil(dayAhead(30), localToday),
+      batchesUntil(dayAhead(60), localToday),
+      batchesUntil(dayAhead(90), localToday)
+    ]);
 
     const recentSales = await prisma.sale.findMany({
       select: {
@@ -101,6 +108,7 @@ router.get('/api/dashboard/stats', async (req: Request, res: Response) => {
       lowStockCount,
       outOfStockCount,
       expiredCount,
+      nearExpiry: { d30, d60, d90 },
       recentSales: recentSales.map(s => ({
         id: s.id,
         invoice_no: s.invoiceNo,

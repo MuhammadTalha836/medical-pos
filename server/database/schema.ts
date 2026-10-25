@@ -245,6 +245,15 @@ CREATE TABLE IF NOT EXISTS purchase_return_items (
   total_refund REAL NOT NULL
 );
 
+-- Which batches each sale line was taken from (FEFO), so returns go back to the same batch
+CREATE TABLE IF NOT EXISTS sale_item_batches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_item_id INTEGER NOT NULL REFERENCES sale_items(id) ON DELETE CASCADE,
+  batch_id INTEGER NOT NULL REFERENCES product_batches(id) ON DELETE CASCADE,
+  units INTEGER NOT NULL,
+  returned_units INTEGER NOT NULL DEFAULT 0
+);
+
 -- Payments to suppliers (distributors) against what the store owes them
 CREATE TABLE IF NOT EXISTS supplier_payments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -358,6 +367,7 @@ CREATE INDEX IF NOT EXISTS idx_shifts_user_status ON cashier_shifts(user_id, sta
 CREATE INDEX IF NOT EXISTS idx_shifts_shift_no ON cashier_shifts(shift_no);
 CREATE INDEX IF NOT EXISTS idx_shifts_start_time ON cashier_shifts(start_time);
 CREATE INDEX IF NOT EXISTS idx_supplier_payments_company ON supplier_payments(company_id);
+CREATE INDEX IF NOT EXISTS idx_sale_item_batches_item ON sale_item_batches(sale_item_id);
 `;
 
 /**

@@ -77,6 +77,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
   const lowStockCount = stats?.lowStockCount || 0;
   const outOfStockCount = stats?.outOfStockCount || 0;
   const expiredCount = stats?.expiredCount || 0;
+  // Batches with stock that expire within 30 / 60 / 90 days (not yet expired)
+  const nearExpiry: { d30: number; d60: number; d90: number } | null = stats?.nearExpiry ?? null;
 
   return (
     <div className="page-container">
@@ -180,8 +182,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
               {expiredCount}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Action required for returns
+              Send back from Purchases → Returns to Supplier
             </div>
+            {nearExpiry && (
+              <dl className="mt-3 grid grid-cols-3 gap-1 text-center">
+                {([['30 days', nearExpiry.d30], ['60 days', nearExpiry.d60], ['90 days', nearExpiry.d90]] as const).map(([label, value]) => (
+                  <div key={label} className="rounded-lg bg-amber-500/10 px-1 py-1">
+                    <dt className="text-2xs text-amber-700 dark:text-amber-300">{label}</dt>
+                    <dd className="text-sm font-bold font-mono text-amber-700 dark:text-amber-300">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {nearExpiry && hasPermission('reports') && (
+              <button type="button" onClick={() => onNavigateTab('reports')} className="btn-secondary btn-sm mt-2 w-full">
+                Expiring soon: open report
+              </button>
+            )}
           </div>
         </div>
       </div>

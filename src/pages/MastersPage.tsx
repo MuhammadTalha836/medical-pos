@@ -9,10 +9,12 @@ import {
   Plus,
   Search,
   Edit2,
+  Layers,
   Trash2,
   CheckCircle2,
 } from 'lucide-react';
 import { moneyFormatter } from '../utils/format';
+import { BatchListModal } from '../components/masters/BatchListModal';
 
 interface MastersPageProps {
   settings?: SystemSettings | null;
@@ -20,6 +22,7 @@ interface MastersPageProps {
 
 export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
   const { hasPermission } = useAuthStore();
+  const [batchesFor, setBatchesFor] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState<'products' | 'companies'>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -443,6 +446,14 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                           </td>
                           <td className="py-3 px-3 text-center">
                             <div className="flex items-center justify-center space-x-1.5">
+                              <button
+                                onClick={() => setBatchesFor(prod)}
+                                className="btn-secondary"
+                                title="Batches and expiry dates"
+                                aria-label={`Batches of ${prod.name}`}
+                              >
+                                <Layers className="w-4 h-4" />
+                              </button>
                               {hasPermission('can_edit_product') && (
                                 <button
                                   onClick={() => handleOpenEditProduct(prod)}
@@ -460,9 +471,6 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                              )}
-                              {!hasPermission('can_edit_product') && !hasPermission('can_delete_product') && (
-                                <span className="text-2xs text-slate-400 italic">View Only</span>
                               )}
                             </div>
                           </td>
@@ -961,6 +969,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
           </div>
         </form>
       </Modal>
+      <BatchListModal product={batchesFor} canEdit={hasPermission('can_edit_product')} onClose={() => setBatchesFor(null)} />
     </div>
   );
 };

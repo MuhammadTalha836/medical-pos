@@ -28,7 +28,8 @@ import {
   PurchaseReturnDetails,
   ExpiryCandidate,
   PurchaseReturnLineInput,
-  ReorderList
+  ReorderList,
+  ProductBatchRow
 } from '../types';
 
 const API_BASE = '/api';
@@ -166,6 +167,9 @@ export const api = {
   getPurchases: () => get<PurchaseInvoice[]>('/purchases'),
   getPurchaseById: (id: number) => get<PurchaseInvoice>(`/purchases/${id}`),
 
+  getProductBatches: (productId: number) => get<ProductBatchRow[]>(`/products/${productId}/batches`),
+  updateProductBatch: (productId: number, batchId: number, data: { batch_no: string; expiry_date: string | null }) =>
+    put<Success>(`/products/${productId}/batches/${batchId}`, data),
   getReorderList: (coverDays?: number) => get<ReorderList>('/reorder', { cover_days: coverDays }),
 
   // Returns to suppliers and expiry claims

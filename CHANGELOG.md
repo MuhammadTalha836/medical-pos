@@ -14,6 +14,17 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M4: batches, first-expiry-first, expiry alerts)
+- **Sales use the earliest expiry first.** A sale line can come from several batches. Expired stock is never sold: the POS says how much is expired and where to send it back (Purchases → Returns to Supplier).
+- **Returns go back into the batch they came from.**
+- **Every unit belongs to a batch.**
+  - Opening stock and stock typed into a medicine go into an "OPENING" batch.
+  - Lowering a medicine's stock takes it from the earliest expiry first.
+  - On start-up, older databases are brought in line once.
+- **Medicines → Batches button:** each batch with its stock and status (expired, expiring within 90 days, good, no expiry). Users who can edit medicines can correct a batch number or expiry date, for example to give opening stock its real expiry.
+- **Dashboard:** shows how many batches expire within 30, 60 and 90 days, next to the expired count.
+- **Reports → Expired & Near-Expiry:** shows loose units and whether each batch has expired or is about to. These numbers are now right because batches go down with every sale.
+
 ### Added (M3: reorder list)
 - Purchases → **Reorder List** tab: a short list for every supplier.
   - **What is listed:** medicines at or below their minimum stock, and medicines that will run out within 7/15/30 days at the last 30 days' sales speed. Returns are taken off the sales speed.

@@ -2,6 +2,13 @@ import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { requirePermission, sendError } from '../http/context';
+import { parseBody, batchEditSchema } from '../validation/schemas';
+import { logSecurityAudit } from '../security/audit';
+import { syncProductBatches } from '../stock/batchStock';
+import { fefoOrder, isExpired, toUnits } from '../stock/batchMath';
+import { localDateString } from '../../shared/dates';
+
+const NEAR_EXPIRY_DAYS = 90;
 
 // Products master
 const router = Router();
@@ -112,7 +119,8 @@ router.post('/api/products', async (req: Request, res: Response) => {
       allow_open_sale, min_sale_qty
     } = req.body;
 
-    const newProd = await prisma.product.create({
+    const newProd = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
       data: {
         companyId: company_id ? Number(company_id) : null,
         cCode: c_code,
@@ -135,6 +143,10 @@ router.post('/api/products', async (req: Request, res: Response) => {
         minSaleQty: parseInt(min_sale_qty) || 1,
         status: 'active'
       }
+      });
+      // Opening stock becomes the medicine's opening batch
+      await syncProductBatches(tx, created.id);
+      return created;
     });
 
     res.json({ success: true, id: newProd.id });
@@ -154,7 +166,8 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
       allow_open_sale, min_sale_qty
     } = req.body;
 
-    await prisma.product.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.product.update({
       where: { id: idNum },
       data: {
         companyId: company_id ? Number(company_id) : null,
@@ -178,8 +191,64 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
         minSaleQty: parseInt(min_sale_qty) || 1,
         status: status || 'active'
       }
+      });
+      // Stock edited here keeps its batches in step (added stock: opening batch; lowered: earliest expiry first)
+      await syncProductBatches(tx, idNum);
     });
 
+    res.json({ success: true });
+  } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+// A medicine's batches with what is left of each and its expiry state
+router.get('/api/products/:id/batches', async (req: Request, res: Response) => {
+  try {
+    if (!(await requirePermission(req, res, 'masters', 'You do not have access to medicines.'))) return;
+    const product = await prisma.product.findUnique({ where: { id: Number(req.params.id) || 0 } });
+    if (!product) return res.status(404).json({ error: 'Medicine not found' });
+    await prisma.$transaction(tx => syncProductBatches(tx, product.id));
+    const batches = await prisma.productBatch.findMany({ where: { productId: product.id }, orderBy: [{ expiryDate: 'asc' }, { id: 'asc' }] });
+    const today = localDateString();
+    const soon = localDateString(new Date(Date.now() + NEAR_EXPIRY_DAYS * 24 * 60 * 60 * 1000));
+    res.json(fefoOrder(batches.map(b => ({ ...b, units: toUnits(b.quantityBoxes, b.quantityLoose, product.packing) })), today).map(b => ({
+      id: b.id,
+      batch_no: b.batchNo,
+      expiry_date: b.expiryDate,
+      quantity_boxes: b.quantityBoxes,
+      quantity_loose: b.quantityLoose,
+      units: b.units,
+      purchase_cost: b.purchaseCost,
+      status: !b.expiryDate ? 'no_expiry' : isExpired(b.expiryDate, today) ? 'expired' : b.expiryDate <= soon ? 'near' : 'ok',
+      created_at: b.createdAt
+    })));
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+// Correct a batch number or expiry date (quantities only change through sales, purchases and returns)
+router.put('/api/products/:id/batches/:batchId', async (req: Request, res: Response) => {
+  try {
+    const actor = await requirePermission(req, res, 'can_edit_product', 'You do not have permission to edit medicines.');
+    if (!actor) return;
+    const body = parseBody(batchEditSchema, req.body, res);
+    if (!body) return;
+    const batch = await prisma.productBatch.findFirst({ where: { id: Number(req.params.batchId) || 0, productId: Number(req.params.id) || 0 }, include: { product: { select: { name: true } } } });
+    if (!batch) return res.status(404).json({ error: 'Batch not found' });
+    const updated = await prisma.productBatch.update({
+      where: { id: batch.id },
+      data: { batchNo: body.batch_no, expiryDate: body.expiry_date ?? '' }
+    });
+    await logSecurityAudit({
+      action: 'BATCH_EDIT',
+      module: 'Inventory',
+      status: 'SUCCESS',
+      details: `${batch.product.name}: batch ${batch.batchNo} (expiry ${batch.expiryDate || 'none'}) -> ${updated.batchNo} (expiry ${updated.expiryDate || 'none'})`,
+      userId: actor.id,
+      userName: actor.username
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     sendError(res, error, 400);

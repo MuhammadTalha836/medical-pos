@@ -8,6 +8,7 @@ import { DEVELOPER_PROFILE_SETTING_KEYS, composeInvoiceFooter } from '../../shar
 import { DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
 import { priceReturn, priceSaleLine, settleCash, totalSale } from '../sales/saleMath';
 import { localDateKey } from '../../shared/dates';
+import { returnUnits, syncProductBatches, takeUnits } from '../stock/batchStock';
 
 // Counter sales (POS), sales history and returns
 const router = Router();
@@ -166,8 +167,10 @@ router.post('/api/sales', async (req: Request, res: Response) => {
           if (unitsToDeduct > available) {
             throw new Error(`Not enough stock for "${prod.name}": ${describeStock(prod.stockBoxes, prod.stockLoose, prod.unitType)} available.`);
           }
+          // First expiry, first out; expired batches are never sold
+          const allocations = await takeUnits(tx, { id: prod.id, name: prod.name, packing, unitType: prod.unitType }, unitsToDeduct, false);
 
-          await tx.saleItem.create({
+          const saleItem = await tx.saleItem.create({
             data: {
               saleId: sale.id,
               productId: prod.id,
@@ -184,8 +187,11 @@ router.post('/api/sales', async (req: Request, res: Response) => {
               discountPct: priced.discountPct,
               discountAmount: priced.discountAmount,
               netAmount: priced.netAmount,
-              batchId
+              batchId: allocations[0]?.batchId ?? batchId
             }
+          });
+          await tx.saleItemBatch.createMany({
+            data: allocations.map(a => ({ saleItemId: saleItem.id, batchId: a.batchId, units: a.units }))
           });
 
           const remaining = available - unitsToDeduct;
@@ -390,11 +396,27 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
 
         // Stock goes back in the unit it was sold in
         const packing = prod.packing || 1;
-        const totalUnits = (prod.stockBoxes * packing) + prod.stockLoose + (line.isLoose ? line.quantity : line.quantity * packing);
+        const unitsBack = line.isLoose ? line.quantity : line.quantity * packing;
+        const totalUnits = (prod.stockBoxes * packing) + prod.stockLoose + unitsBack;
         await tx.product.update({
           where: { id: prod.id },
           data: { stockBoxes: Math.floor(totalUnits / packing), stockLoose: totalUnits % packing }
         });
+
+        // ...and into the batches it was taken from, most recently taken first
+        const lineIds = original.items.filter(i => i.productId === prod.id && !!i.isLoose === line.isLoose).map(i => i.id);
+        const taken = await tx.saleItemBatch.findMany({ where: { saleItemId: { in: lineIds } }, orderBy: { id: 'desc' } });
+        let left = unitsBack;
+        for (const alloc of taken) {
+          if (left <= 0) break;
+          const back = Math.min(left, alloc.units - alloc.returnedUnits);
+          if (back <= 0) continue;
+          await tx.saleItemBatch.update({ where: { id: alloc.id }, data: { returnedUnits: { increment: back } } });
+          await returnUnits(tx, packing, [{ batchId: alloc.batchId, units: back }]);
+          left -= back;
+        }
+        // Sales made before batches were tracked: the units go to the opening batch
+        await syncProductBatches(tx, prod.id);
       }
 
       await tx.sale.update({

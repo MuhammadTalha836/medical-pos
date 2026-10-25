@@ -14,8 +14,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 |---|---|---|
 | M1 | Supplier / distributor ledger (payables) | ✅ |
 | M2 | Purchase returns and expiry claims | ✅ |
-| M3 | Reorder / short list | ✅ built and tested; waiting for the owner's check |
-| M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ⬜ |
+| M3 | Reorder / short list | ✅ |
+| M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ✅ built and tested; waiting for the owner's check |
 | M5 | Prescription and controlled-medicine register | ⬜ |
 | M6 | Generic / substitute search | ⬜ |
 | M7 | WhatsApp receipts and khata reminders | ⬜ |
@@ -143,7 +143,7 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - A line linked to a purchase is credited at its cost after the line discount, bonus boxes included.
 - Unlinked stock is credited at the current trade price.
 
-**Until M4:** batches are not reduced by sales, so the expiry list never offers more than the stock in boxes.
+**Since M4:** batches follow every sale (FEFO), so the expiry list shows real quantities. The stock cap stays only as a safety net.
 
 **Tests (`test:m2`):**
 - stock goes down;
@@ -196,6 +196,24 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 **UI.**
 - Expiry alerts at 30/60/90 days on the Dashboard and Reports.
 - Medicines → batch list for each medicine.
+
+**Owner decision:** expired batches are never sold. A sale that would need them is refused with a message pointing to Returns to Supplier.
+
+**Built (2026-10-25):**
+- `server/stock/batchMath.ts` (pure, with spec: FEFO order, allocate, reconcile) and `server/stock/batchStock.ts`:
+  - `takeUnits` and `takeUnitsFromBatch`;
+  - `returnUnits`;
+  - `syncProductBatches`;
+  - `reconcileAllProductBatches`, run from `initPrisma`.
+- New table `sale_item_batches`. Sales record their batches there, and returns put units back into them (`returned_units`).
+- Supplier returns take the named batch first, then the earliest expiry.
+- Product create/edit keeps batches in step:
+  - opening stock goes into the `OPENING` batch;
+  - lowered stock is trimmed by earliest expiry.
+- `GET /api/products/:id/batches` and `PUT /api/products/:id/batches/:batchId` (batch number / expiry only).
+- Medicines → batch button (`BatchListModal`).
+- The expired report counts loose units and marks expired vs expiring.
+- The Dashboard shows 30/60/90-day near-expiry counts.
 
 **Tests:**
 - FEFO order;

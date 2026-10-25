@@ -80,7 +80,12 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 8. **Purchase & Stock Inward (`PurchasesPage.tsx`)**:
    - Supplier purchase invoice recording with batch numbers, expiry dates, purchase cost, bonus boxes, and retail rates.
    - Automatic inventory increment (`boxes + bonus`) and real-time update of product master prices (T-Price, MRP, and Unit Prices).
-   - Expiry tracking via `product_batches`.
+   - Expiry tracking via `product_batches`. Every unit belongs to a batch (M4).
+     - Sales take the earliest expiry first and never sell expired stock; `sale_item_batches` records which batches each line used.
+     - Sale returns go back into those batches.
+     - Opening stock goes to an `OPENING` batch; lowered stock is trimmed by earliest expiry. A start-up reconcile fixes older databases.
+     - Medicines → Batches (`BatchListModal`) lists each batch with its status and lets `can_edit_product` correct the batch number or expiry.
+     - The Dashboard shows 30/60/90-day near-expiry counts.
    - Lines are costed on the server (`createPurchaseSchema`): whole boxes, no negative prices, unknown medicines stop the purchase. Payment is Paid in full, On credit or Part paid now (`paid_amount`).
    - **Suppliers (payables) tab (`src/components/suppliers/`)**: what the store owes each company (supplier), from `buildSupplierLedger` (`server/suppliers/ledgerMath.ts`). The balance is worked out every time from purchases, `supplier_payments` and purchase-return credits, never stored. **Pay** (`can_pay_supplier`) records cash/bank/cheque/online payments that settle the oldest bill first and cannot exceed what is owed. **Statement** lists unpaid bills and every entry with a running balance, printed on A4 by `printDocument`. Supplier payments are not part of a shift's drawer cash.
    - **Reorder List tab (`src/components/reorder/ReorderTab.tsx`, `GET /api/reorder`)**: per supplier, medicines at or below `min_stock_alert` or running out within the cover days at the last 30 days' sales speed (`suggestReorder` in `server/reorder/reorderMath.ts`). Boxes = max(minimum × 2 − stock, daily sales × cover days − stock), rounded up, and editable. Each supplier has Print order list, Copy as text and Create purchase (fills New Purchase). Cover days: 7/15/30, default from `reorder_cover_days`.

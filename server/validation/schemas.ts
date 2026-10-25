@@ -170,6 +170,11 @@ export const createPurchaseReturnSchema = z.looseObject({
   }), { error: 'Add at least one medicine to return.' }).min(1, { error: 'Add at least one medicine to return.' })
 });
 
+export const batchEditSchema = z.looseObject({
+  batch_no: requiredText('Enter the batch number').pipe(z.string().max(60, { error: 'Batch number is too long' })),
+  expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Expiry must be a valid date' }).nullish()
+});
+
 const customerPhone = z.string({ error: 'Customer phone number is required' }).trim()
   .refine(isValidPhone, { error: `Enter a valid phone number (${PHONE_MIN_DIGITS}-${PHONE_MAX_DIGITS} digits)` });
 
