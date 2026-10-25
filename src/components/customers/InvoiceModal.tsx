@@ -4,6 +4,9 @@ import { api } from '../../services/apiService';
 import { SaleInvoice, SystemSettings } from '../../types';
 import { Modal } from '../common/Modal';
 import { UnifiedInvoice } from '../pos/UnifiedInvoice';
+import { WhatsAppButton } from '../common/WhatsAppButton';
+import { receiptMessage } from '../../../shared/whatsapp';
+import { moneyFormatter } from '../../utils/format';
 
 interface InvoiceModalProps {
   /** Sale to show; null closes the modal */
@@ -49,7 +52,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ saleId, settings, on
               {invoice.status === 'returned' ? 'All items on this invoice were returned' : 'Some items on this invoice were returned'}
             </p>
           )}
-          <UnifiedInvoice invoice={invoice} settings={settings} onClose={onClose} />
+          <UnifiedInvoice
+            invoice={invoice}
+            settings={settings}
+            onClose={onClose}
+            extraActions={<WhatsAppButton phone={invoice.customer_phone} message={() => receiptMessage(invoice, settings, moneyFormatter(settings))} />}
+          />
         </div>
       )}
     </Modal>

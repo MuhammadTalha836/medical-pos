@@ -239,3 +239,17 @@ ipcMain.handle('cloud:open-sign-in', async (_event, url: unknown) => {
   await shell.openExternal(parsed.toString());
   return true;
 });
+
+// IPC: Open a WhatsApp message (receipt, khata reminder, supplier order). Only https://wa.me/<digits> is allowed.
+ipcMain.handle('whatsapp:open', async (_event, url: unknown) => {
+  if (typeof url !== 'string') return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'wa.me' || !/^\/\d{7,15}$/.test(parsed.pathname)) return false;
+  await shell.openExternal(parsed.toString());
+  return true;
+});

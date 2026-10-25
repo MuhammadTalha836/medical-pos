@@ -18,6 +18,8 @@ interface UnifiedInvoiceProps {
   onPrint?: () => void;
   onClose?: () => void;
   showControls?: boolean;
+  /** More buttons in the on-screen control bar (never printed), e.g. WhatsApp */
+  extraActions?: React.ReactNode;
 }
 
 export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
@@ -27,7 +29,8 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
   paperSizeOverride,
   onPrint,
   onClose,
-  showControls = true
+  showControls = true,
+  extraActions
 }) => {
   // Thermal-only: the admin-selected design and roll width are authoritative (legacy values normalize safely)
   const template = normalizeTemplate(templateOverride ?? settings?.default_invoice_template);
@@ -290,7 +293,8 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
           </span>
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-start gap-2">
+            {extraActions}
             <button
               type="button"
               onClick={handlePrint}

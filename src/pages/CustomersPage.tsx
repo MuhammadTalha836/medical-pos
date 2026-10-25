@@ -166,6 +166,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ settings }) => {
       ) : (
         <KhataTab
           customers={customers}
+          settings={settings}
           loading={loading}
           money={money}
           currency={currency}

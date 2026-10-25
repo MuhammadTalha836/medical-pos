@@ -14,6 +14,15 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M7: WhatsApp receipts and khata reminders)
+- **Send on WhatsApp:** the button opens WhatsApp with the message already typed; staff check it and press Send. No paid service is used, and the POS keeps working offline.
+  - **POS receipt** and **invoice reprint:** "Send receipt on WhatsApp" when the customer has a phone.
+  - **Customers → Khata:** **Send reminder** on every customer with udhaar.
+  - **Purchases → Reorder List:** **Send on WhatsApp** sends the order list to the supplier's phone.
+- Phones are turned into the international form (0300-1234567 → 923001234567). The button sits next to Print Invoice. For a number that cannot be on WhatsApp (e.g. a mobile number missing a digit), it is disabled with the reason, and the customer form and POS phone field warn about it.
+- **Settings → Store → WhatsApp Messages:** edit the receipt and reminder text, with fill-in words such as {customer}, {total} and {balance}, and Reset to default.
+- If WhatsApp cannot be opened, the message is copied so it can be pasted.
+
 ### Added (M6: substitutes by generic formula)
 - **POS Substitutes:**
   - An out-of-stock search result shows **Substitutes**; other results show **Alternatives**.

@@ -17,8 +17,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | M3 | Reorder / short list | ✅ |
 | M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ✅ |
 | M5 | Prescription and controlled-medicine register | ✅ |
-| M6 | Generic / substitute search | ✅ built and tested; waiting for the owner's check |
-| M7 | WhatsApp receipts and khata reminders | ⬜ |
+| M6 | Generic / substitute search | ✅ |
+| M7 | WhatsApp receipts and khata reminders | ✅ built and tested; waiting for the owner's check |
 | M8 | Expenses and day close (cash book) | ⬜ |
 | M9 | Physical stock count and stock adjustment | ⬜ |
 | M10 | Loyalty points / regular-customer discount | ⬜ |
@@ -298,6 +298,26 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - Settings: message templates.
 
 **Tests:** template and phone formatting (unit spec).
+
+**Built (2026-10-25):**
+- `shared/whatsapp.ts` (+ spec): `whatsappPhone`, `fillTemplate`, `whatsappLink`, `receiptMessage` (items capped at 25 lines) and `reminderMessage`, with the default texts.
+- IPC `whatsapp:open` (only `https://wa.me/<digits>`) and `window.electronAPI.openWhatsApp`.
+- Settings `whatsapp_receipt_template` / `whatsapp_reminder_template`:
+  - saved with the `settings` permission;
+  - at most 1000 characters;
+  - blank means the default.
+- `WhatsAppButton` on:
+  - the POS receipt;
+  - the invoice reprint;
+  - Khata (**Send reminder**);
+  - the Reorder List (**Send on WhatsApp** to the supplier; the list now carries `company_phone`).
+- Settings → Store → **WhatsApp Messages** editor.
+- No schema change.
+
+**Choices:**
+- Sending a reminder needs no extra permission; whoever can see the khata can send it.
+- If WhatsApp cannot be opened, the text is copied instead.
+- `test:m7` covers the settings and the supplier phone.
 
 ## M8: Expenses and day close (cash book)
 **Goal.** Record shop expenses and close the day with the real profit.

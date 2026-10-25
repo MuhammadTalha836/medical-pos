@@ -329,6 +329,7 @@ export interface ReorderItem {
   generic_name: string | null;
   company_id: number | null;
   company_name: string;
+  company_phone: string | null;
   packing: number;
   unit_type: string;
   stock_boxes: number;
@@ -442,6 +443,8 @@ export interface SystemSettings {
   max_bill_discount_pct?: string;
   /** Days of sales a reorder should cover (Purchases → Reorder) */
   reorder_cover_days?: string;
+  whatsapp_receipt_template?: string;
+  whatsapp_reminder_template?: string;
 
   // Requirement 9: Advanced Invoice Settings
   default_invoice_template?: InvoiceTemplateType;
@@ -636,6 +639,8 @@ export interface ElectronAPI {
   selectRestoreFile: () => Promise<string | null>;
   /** Opens the Google sign-in page for online backups in the system browser */
   openCloudSignIn: (url: string) => Promise<boolean>;
+  /** Opens a https://wa.me/ link (message ready to send) in WhatsApp */
+  openWhatsApp: (url: string) => Promise<boolean>;
 }
 
 declare global {

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { AlertTriangle, ChevronDown, ChevronRight, CreditCard, DollarSign, Phone, Wallet } from 'lucide-react';
 import { api } from '../../services/apiService';
-import { Customer } from '../../types';
+import { Customer, SystemSettings } from '../../types';
 import { Modal } from '../common/Modal';
 import { useShiftStore } from '../../store/useShiftStore';
 import { CustomerInvoiceList, LedgerState, isLoadedLedger } from './CustomerInvoiceList';
+import { WhatsAppButton } from '../common/WhatsAppButton';
+import { reminderMessage } from '../../../shared/whatsapp';
 
 interface KhataTabProps {
   customers: Customer[];
+  settings?: SystemSettings | null;
   loading: boolean;
   money: (value: number) => string;
   currency: string;
@@ -23,7 +26,7 @@ const isOverLimit = (c: Customer) => c.credit_limit > 0 && c.current_balance > c
 
 // Udhaar: who owes how much, receive payments, and each customer's credit invoices and payments
 export const KhataTab: React.FC<KhataTabProps> = ({
-  customers, loading, money, currency, ledgers, loadLedger, onOpenInvoice, canReceivePayment, onPaymentRecorded
+  customers, settings, loading, money, currency, ledgers, loadLedger, onOpenInvoice, canReceivePayment, onPaymentRecorded
 }) => {
   const { activeShift, fetchShiftSummary } = useShiftStore();
   const [showAll, setShowAll] = useState(false);
@@ -180,12 +183,17 @@ export const KhataTab: React.FC<KhataTabProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        {balance > 0 && canReceivePayment && (
-                          <button type="button" onClick={() => openPayment(cust)} className="btn-primary btn-sm">
-                            <DollarSign className="w-4 h-4" />
-                            <span>Receive Payment</span>
-                          </button>
-                        )}
+                        <div className="inline-flex flex-wrap items-start justify-center gap-2">
+                          {balance > 0 && canReceivePayment && (
+                            <button type="button" onClick={() => openPayment(cust)} className="btn-primary btn-sm">
+                              <DollarSign className="w-4 h-4" />
+                              <span>Receive Payment</span>
+                            </button>
+                          )}
+                          {balance > 0 && (
+                            <WhatsAppButton phone={cust.phone} message={() => reminderMessage(cust, settings, money)} label="Send reminder" />
+                          )}
+                        </div>
                       </td>
                     </tr>
                     {isOpen && (

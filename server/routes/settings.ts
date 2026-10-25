@@ -8,6 +8,7 @@ import { parseBody, settingsSchema } from '../validation/schemas';
 import { DEFAULT_DEVELOPER_FOOTER, isValidPaperSize, isValidTemplate, normalizePaperSize, normalizeTemplate } from '../../shared/invoice';
 import { DEFAULT_INVOICE_SETTINGS, DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
 import { DEVELOPER_INFO_PLACEMENTS, DEVELOPER_PROFILE_FIELDS, DEVELOPER_PROFILE_SETTING_KEYS, developerInfoFor } from '../../shared/developerProfile';
+import { WHATSAPP_TEMPLATE_KEYS, WHATSAPP_TEMPLATE_MAX } from '../../shared/whatsapp';
 import { getActingUser, hasRolePermission, sendError } from '../http/context';
 
 // System settings
@@ -130,6 +131,11 @@ router.post('/api/settings', async (req: Request, res: Response) => {
     }
     if (settings.paper_width !== undefined && !isValidPaperSize(settings.paper_width)) {
       return res.status(400).json({ error: 'Invalid paper width. Only 58mm and 80mm thermal rolls are supported' });
+    }
+    for (const key of WHATSAPP_TEMPLATE_KEYS) {
+      if (settings[key] !== undefined && String(settings[key]).length > WHATSAPP_TEMPLATE_MAX) {
+        return res.status(400).json({ error: `WhatsApp messages can be at most ${WHATSAPP_TEMPLATE_MAX} characters.` });
+      }
     }
     // invoice_paper_size is canonical; keep the legacy paper_width key in step with it
     if (settings.invoice_paper_size !== undefined) {

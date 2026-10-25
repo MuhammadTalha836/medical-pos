@@ -10,6 +10,8 @@ import { CustomerPicker } from '../components/pos/CustomerPicker';
 import { PrescriptionModal } from '../components/pos/PrescriptionModal';
 import { SubstitutesModal } from '../components/pos/SubstitutesModal';
 import { ScheduleBadge } from '../components/common/ScheduleBadge';
+import { WhatsAppButton } from '../components/common/WhatsAppButton';
+import { receiptMessage } from '../../shared/whatsapp';
 import { isCounterCustomer } from '../../shared/customers';
 import { missingPrescriptionFields, normalizeSchedule } from '../../shared/schedule';
 import { MAX_OPEN_INVOICES } from '../store/usePosStore';
@@ -1232,6 +1234,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               invoice={createdInvoice}
               settings={settings}
               onClose={() => setIsReceiptModalOpen(false)}
+              extraActions={
+                <WhatsAppButton phone={createdInvoice.customer_phone} message={() => receiptMessage(createdInvoice, settings, money)} />
+              }
             />
           )}
         </div>

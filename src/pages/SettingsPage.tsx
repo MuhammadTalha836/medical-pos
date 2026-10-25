@@ -10,6 +10,13 @@ import { RolesTab } from '../components/settings/RolesTab';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { ReceiptPrinterCard } from '../components/settings/ReceiptPrinterCard';
 import {
+  DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
+  DEFAULT_WHATSAPP_REMINDER_TEMPLATE,
+  RECEIPT_PLACEHOLDERS,
+  REMINDER_PLACEHOLDERS,
+  WHATSAPP_TEMPLATE_MAX
+} from '../../shared/whatsapp';
+import {
   Store,
   Receipt,
   Users,
@@ -25,6 +32,7 @@ import {
   ShieldCheck,
   RotateCcw,
   Percent,
+  MessageCircle,
   FileText,
   LayoutDashboard,
   Eye,
@@ -584,6 +592,40 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* WhatsApp messages */}
+            <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
+              <div className="flex items-center space-x-2">
+                <MessageCircle className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                <h2 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">WhatsApp Messages</h2>
+              </div>
+              <p className="field-hint">
+                The text that opens in WhatsApp when you send a receipt or a khata reminder. Words in braces are filled in for each customer.
+              </p>
+              {([
+                { key: 'whatsapp_receipt_template', label: 'Receipt message', fallback: DEFAULT_WHATSAPP_RECEIPT_TEMPLATE, placeholders: RECEIPT_PLACEHOLDERS },
+                { key: 'whatsapp_reminder_template', label: 'Khata reminder message', fallback: DEFAULT_WHATSAPP_REMINDER_TEMPLATE, placeholders: REMINDER_PLACEHOLDERS }
+              ] as const).map(t => (
+                <div key={t.key}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label htmlFor={t.key} className="field-label mb-0">{t.label}</label>
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, [t.key]: t.fallback }))} className="btn-secondary btn-sm">
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Reset to default</span>
+                    </button>
+                  </div>
+                  <textarea
+                    id={t.key}
+                    rows={7}
+                    maxLength={WHATSAPP_TEMPLATE_MAX}
+                    value={formData[t.key] ?? t.fallback}
+                    onChange={(e) => setFormData(prev => ({ ...prev, [t.key]: e.target.value }))}
+                    className="field-textarea w-full"
+                  />
+                  <p className="field-hint">You can use: {t.placeholders.map(p => `{${p}}`).join(', ')}. Left blank, the default message is sent.</p>
+                </div>
+              ))}
             </div>
           </form>
         </div>

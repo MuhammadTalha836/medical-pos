@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Phone, Search, User, UserPlus, X } from 'l
 import { api, ApiError } from '../../services/apiService';
 import { Customer } from '../../types';
 import { COUNTER_CUSTOMER, isCounterCustomer, isValidPhone, normalizePhone } from '../../../shared/customers';
+import { whatsappPhoneWarning } from '../../../shared/whatsapp';
 
 interface CustomerPickerProps {
   customerId: number | null;
@@ -235,6 +236,9 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
               className="field-input field-sm w-full pl-9"
             />
           </div>
+          {isValidPhone(customerPhone) && whatsappPhoneWarning(customerPhone) && (
+            <p className="text-2xs text-amber-700 dark:text-amber-400">{whatsappPhoneWarning(customerPhone)}</p>
+          )}
 
           {phoneOwner ? (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs flex items-center justify-between gap-2">

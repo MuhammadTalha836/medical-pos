@@ -35,6 +35,7 @@ npm run test:m3          # reorder list: below minimum / running out by 30-day s
 npm run test:m4          # batches: FEFO sales, splits, returns to batch, expired never sold, opening batch, reconcile
 npm run test:m5          # controlled medicines: prescription required, register rows per line, Rx-only free, register filter/returns/access
 npm run test:m6          # substitutes: formula matching (case/spacing/order/strength), in-stock first, exclusions, generics list, login
+npm run test:m7          # WhatsApp templates: defaults, save, cashier 403, length limit; supplier phone on the reorder list
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -152,6 +153,10 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - **Substitutes (M6).** `shared/generic.ts`: `genericKey` (case, spacing and ingredient order ignored, strengths kept) and `rankSubstitutes` (in stock first, then same unit type, then stock, then name).
   - `GET /api/products/:id/substitutes` and `GET /api/products/generics?q=` (login only). They are registered before `/api/products/:id`.
   - In the POS, `SubstitutesModal` opens on F7 or the Substitutes button.
+- **WhatsApp (M7).** `shared/whatsapp.ts`: `whatsappPhone` (→ 92XXXXXXXXXX or null), `fillTemplate`, `whatsappLink`, `receiptMessage`, `reminderMessage`.
+  - `WhatsAppButton` (`src/components/common/`) opens the link through the `whatsapp:open` IPC, which allows only `https://wa.me/<digits>`. It copies the text when that fails.
+  - Used on the POS receipt, the invoice reprint, Khata (Send reminder) and the Reorder List (supplier `company_phone`).
+  - Texts: settings `whatsapp_receipt_template` / `whatsapp_reminder_template` (max 1000 characters, blank = default), edited in Settings → Store.
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**
@@ -193,7 +198,7 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 **Electron** (`electron/main.ts`, `preload.ts`, `electron.vite.config.ts`, `electron-builder.yml`):
 - Main dynamically imports `server/api.ts` after setting `PHARMACARE_DATA_DIR` / `PHARMACARE_BACKUP_DIR` to the per-user folder (packaged only), and listens on `127.0.0.1:${PHARMACARE_API_PORT || 3001}`.
 - Packaged: the same Express app serves `out/renderer`, so the window loads `http://127.0.0.1:3001` and relative `/api` calls work. Dev: the window loads electron-vite's dev server, which proxies `/api`.
-- Hardened when packaged: no menu, no DevTools, reload/inspector keys blocked, navigation locked. Exposes `window.electronAPI` (thermal print, backup/restore file dialogs) via a CommonJS preload.
+- Hardened when packaged: no menu, no DevTools, reload/inspector keys blocked, navigation locked. Exposes `window.electronAPI` (thermal print, backup/restore file dialogs, `openWhatsApp`) via a CommonJS preload.
 - **Native module ABI:** better-sqlite3 is compiled for one runtime at a time, and everything (dev, integration suites, builds) runs on Electron's runtime, so it always stays the Electron build. `scripts/electron.mjs` probes it and runs `npm run rebuild` once if it does not load (e.g. after `npm install`, which builds it for plain Node). `rebuild`/`build:unpack`/`build:win` clear `node_modules/better-sqlite3/build/Release/.forge-meta` (`native:reset`); a stale marker makes electron-builder skip its rebuild and ship the Node binary.
 - `build:unpack`/`build:win` need `.env.developer`; the key ends up inside the build, so never share a build made with a test key.
 - **Electron is pinned to 42**: the newest better-sqlite3 on npm accepted by the Prisma adapter (12.11.1) has no binaries for newer Electron. Upgrade once better-sqlite3 12.12+ is published.

@@ -1,6 +1,7 @@
 import { DEFAULT_DEVELOPER_FOOTER } from './invoice';
 import { DEFAULT_DEVELOPER_PROFILE_SETTINGS } from './developerProfile';
 import { DEFAULT_BACKUP_MODE } from './backup';
+import { DEFAULT_WHATSAPP_RECEIPT_TEMPLATE, DEFAULT_WHATSAPP_REMINDER_TEMPLATE } from './whatsapp';
 
 // Default system_settings values, shared by the seed, GET /api/settings and the Settings page.
 // Settings are stored as strings; booleans are 'true' / 'false'.
@@ -67,6 +68,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   low_stock_threshold: '10',
   max_bill_discount_pct: '14',
   reorder_cover_days: '7',
+  whatsapp_receipt_template: DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
+  whatsapp_reminder_template: DEFAULT_WHATSAPP_REMINDER_TEMPLATE,
   ...DEFAULT_INVOICE_SETTINGS,
   setup_completed: 'false',
   developer_email: '',

@@ -20,6 +20,8 @@ export interface ElectronAPI {
   selectRestoreFile: () => Promise<string | null>;
   /** Opens the Google sign-in page for online backups in the system browser */
   openCloudSignIn: (url: string) => Promise<boolean>;
+  /** Opens a https://wa.me/ link (message ready to send) in WhatsApp */
+  openWhatsApp: (url: string) => Promise<boolean>;
 }
 
 const api: ElectronAPI = {
@@ -27,7 +29,8 @@ const api: ElectronAPI = {
   listPrinters: () => ipcRenderer.invoke('printers:list'),
   selectBackupDir: () => ipcRenderer.invoke('dialog:select-backup-dir'),
   selectRestoreFile: () => ipcRenderer.invoke('dialog:select-restore-file'),
-  openCloudSignIn: (url) => ipcRenderer.invoke('cloud:open-sign-in', url)
+  openCloudSignIn: (url) => ipcRenderer.invoke('cloud:open-sign-in', url),
+  openWhatsApp: (url) => ipcRenderer.invoke('whatsapp:open', url)
 };
 
 contextBridge.exposeInMainWorld('electronAPI', api);

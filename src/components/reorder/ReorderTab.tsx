@@ -3,6 +3,8 @@ import { AlertTriangle, CheckCircle2, ClipboardCopy, PackagePlus, Printer, Refre
 import { api } from '../../services/apiService';
 import { ReorderItem, SystemSettings } from '../../types';
 import { printDocument } from '../../utils/printDocument';
+import { copyText } from '../../utils/copyText';
+import { WhatsAppButton } from '../common/WhatsAppButton';
 
 export interface ReorderPurchaseLine {
   product_id: number;
@@ -25,23 +27,6 @@ const COVER_CHOICES = [7, 15, 30];
 
 const stockText = (item: ReorderItem) =>
   item.stock_loose > 0 ? `${item.stock_boxes} box + ${item.stock_loose} ${item.unit_type}` : `${item.stock_boxes} box`;
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // Older engines: copy through a hidden text box
-    const box = document.createElement('textarea');
-    box.value = text;
-    box.style.cssText = 'position:fixed;opacity:0;';
-    document.body.appendChild(box);
-    box.select();
-    const ok = document.execCommand('copy');
-    box.remove();
-    return ok;
-  }
-}
 
 /** The short list: what to order from each supplier, with editable quantities */
 export const ReorderTab: React.FC<ReorderTabProps> = ({ settings, money, canCreatePurchase, canSaveDefault, onCreatePurchase, onSavedDefault }) => {
@@ -75,11 +60,11 @@ export const ReorderTab: React.FC<ReorderTabProps> = ({ settings, money, canCrea
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const map = new Map<string, { companyId: number | null; name: string; rows: ReorderItem[] }>();
+    const map = new Map<string, { companyId: number | null; name: string; phone: string | null; rows: ReorderItem[] }>();
     for (const item of items) {
       if (q && !item.name.toLowerCase().includes(q) && !(item.generic_name ?? '').toLowerCase().includes(q)) continue;
       const key = String(item.company_id ?? 'none');
-      const group = map.get(key) ?? { companyId: item.company_id, name: item.company_name, rows: [] };
+      const group = map.get(key) ?? { companyId: item.company_id, name: item.company_name, phone: item.company_phone, rows: [] };
       group.rows.push(item);
       map.set(key, group);
     }
@@ -100,10 +85,14 @@ export const ReorderTab: React.FC<ReorderTabProps> = ({ settings, money, canCrea
     }
   };
 
-  const copyGroup = async (name: string, rows: ReorderItem[]) => {
+  const orderText = (name: string, rows: ReorderItem[]) => {
     const lines = orderedRows(rows).map(r => `- ${r.name}: ${boxesFor(r)} box${boxesFor(r) === 1 ? '' : 'es'}`);
     const header = settings?.store_name ? `Order for ${name} from ${settings.store_name}` : `Order for ${name}`;
-    if (await copyText([header, '', ...lines].join('\n'))) {
+    return [header, '', ...lines].join('\n');
+  };
+
+  const copyGroup = async (name: string, rows: ReorderItem[]) => {
+    if (await copyText(orderText(name, rows))) {
       setNotice(`Order list for ${name} copied. Paste it into WhatsApp or a message.`);
       setError(null);
     } else {
@@ -175,6 +164,9 @@ export const ReorderTab: React.FC<ReorderTabProps> = ({ settings, money, canCrea
                 <ClipboardCopy className="w-4 h-4" />
                 <span>Copy as text</span>
               </button>
+              {orderedRows(group.rows).length > 0 && (
+                <WhatsAppButton phone={group.phone} message={() => orderText(group.name, group.rows)} label="Send on WhatsApp" />
+              )}
               {canCreatePurchase && group.companyId !== null && (
                 <button
                   type="button"

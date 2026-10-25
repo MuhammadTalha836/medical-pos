@@ -34,4 +34,7 @@ optimize and reused the code , use me project base skill and make my project cod
 new key 
 also product wise sale with start date and end date also
 counter sale for black 
- 
+
+when total price is 198 we also can udpate the 198 to 200 
+add note and warnung  for medician shortage
+add item vise search in sales with every all those invoice thats get this medician

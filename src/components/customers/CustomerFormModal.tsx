@@ -3,6 +3,7 @@ import { api } from '../../services/apiService';
 import { Customer } from '../../types';
 import { Modal } from '../common/Modal';
 import { isValidPhone } from '../../../shared/customers';
+import { whatsappPhoneWarning } from '../../../shared/whatsapp';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -86,6 +87,9 @@ export const CustomerFormModal: React.FC<CustomerFormModalProps> = ({ isOpen, cu
             className="field-input w-full"
           />
           <span className="field-hint">Required. Each customer has their own number, so customers with the same name are not mixed up.</span>
+          {whatsappPhoneWarning(form.phone) && (
+            <span className="field-hint text-amber-700! dark:text-amber-400!">{whatsappPhoneWarning(form.phone)}</span>
+          )}
         </label>
 
         <label className="block">

@@ -20,7 +20,7 @@ router.get('/api/reorder', async (req: Request, res: Response) => {
     const [products, soldLines, returnedLines] = await Promise.all([
       prisma.product.findMany({
         where: { status: 'active', ...(companyId ? { companyId } : {}) },
-        include: { company: { select: { name: true } } }
+        include: { company: { select: { name: true, phone: true } } }
       }),
       prisma.saleItem.findMany({
         where: { sale: { saleDate: { gte: since }, status: { in: COUNTED_SALE_STATUSES } } },
@@ -54,6 +54,7 @@ router.get('/api/reorder', async (req: Request, res: Response) => {
         generic_name: p.genericName,
         company_id: p.companyId,
         company_name: p.company?.name ?? 'No supplier',
+        company_phone: p.company?.phone ?? null,
         packing: Math.max(1, p.packing || 1),
         unit_type: p.unitType,
         stock_boxes: p.stockBoxes,
