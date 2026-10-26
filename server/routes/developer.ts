@@ -43,6 +43,7 @@ const WRITABLE_DEVELOPER_SETTING_KEYS = [
   'allow_admin_create_admin',
   'allow_admin_edit_store_identity',
   'allow_admin_hide_store_identity',
+  'loyalty_feature_allowed',
   'store_name',
   'store_address',
   'developer_invoice_footer',
@@ -161,7 +162,7 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
       }
       updates[placement.setting] = parseInfoFields(updates[placement.setting]).join(',');
     }
-    for (const key of ['allow_admin_create_cashier', 'allow_admin_create_admin', 'allow_admin_edit_store_identity', 'allow_admin_hide_store_identity']) {
+    for (const key of ['allow_admin_create_cashier', 'allow_admin_create_admin', 'allow_admin_edit_store_identity', 'allow_admin_hide_store_identity', 'loyalty_feature_allowed']) {
       if (updates[key] !== undefined && updates[key] !== 'true' && updates[key] !== 'false') {
         return res.status(400).json({ error: `${key} must be 'true' or 'false'` });
       }

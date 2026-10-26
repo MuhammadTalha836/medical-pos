@@ -10,6 +10,8 @@ import { UsersTab } from '../components/settings/UsersTab';
 import { RolesTab } from '../components/settings/RolesTab';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { ReceiptPrinterCard } from '../components/settings/ReceiptPrinterCard';
+import { LoyaltySettingsTab } from '../components/loyalty/LoyaltySettingsTab';
+import { moneyFormatter } from '../utils/format';
 import {
   DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
   DEFAULT_WHATSAPP_REMINDER_TEMPLATE,
@@ -18,6 +20,7 @@ import {
   WHATSAPP_TEMPLATE_MAX
 } from '../../shared/whatsapp';
 import {
+  Award,
   Store,
   Receipt,
   Users,
@@ -149,7 +152,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   const { theme, setTheme } = useThemeStore();
   const { user, hasPermission } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles'>('store');
+  const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles' | 'loyalty'>('store');
+  const showLoyalty = settings?.loyalty_feature_allowed === 'true' && hasPermission('can_manage_loyalty');
   const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateType>('classic');
   const [previewPaperSize, setPreviewPaperSize] = useState<InvoicePaperSize>('80mm');
   const previewMountRef = useRef<HTMLDivElement>(null);
@@ -230,7 +234,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
     e.preventDefault();
     try {
       setSaving(true);
-      await api.saveSettings(formData);
+      // The loyalty switch is saved by its own tab; an older copy here must not undo it
+      const { loyalty_enabled: _enabled, loyalty_feature_allowed: _allowed, ...rest } = formData as SystemSettings;
+      void _enabled; void _allowed;
+      await api.saveSettings(rest);
       setSuccessMsg('Settings updated successfully.');
       onRefreshSettings?.();
       setTimeout(() => setSuccessMsg(null), 4000);
@@ -323,6 +330,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           >
             <ShieldCheck className="w-4 h-4" />
             <span>Staff Roles & Permissions ({roles.length})</span>
+          </button>
+        )}
+
+        {showLoyalty && (
+          <button
+            onClick={() => setActiveTab('loyalty')}
+            className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
+              activeTab === 'loyalty'
+                ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            <span>Loyalty Points</span>
           </button>
         )}
       </div>
@@ -1091,6 +1112,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       )}
 
       {activeTab === 'roles' && <RolesTab roles={roles} onChanged={refreshUsersAndRoles} notify={notify} />}
+
+      {activeTab === 'loyalty' && showLoyalty && (
+        <LoyaltySettingsTab settings={settings} money={moneyFormatter(settings)} onRefreshSettings={onRefreshSettings} />
+      )}
     </div>
   );
 };

@@ -20,8 +20,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | M6 | Generic / substitute search | ✅ |
 | M7 | WhatsApp receipts and khata reminders | ✅ |
 | M8 | Expenses and day close (cash book) | ✅ |
-| M9 | Physical stock count and stock adjustment | 🟡 built and tested; waiting for the owner's check |
-| M10 | Loyalty points / regular-customer discount | ⬜ |
+| M9 | Physical stock count and stock adjustment | ✅ |
+| M10 | Loyalty points / regular-customer discount | 🟡 built and tested; waiting for the owner's check |
 | M11 | Multi-PC LAN mode (see `MULTI_PC_LAN_MODE.md`) | ⬜ |
 
 FBR POS integration is left out: it needs the internet and FBR registration, which breaks the "100% Offline" promise.
@@ -446,6 +446,22 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - redeem;
 - return reversal;
 - cap.
+
+**Owner decisions (2026-10-26):**
+- The Developer allows loyalty first; only then does the Admin see it, switch it on and set the rules.
+- The Admin builds plans (templates): Regular, Silver, Gold, Chronic Care or their own, each with its own rules, and can put a customer on a plan by hand. A plan can move customers up automatically after a buying amount in 12 months.
+- Any cashier may use a customer's points at the counter, within the plan's limits (checked on the server).
+- Expiry is set per plan (0 = never); the earliest-expiring points are used first.
+- Udhaar sales earn points only when the plan says so.
+
+**Built (2026-10-26):**
+- Settings `loyalty_feature_allowed` (Developer) and `loyalty_enabled` (Admin); permission `can_manage_loyalty`.
+- Data: tables `loyalty_plans` and `loyalty_transactions`; columns `customers.loyalty_plan_id` / `loyalty_points` and `sales.member_discount_pct` / `member_discount_amt` / `points_redeemed` / `points_redeemed_value` / `points_earned` / `points_balance` / `loyalty_plan_name`.
+- `shared/loyalty.ts` (pure, with spec), `server/loyalty/loyaltyStore.ts`, `server/routes/loyalty.ts`.
+- Sales: member discount within the store maximum, points used (`redeem_points`) and earned on what was paid; returns take back and give back points in proportion.
+- UI: Developer toggle; Settings → **Loyalty Points** (switch, plans, templates with examples); POS member line, member discount and **Use points**; receipt and WhatsApp lines; Customers → **Loyalty Points** tab and the **Points** window.
+
+**Tests:** `shared/loyalty.spec.ts` and `test:m10` (10 tests).
 
 ## M11: Multi-PC LAN mode
 Follows `docs/MULTI_PC_LAN_MODE.md` (audit-first, with its own phases). It is started only after M1–M10, because every module above must work with several counters.

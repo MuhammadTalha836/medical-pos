@@ -49,7 +49,8 @@ export const PERMISSION_GROUPS = [
       { key: 'can_add_customer', label: 'Register Khata Account' },
       { key: 'can_edit_customer', label: 'Edit Customer & Limits' },
       { key: 'can_delete_customer', label: 'Delete Khata Account' },
-      { key: 'can_receive_payment', label: 'Receive Cash Recoveries' }
+      { key: 'can_receive_payment', label: 'Receive Cash Recoveries' },
+      { key: 'can_manage_loyalty', label: 'Manage Loyalty Plans & Points' }
     ]
   },
   {

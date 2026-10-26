@@ -70,6 +70,9 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   reorder_cover_days: '7',
   // Close each finished day on its own after midnight (M8)
   auto_day_close: 'true',
+  // Loyalty points (M10): the Developer allows the feature, then the Admin switches it on
+  loyalty_feature_allowed: 'false',
+  loyalty_enabled: 'false',
   whatsapp_receipt_template: DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
   whatsapp_reminder_template: DEFAULT_WHATSAPP_REMINDER_TEMPLATE,
   ...DEFAULT_INVOICE_SETTINGS,

@@ -28,6 +28,7 @@
     "test:m7": "node scripts/electron.mjs test server/tests/m7_test.ts",
     "test:m8": "node scripts/electron.mjs test server/tests/m8_test.ts",
     "test:m9": "node scripts/electron.mjs test server/tests/m9_test.ts",
+    "test:m10": "node scripts/electron.mjs test server/tests/m10_test.ts",
     "prisma:generate": "prisma generate",
     "developer:key": "tsx scripts/developer-key.ts",
     "build": "prisma generate && tsc --noEmit && electron-vite build",

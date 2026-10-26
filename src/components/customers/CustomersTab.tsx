@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, MapPin, Pencil, Phone, Search, Trash2, Users } from 'lucide-react';
+import { Award, ChevronDown, ChevronRight, MapPin, Pencil, Phone, Search, Trash2, Users } from 'lucide-react';
 import { Customer } from '../../types';
 import { CustomerInvoiceList, LedgerState, isLoadedLedger } from './CustomerInvoiceList';
 
@@ -12,10 +12,13 @@ interface CustomersTabProps {
   onOpenInvoice: (saleId: number) => void;
   onEdit?: (customer: Customer) => void;
   onDelete?: (customer: Customer) => void;
+  /** Loyalty (M10): show each customer's plan and points, and open their points */
+  showLoyalty?: boolean;
+  onLoyalty?: (customer: Customer) => void;
 }
 
 // All customers; the arrow on a row shows that customer's invoices underneath
-export const CustomersTab: React.FC<CustomersTabProps> = ({ customers, loading, money, ledgers, loadLedger, onOpenInvoice, onEdit, onDelete }) => {
+export const CustomersTab: React.FC<CustomersTabProps> = ({ customers, loading, money, ledgers, loadLedger, onOpenInvoice, onEdit, onDelete, showLoyalty, onLoyalty }) => {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
@@ -100,6 +103,12 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({ customers, loading, 
                         <button type="button" onClick={() => toggle(cust.id)} className="text-left">
                           <span className="block font-bold text-slate-900 dark:text-white">{cust.name}</span>
                           <span className="block text-2xs text-slate-400">Account #{cust.id}</span>
+                          {showLoyalty && (
+                            <span className="flex items-center gap-1 text-2xs font-semibold text-amber-700 dark:text-amber-400">
+                              <Award className="w-3.5 h-3.5" />
+                              {cust.loyalty_plan_name || 'Default plan'}, {cust.loyalty_points ?? 0} points
+                            </span>
+                          )}
                         </button>
                       </td>
                       <td className="py-3 px-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
@@ -117,6 +126,12 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({ customers, loading, 
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center justify-center gap-1.5">
+                          {onLoyalty && (
+                            <button type="button" onClick={() => onLoyalty(cust)} className="btn-secondary btn-sm" title="Loyalty points and plan">
+                              <Award className="w-4 h-4" />
+                              <span>Points</span>
+                            </button>
+                          )}
                           {onEdit && (
                             <button type="button" onClick={() => onEdit(cust)} className="btn-secondary btn-sm" title="Edit customer">
                               <Pencil className="w-4 h-4" />

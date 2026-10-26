@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Phone, Search, User, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, Award, CheckCircle2, Phone, Search, User, UserPlus, X } from 'lucide-react';
 import { api, ApiError } from '../../services/apiService';
-import { Customer } from '../../types';
+import { Customer, LoyaltyPlan } from '../../types';
 import { COUNTER_CUSTOMER, isCounterCustomer, isValidPhone, normalizePhone } from '../../../shared/customers';
 import { whatsappPhoneWarning } from '../../../shared/whatsapp';
 
@@ -17,6 +17,8 @@ interface CustomerPickerProps {
   /** Amount this invoice adds to the khata (net total on a Credit sale, otherwise 0) */
   creditAmount: number;
   money: (value: number) => string;
+  /** The saved customer's points and plan while loyalty is on (null otherwise) */
+  onLoyalty?: (loyalty: { points: number; plan: LoyaltyPlan } | null) => void;
 }
 
 // Customer field at the POS: type a name or phone to find a saved customer, or save a new one
@@ -28,7 +30,8 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
   nameInputRef,
   canAddCustomer,
   creditAmount,
-  money
+  money,
+  onLoyalty
 }) => {
   const [results, setResults] = useState<Customer[]>([]);
   const [highlight, setHighlight] = useState(0);
@@ -55,6 +58,13 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
       .catch(() => { /* details are informational; the server checks the sale */ });
     return () => { cancelled = true; };
   }, [customerId]); // only when the linked customer changes
+
+  // The invoice's loyalty preview follows the linked customer
+  useEffect(() => {
+    onLoyalty?.(customerId && selected?.id === customerId && selected.loyalty_plan
+      ? { points: selected.loyalty_points ?? 0, plan: selected.loyalty_plan }
+      : null);
+  }, [selected, customerId]);
 
   // Look up matches while an unlinked name or phone is typed
   useEffect(() => {
@@ -106,7 +116,9 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
     try {
       setSaving(true);
       const res = await api.createCustomer({ name: typedName, phone: customerPhone.trim() });
-      select(res.customer);
+      // The search result also carries the loyalty plan the new customer starts on
+      const full = (await api.searchCustomers(res.customer.phone || res.customer.name).catch(() => [])).find(c => c.id === res.customer.id);
+      select(full ?? res.customer);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409 && err.data?.customer) {
         setPhoneOwner(err.data.customer);
@@ -212,6 +224,12 @@ export const CustomerPicker: React.FC<CustomerPickerProps> = ({
             <div className="text-slate-600 dark:text-slate-300">
               Khata balance: <strong className="font-mono">{money(balance)}</strong>
               {limit > 0 && <span className="text-slate-500"> (limit {money(limit)})</span>}
+            </div>
+          )}
+          {selected?.loyalty_plan && (
+            <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold">
+              <Award className="w-4 h-4 shrink-0" />
+              {selected.loyalty_plan.name}: {selected.loyalty_points ?? 0} points ({money(selected.points_value ?? 0)})
             </div>
           )}
           {selected && creditAmount > 0 && (

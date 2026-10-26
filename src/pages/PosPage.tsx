@@ -36,9 +36,12 @@ import {
   PlayCircle,
   ShieldAlert,
   Keyboard,
+  Award,
 } from 'lucide-react';
 import { currencySymbol, moneyFormatter } from '../utils/format';
 import { useShiftElapsed } from '../hooks/useShiftElapsed';
+import { memberDiscount, pointsEarned, redeemLimit } from '../../shared/loyalty';
+import { loyaltyOn, planRulesOf } from '../utils/loyalty';
 
 interface PosPageProps {
   settings?: SystemSettings | null;
@@ -111,6 +114,10 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     notes,
     prescription,
     setPrescription,
+    customerLoyalty,
+    setCustomerLoyalty,
+    redeemPoints,
+    setRedeemPoints,
     addItem,
     updateQuantity,
     updateDiscountPct,
@@ -169,9 +176,26 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   const receiptContainerRef = useRef<HTMLDivElement>(null);
 
   const canDiscount = hasPermission('can_discount');
-  const totals = getTotals();
+  const baseTotals = getTotals();
   const currency = currencySymbol(settings);
   const money = moneyFormatter(settings);
+
+  // Loyalty preview (M10): the same rules the server applies; the saved sale carries the server's numbers
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const loyaltyPreview = (() => {
+    if (!loyaltyOn(settings) || !customerId || !customerLoyalty) return null;
+    const rules = planRulesOf(customerLoyalty.plan);
+    const member = memberDiscount(baseTotals.subtotal, rules.discountPct, billDiscountPct, maxBillDiscount);
+    const afterMember = round2(Math.max(0, baseTotals.netTotal - member.amount));
+    const limit = redeemLimit(customerLoyalty.points, afterMember, rules);
+    const used = Math.min(redeemPoints, limit);
+    const value = round2(Math.min(afterMember, used * rules.pointValue));
+    const net = round2(Math.max(0, afterMember - value));
+    return { rules, member, limit, used, value, net, earn: pointsEarned(net, rules, paymentType) };
+  })();
+  const totals = loyaltyPreview
+    ? { ...baseTotals, netTotal: loyaltyPreview.net, changeDue: round2(Math.max(0, cashTendered - loyaltyPreview.net)) }
+    : baseTotals;
 
   // Initial focus
   useEffect(() => {
@@ -504,7 +528,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         change_due: totals.changeDue,
         payment_type: paymentType,
         notes: notes || null,
-        prescription: controlledNames.length > 0 ? rx : null
+        prescription: controlledNames.length > 0 ? rx : null,
+        redeem_points: loyaltyPreview?.used || 0
       };
 
       const result = await api.createSale(salePayload);
@@ -973,6 +998,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             canAddCustomer={hasPermission('can_add_customer')}
             creditAmount={paymentType === 'Credit' ? totals.netTotal : 0}
             money={money}
+            onLoyalty={setCustomerLoyalty}
           />
         </div>
 
@@ -1036,6 +1062,57 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
               <span>Bill Discount Amt:</span>
               <span className="font-mono font-bold">-{money(totals.billDiscountAmt)}</span>
+            </div>
+          )}
+
+          {loyaltyPreview && customerLoyalty && (
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                  <Award className="w-4 h-4" />
+                  {customerLoyalty.plan.name} member
+                </span>
+                <span className="font-mono text-slate-700 dark:text-slate-300">
+                  {customerLoyalty.points} pts ({money(round2(customerLoyalty.points * loyaltyPreview.rules.pointValue))})
+                </span>
+              </div>
+              {loyaltyPreview.member.amount > 0 && (
+                <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span>Member discount ({loyaltyPreview.member.pct}%):</span>
+                  <span className="font-mono font-bold">-{money(loyaltyPreview.member.amount)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="pos-redeem" className="text-xs text-slate-700 dark:text-slate-300 font-medium">Use points:</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="pos-redeem"
+                    type="number"
+                    min="0"
+                    max={loyaltyPreview.limit}
+                    disabled={loyaltyPreview.limit === 0}
+                    value={redeemPoints || ''}
+                    onChange={e => setRedeemPoints(parseInt(e.target.value) || 0)}
+                    placeholder="0"
+                    className="field-input field-sm w-20 text-center font-mono"
+                  />
+                  <button type="button" onClick={() => setRedeemPoints(loyaltyPreview.limit)} disabled={loyaltyPreview.limit === 0} className="btn-secondary btn-sm">Max</button>
+                </div>
+              </div>
+              {loyaltyPreview.used > 0 && (
+                <div className="flex justify-between items-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span>Points used ({loyaltyPreview.used}):</span>
+                  <span className="font-mono font-bold">-{money(loyaltyPreview.value)}</span>
+                </div>
+              )}
+              <p className="text-2xs text-slate-500 dark:text-slate-400">
+                {loyaltyPreview.limit === 0
+                  ? `Points can be used from ${loyaltyPreview.rules.minRedeemPoints} points, up to ${loyaltyPreview.rules.maxRedeemPct}% of a bill.`
+                  : redeemPoints > loyaltyPreview.limit
+                    ? `At most ${loyaltyPreview.limit} points on this bill.`
+                    : `Up to ${loyaltyPreview.limit} points on this bill.`}
+                {' '}This bill earns {loyaltyPreview.earn} point{loyaltyPreview.earn === 1 ? '' : 's'}.
+              </p>
             </div>
           )}
 

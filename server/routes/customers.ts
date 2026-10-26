@@ -4,6 +4,7 @@ import { getActingUser, hasRolePermission, requirePermission, sessionIdentity, s
 import { customerSchema, parseBody } from '../validation/schemas';
 import { normalizePhone } from '../../shared/customers';
 import { logSecurityAudit } from '../security/audit';
+import { defaultPlan, loyaltyActive, planPayload } from '../loyalty/loyaltyStore';
 
 // Customers and credit ledger (khata)
 const router = Router();
@@ -14,6 +15,7 @@ router.get('/api/customers', async (_req: Request, res: Response) => {
   try {
     const customers = await prisma.$queryRaw<any[]>`
       SELECT c.id, c.name, c.phone, c.address, c.credit_limit, c.current_balance, c.created_at,
+        c.loyalty_points, c.loyalty_plan_id, (SELECT lp.name FROM loyalty_plans lp WHERE lp.id = c.loyalty_plan_id) as loyalty_plan_name,
         (SELECT COUNT(*) FROM sales s WHERE s.customer_id = c.id) as invoices_count,
         (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.status != 'returned')
           - (SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id
@@ -29,7 +31,7 @@ router.get('/api/customers', async (_req: Request, res: Response) => {
   }
 });
 
-type CustomerRow = { id: number; name: string; phone: string | null; currentBalance: number; creditLimit: number };
+type CustomerRow = { id: number; name: string; phone: string | null; currentBalance: number; creditLimit: number; loyaltyPoints?: number; loyaltyPlanId?: number | null };
 
 // Client contract (snake_case), as in GET /api/customers
 const customerPayload = (c: CustomerRow & { address?: string | null }) => ({
@@ -38,10 +40,12 @@ const customerPayload = (c: CustomerRow & { address?: string | null }) => ({
   phone: c.phone,
   address: c.address ?? null,
   current_balance: c.currentBalance,
-  credit_limit: c.creditLimit
+  credit_limit: c.creditLimit,
+  loyalty_points: c.loyaltyPoints ?? 0,
+  loyalty_plan_id: c.loyaltyPlanId ?? null
 });
 
-const customerFields = { id: true, name: true, phone: true, address: true, currentBalance: true, creditLimit: true } as const;
+const customerFields = { id: true, name: true, phone: true, address: true, currentBalance: true, creditLimit: true, loyaltyPoints: true, loyaltyPlanId: true } as const;
 
 // Phones are stored as typed; two customers match when their digits match
 async function findByPhone(phone: string, exceptId?: number) {
@@ -85,6 +89,15 @@ router.get('/api/customers/search', async (req: Request, res: Response) => {
       .sort((a, b) => a.r - b.r || a.c.name.localeCompare(b.c.name))
       .slice(0, 8)
       .map(m => customerPayload(m.c));
+    // While loyalty is on, each customer carries their plan so the POS can show the discount and points before saving
+    if (await loyaltyActive()) {
+      const plans = await prisma.loyaltyPlan.findMany();
+      const fallback = plans.find(p => p.isDefault === 1 && p.status === 'active') ?? null;
+      return res.json(matches.map(c => {
+        const plan = plans.find(p => p.id === c.loyalty_plan_id) ?? fallback;
+        return { ...c, loyalty_plan: plan ? planPayload(plan) : null, points_value: plan ? Math.round(c.loyalty_points * plan.pointValue * 100) / 100 : 0 };
+      }));
+    }
     res.json(matches);
   } catch (error: unknown) {
     sendError(res, error);
@@ -106,7 +119,9 @@ router.post('/api/customers', async (req: Request, res: Response) => {
         phone: body.phone,
         address: body.address || null,
         creditLimit: body.credit_limit ?? 0,
-        currentBalance: 0.0
+        currentBalance: 0.0,
+        // New customers start on the default loyalty plan (if one is set)
+        loyaltyPlanId: (await defaultPlan(prisma))?.id ?? null
       },
       select: customerFields
     });

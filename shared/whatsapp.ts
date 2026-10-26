@@ -70,6 +70,16 @@ interface ReceiptSale {
   payment_type: string;
   store_name_snapshot?: string | null;
   items?: { product_name: string; quantity: number; is_loose: number | boolean; net_amount: number }[];
+  /** Loyalty (M10): set on sales to a member */
+  loyalty_plan_name?: string | null;
+  points_earned?: number;
+  points_balance?: number | null;
+}
+
+/** "Points earned: 12, balance: 340" for a member's sale, or '' */
+function pointsLine(sale: ReceiptSale): string {
+  if (!sale.loyalty_plan_name || sale.points_balance === null || sale.points_balance === undefined) return '';
+  return `\n\nLoyalty points earned: ${sale.points_earned ?? 0}. Your balance: ${sale.points_balance} points.`;
 }
 
 const tidy = (text: string) => text.replace(/[ \t]+$/gm, '').trim();
@@ -106,7 +116,7 @@ export function receiptMessage(sale: ReceiptSale, settings: MessageSettings | nu
     items: receiptItemLines(sale.items, money),
     total: money(Number(sale.net_total) || 0),
     payment: sale.payment_type
-  })), settings);
+  }) + pointsLine(sale)), settings);
 }
 
 export function reminderMessage(

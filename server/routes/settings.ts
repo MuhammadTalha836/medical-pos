@@ -81,6 +81,7 @@ const DEVELOPER_ONLY_SETTING_KEYS = [
   'allow_admin_create_admin',
   'allow_admin_edit_store_identity',
   'allow_admin_hide_store_identity',
+  'loyalty_feature_allowed',
   'backup_retention_limit',
   'backup_mode',
   'backup_frequency',
@@ -142,6 +143,22 @@ router.post('/api/settings', async (req: Request, res: Response) => {
       settings.paper_width = settings.invoice_paper_size;
     } else if (settings.paper_width !== undefined) {
       settings.invoice_paper_size = settings.paper_width;
+    }
+
+    // Loyalty on/off: only with the loyalty permission, and switching it on needs the Developer's permission first
+    if (settings.loyalty_enabled !== undefined) {
+      const value = String(settings.loyalty_enabled);
+      if (value !== 'true' && value !== 'false') return res.status(400).json({ error: "loyalty_enabled must be 'true' or 'false'" });
+      if (!(await hasRolePermission(actingUser.role, 'can_manage_loyalty'))) {
+        delete settings.loyalty_enabled;
+      } else if (value === 'true') {
+        const rows = await prisma.systemSetting.findMany({ where: { key: { in: ['loyalty_feature_allowed', 'loyalty_enabled'] } } });
+        const current = Object.fromEntries(rows.map(r => [r.key, r.value]));
+        if (current.loyalty_feature_allowed !== 'true') {
+          if (current.loyalty_enabled !== 'true') return res.status(400).json({ error: 'Loyalty points are not available for this store.' });
+          delete settings.loyalty_enabled;
+        }
+      }
     }
 
     // If acting user is NOT developer, protect developer-managed keys & store identity

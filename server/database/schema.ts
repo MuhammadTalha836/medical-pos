@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS customers (
   address TEXT,
   credit_limit REAL DEFAULT 0.0,
   current_balance REAL DEFAULT 0.0,
+  loyalty_plan_id INTEGER,
+  loyalty_points INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -131,6 +133,13 @@ CREATE TABLE IF NOT EXISTS sales (
   store_name_snapshot TEXT,
   store_address_snapshot TEXT,
   invoice_footer_snapshot TEXT,
+  member_discount_pct REAL NOT NULL DEFAULT 0.0,
+  member_discount_amt REAL NOT NULL DEFAULT 0.0,
+  points_redeemed INTEGER NOT NULL DEFAULT 0,
+  points_redeemed_value REAL NOT NULL DEFAULT 0.0,
+  points_earned INTEGER NOT NULL DEFAULT 0,
+  loyalty_plan_name TEXT,
+  points_balance INTEGER,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -380,6 +389,41 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 14d. Loyalty (M10). Plans hold the rules; loyalty_transactions is the points ledger. customers.loyalty_points is
+-- the balance, recomputed from the ledger in the same transaction. remaining = unused points of a plus row (oldest first, expiry).
+CREATE TABLE IF NOT EXISTS loyalty_plans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  points_per_100 REAL NOT NULL DEFAULT 1.0,
+  point_value REAL NOT NULL DEFAULT 1.0,
+  min_bill_to_earn REAL NOT NULL DEFAULT 0.0,
+  discount_pct REAL NOT NULL DEFAULT 0.0,
+  min_redeem_points INTEGER NOT NULL DEFAULT 0,
+  max_redeem_pct REAL NOT NULL DEFAULT 100.0,
+  expiry_months INTEGER NOT NULL DEFAULT 0,
+  earn_on_credit INTEGER NOT NULL DEFAULT 0,
+  upgrade_spend REAL NOT NULL DEFAULT 0.0,
+  is_default INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'active',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS loyalty_transactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  sale_id INTEGER,
+  sale_return_id INTEGER,
+  type TEXT NOT NULL,
+  points INTEGER NOT NULL DEFAULT 0,
+  remaining INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT,
+  notes TEXT,
+  user_id INTEGER,
+  user_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 15. System Settings
 CREATE TABLE IF NOT EXISTS system_settings (
   key TEXT PRIMARY KEY,
@@ -465,6 +509,8 @@ CREATE INDEX IF NOT EXISTS idx_expenses_shift ON expenses(shift_id);
 CREATE INDEX IF NOT EXISTS idx_stock_adjustments_created ON stock_adjustments(created_at);
 CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product ON stock_adjustments(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_count_items_count ON stock_count_items(count_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_tx_customer ON loyalty_transactions(customer_id);
+CREATE INDEX IF NOT EXISTS idx_loyalty_tx_sale ON loyalty_transactions(sale_id);
 `;
 
 /**
@@ -508,5 +554,14 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definitio
   { table: 'daily_closings', column: 'customer_payments_cash', definition: 'REAL NOT NULL DEFAULT 0.0' },
   { table: 'daily_closings', column: 'net_profit', definition: 'REAL NOT NULL DEFAULT 0.0' },
   { table: 'daily_closings', column: 'open_shifts_at_close', definition: 'INTEGER NOT NULL DEFAULT 0' },
-  { table: 'daily_closings', column: 'auto_closed', definition: 'INTEGER NOT NULL DEFAULT 0' }
+  { table: 'daily_closings', column: 'auto_closed', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'customers', column: 'loyalty_plan_id', definition: 'INTEGER' },
+  { table: 'customers', column: 'loyalty_points', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'sales', column: 'member_discount_pct', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'sales', column: 'member_discount_amt', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'sales', column: 'points_redeemed', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'sales', column: 'points_redeemed_value', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'sales', column: 'points_earned', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'sales', column: 'loyalty_plan_name', definition: 'TEXT' },
+  { table: 'sales', column: 'points_balance', definition: 'INTEGER' }
 ];

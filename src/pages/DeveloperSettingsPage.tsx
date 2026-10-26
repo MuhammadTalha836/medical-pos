@@ -90,6 +90,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
     allow_admin_create_admin: 'false',
     allow_admin_edit_store_identity: 'false',
     allow_admin_hide_store_identity: 'false',
+    loyalty_feature_allowed: 'false',
     store_name: '',
     store_address: '',
     developer_invoice_footer: DEFAULT_DEVELOPER_FOOTER,
@@ -524,6 +525,32 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
                     type="checkbox"
                     checked={settings.allow_admin_hide_store_identity === 'true'}
                     onChange={(e) => setSettings(prev => ({ ...prev, allow_admin_hide_store_identity: e.target.checked ? 'true' : 'false' }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle 5: Loyalty points (M10) */}
+              <div className="flex items-start justify-between p-4 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800/80">
+                <div className="space-y-1 pr-4">
+                  <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                    <span>Allow Loyalty Points for This Store</span>
+                    {settings.loyalty_feature_allowed === 'true' ? (
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-emerald-500/10 text-emerald-500">Allowed</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-sm text-2xs font-bold bg-purple-500/10 text-purple-400">Developer Locked</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    When allowed, the Administrator sees Settings → Loyalty, can switch points on, and builds member plans (points per Rs 100, point value, member discount, expiry). When locked, nothing about loyalty is shown and no points are earned or used; saved points are kept.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.loyalty_feature_allowed === 'true'}
+                    onChange={(e) => setSettings(prev => ({ ...prev, loyalty_feature_allowed: e.target.checked ? 'true' : 'false' }))}
                     className="sr-only peer"
                   />
                   <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>

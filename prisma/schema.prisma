@@ -126,9 +126,13 @@ model Customer {
   address        String?
   creditLimit    Float             @default(0.0) @map("credit_limit")
   currentBalance Float             @default(0.0) @map("current_balance")
+  loyaltyPlanId  Int?              @map("loyalty_plan_id")
+  loyaltyPoints  Int               @default(0) @map("loyalty_points")
   createdAt      DateTime          @default(now()) @map("created_at")
   payments       CustomerPayment[]
   sales          Sale[]
+  loyaltyPlan    LoyaltyPlan?      @relation(fields: [loyaltyPlanId], references: [id], onDelete: SetNull)
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@map("customers")
 }
@@ -174,6 +178,13 @@ model Sale {
   storeNameSnapshot     String?  @map("store_name_snapshot")
   storeAddressSnapshot  String?  @map("store_address_snapshot")
   invoiceFooterSnapshot String?  @map("invoice_footer_snapshot")
+  memberDiscountPct     Float    @default(0.0) @map("member_discount_pct")
+  memberDiscountAmt     Float    @default(0.0) @map("member_discount_amt")
+  pointsRedeemed        Int      @default(0) @map("points_redeemed")
+  pointsRedeemedValue   Float    @default(0.0) @map("points_redeemed_value")
+  pointsEarned          Int      @default(0) @map("points_earned")
+  loyaltyPlanName       String?  @map("loyalty_plan_name")
+  pointsBalance         Int?     @map("points_balance")
   createdAt         DateTime     @default(now()) @map("created_at")
 
   customer          Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -504,6 +515,49 @@ model StockAdjustment {
   @@index([createdAt], name: "idx_stock_adjustments_created")
   @@index([productId], name: "idx_stock_adjustments_product")
   @@map("stock_adjustments")
+}
+
+model LoyaltyPlan {
+  id              Int        @id @default(autoincrement())
+  name            String     @unique
+  pointsPer100    Float      @default(1.0) @map("points_per_100")
+  pointValue      Float      @default(1.0) @map("point_value")
+  minBillToEarn   Float      @default(0.0) @map("min_bill_to_earn")
+  discountPct     Float      @default(0.0) @map("discount_pct")
+  minRedeemPoints Int        @default(0) @map("min_redeem_points")
+  maxRedeemPct    Float      @default(100.0) @map("max_redeem_pct")
+  expiryMonths    Int        @default(0) @map("expiry_months")
+  earnOnCredit    Int        @default(0) @map("earn_on_credit")
+  upgradeSpend    Float      @default(0.0) @map("upgrade_spend")
+  isDefault       Int        @default(0) @map("is_default")
+  status          String     @default("active")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  customers       Customer[]
+
+  @@map("loyalty_plans")
+}
+
+model LoyaltyTransaction {
+  id           Int      @id @default(autoincrement())
+  customerId   Int      @map("customer_id")
+  saleId       Int?     @map("sale_id")
+  saleReturnId Int?     @map("sale_return_id")
+  type         String
+  points       Int      @default(0)
+  remaining    Int      @default(0)
+  expiresAt    String?  @map("expires_at")
+  notes        String?
+  userId       Int?     @map("user_id")
+  userName     String?  @map("user_name")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId], name: "idx_loyalty_tx_customer")
+  @@index([saleId], name: "idx_loyalty_tx_sale")
+  @@map("loyalty_transactions")
 }
 
 model SystemSetting {

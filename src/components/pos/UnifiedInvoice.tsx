@@ -230,12 +230,18 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
         row(`Bill Discount (${invoice.bill_discount_pct}%):`, `-${money(invoice.bill_discount_amt)}`, 'text-gray-700')}
       {template === 'compact' && isVisible('show_summary_discount') && totalDiscount > 0 &&
         row('Discount:', `-${money(totalDiscount)}`, 'text-gray-700')}
+      {(invoice.member_discount_amt ?? 0) > 0 &&
+        row(`Member Discount (${invoice.loyalty_plan_name ? `${invoice.loyalty_plan_name} ` : ''}${invoice.member_discount_pct}%):`, `-${money(invoice.member_discount_amt ?? 0)}`, 'text-gray-700')}
+      {(invoice.points_redeemed ?? 0) > 0 &&
+        row(`Points Used (${invoice.points_redeemed}):`, `-${money(invoice.points_redeemed_value ?? 0)}`, 'text-gray-700')}
       {isVisible('show_summary_net') &&
         row('NET PAYABLE:', `${money(invoice.net_total)}`, `${fs.net} font-extrabold pt-1 border-t border-dotted border-black`)}
       {isVisible('show_summary_received') &&
         row('Cash Tendered:', `${money(invoice.cash_tendered)}`, 'pt-0.5')}
       {isVisible('show_summary_change') &&
         row('Change Due:', `${money(invoice.change_due)}`, 'font-bold text-gray-900')}
+      {invoice.loyalty_plan_name && invoice.points_balance !== null && invoice.points_balance !== undefined &&
+        row(`Points Earned: ${invoice.points_earned ?? 0}`, `Balance: ${invoice.points_balance}`, 'pt-0.5 font-semibold')}
     </div>
   );
 

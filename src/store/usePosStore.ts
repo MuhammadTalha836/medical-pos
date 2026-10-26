@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { Product, CartItem, SaleInvoice, PrescriptionInput } from '../types';
+import { Product, CartItem, SaleInvoice, PrescriptionInput, LoyaltyPlan } from '../types';
 
 export type PaymentType = 'Cash' | 'Card' | 'Credit' | 'Online';
 
@@ -17,6 +17,10 @@ export interface InvoiceDraft {
   notes: string;
   /** Prescription details for controlled medicines on this invoice */
   prescription: PrescriptionInput | null;
+  /** The saved customer's points and plan while loyalty is on (M10), for the preview */
+  customerLoyalty: { points: number; plan: LoyaltyPlan } | null;
+  /** Points the customer uses on this invoice */
+  redeemPoints: number;
 }
 
 export interface InvoiceTab {
@@ -39,7 +43,9 @@ const emptyDraft = (): InvoiceDraft => ({
   cashTendered: 0,
   paymentType: 'Cash',
   notes: '',
-  prescription: null
+  prescription: null,
+  customerLoyalty: null,
+  redeemPoints: 0
 });
 
 const pickDraft = (state: InvoiceDraft): InvoiceDraft => ({
@@ -52,7 +58,9 @@ const pickDraft = (state: InvoiceDraft): InvoiceDraft => ({
   cashTendered: state.cashTendered,
   paymentType: state.paymentType,
   notes: state.notes,
-  prescription: state.prescription
+  prescription: state.prescription,
+  customerLoyalty: state.customerLoyalty,
+  redeemPoints: state.redeemPoints
 });
 
 let tabCounter = 0;
@@ -99,6 +107,8 @@ interface PosState extends InvoiceDraft {
   setPaymentType: (type: PaymentType) => void;
   setNotes: (notes: string) => void;
   setPrescription: (prescription: PrescriptionInput | null) => void;
+  setCustomerLoyalty: (loyalty: { points: number; plan: LoyaltyPlan } | null) => void;
+  setRedeemPoints: (points: number) => void;
 
   // Computations
   getTotals: () => {
@@ -349,12 +359,16 @@ export const usePosStore = create<PosState>()(persist((set, get) => ({
       billDiscountPct: 0,
       billDiscountAmt: 0,
       cashTendered: 0,
-      notes: ''
+      notes: '',
+      customerLoyalty: null,
+      redeemPoints: 0
     });
   },
 
   setCustomer: (id: number | null, name: string, phone = '') => {
-    set({ customerId: id, customerName: name, customerPhone: phone });
+    set(state => (state.customerId === id
+      ? { customerName: name, customerPhone: phone }
+      : { customerId: id, customerName: name, customerPhone: phone, customerLoyalty: null, redeemPoints: 0 }));
   },
 
   setBillDiscountPct: (pct: number, maxLimit?: number) => {
@@ -380,6 +394,8 @@ export const usePosStore = create<PosState>()(persist((set, get) => ({
   setPaymentType: (type: PaymentType) => set({ paymentType: type }),
   setNotes: (notes: string) => set({ notes }),
   setPrescription: (prescription: PrescriptionInput | null) => set({ prescription }),
+  setCustomerLoyalty: (loyalty) => set({ customerLoyalty: loyalty }),
+  setRedeemPoints: (points: number) => set({ redeemPoints: Math.max(0, Math.floor(points) || 0) }),
 
   getTotals: () => {
     const { cart, billDiscountAmt, cashTendered } = get();

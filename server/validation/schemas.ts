@@ -5,6 +5,7 @@ import { BACKUP_MODES } from '../../shared/backup';
 import { PASSWORD_MIN, PASSWORD_MIN_MESSAGE } from '../../shared/passwords';
 import { PRESCRIPTION_NOTES_MAX, PRESCRIPTION_TEXT_MAX, isValidCnic } from '../../shared/schedule';
 import { EXPENSE_AMOUNT_MAX, EXPENSE_CATEGORY_MAX, EXPENSE_PAYMENT_METHODS, EXPENSE_TEXT_MAX } from '../../shared/expenses';
+import { LOYALTY_ADJUST_MAX, LOYALTY_NOTES_MAX, LOYALTY_PLAN_NAME_MAX } from '../../shared/loyalty';
 import { MANUAL_ADJUST_REASONS, STOCK_NOTES_MAX, STOCK_UNITS_MAX } from '../../shared/stockAdjust';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
@@ -132,7 +133,9 @@ const prescriptionSchema = z.looseObject({
 
 export const createSaleSchema = z.looseObject({
   items: z.array(saleItemSchema, { error: 'Sale must include at least one item.' }).min(1, { error: 'Sale must include at least one item.' }),
-  prescription: prescriptionSchema.nullish()
+  prescription: prescriptionSchema.nullish(),
+  redeem_points: z.coerce.number({ error: 'Points to use must be a whole number' }).int({ error: 'Points to use must be a whole number' })
+    .min(0, { error: 'Points to use must be a whole number' }).max(10_000_000).optional()
 });
 
 export const saleReturnSchema = z.looseObject({
@@ -250,6 +253,38 @@ export const stockAdjustSchema = z.looseObject({
   loose: stockUnits('Enter the loose units').default(0),
   batch_id: z.coerce.number().int().positive().nullish(),
   notes: stockNotes
+});
+
+const loyaltyNumber = (message: string, min: number, max: number) =>
+  z.coerce.number({ error: message }).min(min, { error: message }).max(max, { error: message });
+
+export const loyaltyPlanSchema = z.looseObject({
+  name: z.string({ error: 'Give the plan a name' }).trim().min(1, { error: 'Give the plan a name' })
+    .max(LOYALTY_PLAN_NAME_MAX, { error: `The plan name cannot exceed ${LOYALTY_PLAN_NAME_MAX} characters` }),
+  points_per_100: loyaltyNumber('Points per Rs 100 must be between 0 and 100', 0, 100),
+  point_value: loyaltyNumber('A point must be worth more than Rs 0 (at most Rs 1000)', 0.01, 1000),
+  min_bill_to_earn: loyaltyNumber('The smallest bill that earns points cannot be negative', 0, 10_000_000).default(0),
+  discount_pct: loyaltyNumber('The member discount must be between 0% and 100%', 0, 100).default(0),
+  min_redeem_points: z.coerce.number({ error: 'The fewest points to use must be a whole number' }).int({ error: 'The fewest points to use must be a whole number' })
+    .min(0, { error: 'The fewest points to use must be a whole number' }).max(10_000_000).default(0),
+  max_redeem_pct: loyaltyNumber('The share of a bill points may pay must be between 0% and 100%', 0, 100).default(100),
+  expiry_months: z.coerce.number({ error: 'Expiry must be 0 (never) to 120 months' }).int({ error: 'Expiry must be 0 (never) to 120 months' })
+    .min(0, { error: 'Expiry must be 0 (never) to 120 months' }).max(120, { error: 'Expiry must be 0 (never) to 120 months' }).default(0),
+  earn_on_credit: z.boolean().default(false),
+  upgrade_spend: loyaltyNumber('The buying amount for an upgrade cannot be negative', 0, 1_000_000_000).default(0),
+  is_default: z.boolean().default(false)
+});
+
+export const loyaltyAdjustSchema = z.looseObject({
+  points: z.coerce.number({ error: 'Enter the points to add or take off' }).int({ error: 'Points must be a whole number' })
+    .refine(v => v !== 0, { error: 'Enter the points to add or take off' })
+    .refine(v => Math.abs(v) <= LOYALTY_ADJUST_MAX, { error: 'That is too many points' }),
+  notes: z.string({ error: 'Write why the points are changed' }).trim().min(3, { error: 'Write why the points are changed' })
+    .max(LOYALTY_NOTES_MAX, { error: `The reason cannot exceed ${LOYALTY_NOTES_MAX} characters` })
+});
+
+export const customerPlanSchema = z.looseObject({
+  plan_id: z.coerce.number({ error: 'Choose a plan' }).int().positive({ error: 'Choose a plan' }).nullable()
 });
 
 export function parseBody<T extends z.ZodType>(schema: T, body: unknown, res: Response): z.infer<T> | null {

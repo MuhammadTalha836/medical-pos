@@ -7,7 +7,9 @@ import { formatSale } from '../http/formatters';
 import { DEVELOPER_PROFILE_SETTING_KEYS, composeInvoiceFooter } from '../../shared/developerProfile';
 import { DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
 import { priceReturn, priceSaleLine, settleCash, totalSale } from '../sales/saleMath';
-import { localDateKey } from '../../shared/dates';
+import { localDateKey, localDateString } from '../../shared/dates';
+import { applyLoyalty, expiryDate, pointsEarned, returnedShare, shareDue } from '../../shared/loyalty';
+import { addPoints, expireDuePoints, LOYALTY_UNAVAILABLE, loyaltyActive, maybeUpgrade, planOf, planRules, recomputeBalance, removePoints } from '../loyalty/loyaltyStore';
 import { returnUnits, syncProductBatches, takeUnits } from '../stock/batchStock';
 import { missingPrescriptionFields, normalizeSchedule } from '../../shared/schedule';
 
@@ -68,6 +70,11 @@ router.post('/api/sales', async (req: Request, res: Response) => {
     };
 
     const today = localDateKey();
+    // Loyalty (M10): member discount, points used and earned, only for a saved customer while loyalty is on
+    const redeemPoints = body.redeem_points ?? 0;
+    const loyaltyOn = await loyaltyActive();
+    if (redeemPoints > 0 && !loyaltyOn) return res.status(400).json({ error: LOYALTY_UNAVAILABLE });
+    if (redeemPoints > 0 && !linkedCustomer) return res.status(400).json({ error: 'Select the saved customer whose points are used.' });
 
     const executeSaleTransaction = async () => {
       return await prisma.$transaction(async (tx) => {
@@ -110,7 +117,23 @@ router.post('/api/sales', async (req: Request, res: Response) => {
           pricedItems.push({ prod, isLoose, quantity, priced, controlled, batchId: item.batch_id ? Number(item.batch_id) : null });
         }
 
-        const totals = totalSale(pricedItems.map(i => i.priced), bill_discount_pct, rules);
+        let totals = totalSale(pricedItems.map(i => i.priced), bill_discount_pct, rules);
+        let loyalty: { plan: NonNullable<Awaited<ReturnType<typeof planOf>>>; bill: ReturnType<typeof applyLoyalty> } | null = null;
+        if (loyaltyOn && linkedCustomer) {
+          await expireDuePoints(tx, linkedCustomer.id);
+          const member = (await tx.customer.findUnique({ where: { id: linkedCustomer.id } }))!;
+          const plan = await planOf(tx, member);
+          if (plan) {
+            const bill = applyLoyalty(
+              { subtotal: totals.totalGross - totals.totalItemDiscount, billDiscountPct: totals.billDiscountPct, netBefore: totals.netTotal },
+              planRules(plan), rules.maxBillDiscountPct, member.loyaltyPoints, redeemPoints
+            );
+            totals = { ...totals, netTotal: bill.netTotal };
+            loyalty = { plan, bill };
+          } else if (redeemPoints > 0) {
+            throw new Error(`${linkedCustomer.name} is not on a loyalty plan.`);
+          }
+        }
         const cash = settleCash(paymentType, totals.netTotal, cash_tendered);
 
         // Credit limit (0 = no limit), checked against the balance at the moment of the sale
@@ -161,6 +184,13 @@ router.post('/api/sales', async (req: Request, res: Response) => {
             shiftId: activeShiftId,
             ...totals,
             ...cash,
+            ...(loyalty ? {
+              memberDiscountPct: loyalty.bill.memberDiscountPct,
+              memberDiscountAmt: loyalty.bill.memberDiscountAmt,
+              pointsRedeemed: loyalty.bill.pointsRedeemed,
+              pointsRedeemedValue: loyalty.bill.pointsRedeemedValue,
+              loyaltyPlanName: loyalty.plan.name
+            } : {}),
             paymentType,
             notes: notes || null,
             storeNameSnapshot: identity.store_name ?? null,
@@ -240,6 +270,20 @@ router.post('/api/sales', async (req: Request, res: Response) => {
             where: { id: linkedCustomer.id },
             data: { currentBalance: { increment: totals.netTotal } }
           });
+        }
+
+        // 4. Loyalty: points used come off first (oldest first), then the points earned on what was paid
+        if (loyalty && linkedCustomer) {
+          const entry = { customerId: linkedCustomer.id, saleId: sale.id, actor };
+          if (loyalty.bill.pointsRedeemed > 0) {
+            await removePoints(tx, 'redeem', loyalty.bill.pointsRedeemed, { ...entry, notes: `Used on ${invoiceNo}` });
+          }
+          const rulesOfPlan = planRules(loyalty.plan);
+          const earned = pointsEarned(totals.netTotal, rulesOfPlan, paymentType);
+          await addPoints(tx, 'earn', earned, expiryDate(localDateString(), rulesOfPlan.expiryMonths), { ...entry, notes: `Earned on ${invoiceNo}` });
+          const balance = await recomputeBalance(tx, linkedCustomer.id);
+          await tx.sale.update({ where: { id: sale.id }, data: { pointsEarned: earned, pointsBalance: balance } });
+          await maybeUpgrade(tx, linkedCustomer.id, actor);
         }
 
         const saved = await tx.sale.findUnique({ where: { id: sale.id }, include: { items: true } });
@@ -456,6 +500,30 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
         where: { id: original.id },
         data: { status: priced.fullyReturned ? 'returned' : 'partially_returned' }
       });
+
+      // Loyalty: earned points are taken back and used points given back, in step with the share returned so far
+      if (original.customerId && (original.pointsEarned > 0 || original.pointsRedeemed > 0)) {
+        const key = (productId: number, isLoose: boolean) => `${productId}:${isLoose ? 1 : 0}`;
+        const share = returnedShare(
+          original.items.map(i => ({ key: key(i.productId, !!i.isLoose), quantity: i.quantity, netAmount: i.netAmount })),
+          [...earlierReturns.map(r => ({ key: key(r.productId, !!r.isLoose), quantity: r.quantity })), ...priced.lines.map(l => ({ key: key(l.productId, l.isLoose), quantity: l.quantity }))]
+        );
+        const history = await tx.loyaltyTransaction.findMany({ where: { saleId: original.id } });
+        const done = (type: string) => history.filter(h => h.type === type).reduce((s, h) => s + Math.abs(h.points), 0);
+        const entry = { customerId: original.customerId, saleId: original.id, saleReturnId: saleReturn.id, actor: await getActingUser(req) };
+        const takeBack = shareDue(original.pointsEarned, share, done('earn_reversed'));
+        if (takeBack > 0) {
+          const earnLots = history.filter(h => h.type === 'earn').map(h => h.id);
+          await removePoints(tx, 'earn_reversed', takeBack, { ...entry, preferLotIds: earnLots, notes: `Return ${returnNo} on ${original.invoiceNo}` });
+        }
+        const giveBack = shareDue(original.pointsRedeemed, share, done('redeem_refunded'));
+        if (giveBack > 0) {
+          const customer = await tx.customer.findUnique({ where: { id: original.customerId } });
+          const plan = customer ? await planOf(tx, customer) : null;
+          await addPoints(tx, 'redeem_refunded', giveBack, expiryDate(localDateString(), plan?.expiryMonths ?? 0), { ...entry, notes: `Return ${returnNo} on ${original.invoiceNo}` });
+        }
+        await recomputeBalance(tx, original.customerId);
+      }
 
       // Returning goods from a credit sale lowers what the customer owes
       if (original.paymentType === 'Credit' && original.customerId) {

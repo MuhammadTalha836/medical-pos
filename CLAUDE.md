@@ -38,6 +38,7 @@ npm run test:m6          # substitutes: formula matching (case/spacing/order/str
 npm run test:m7          # WhatsApp templates: defaults, save, cashier 403, length limit; supplier phone on the reorder list
 npm run test:m8          # expenses and day close: cash expense lowers shift cash, closed shift/day locks, own-only list, day-close figures, automatic midnight close, range report
 npm run test:m9          # stock count and adjustment: count changes nothing until Apply, later sales kept, batches = stock, adjustments by batch/reason, permissions, history
+npm run test:m10         # loyalty: Developer gate + Admin switch, plans, earn/redeem/member discount, returns, expiry, auto upgrade, manual points
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -176,6 +177,12 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - `PUT /api/products/:id` no longer changes stock; `POST /api/products` records opening stock as an `opening` adjustment. `resetStockZero` writes `stock_zero` rows by raw SQL (with `created_at` in Prisma's ISO format).
   - Routes (`server/routes/stock.ts`): `/api/stock/counts` (list, detail, create, `PUT .../items`, `DELETE .../items/:productId`, `apply`, `cancel`), `POST /api/products/:id/adjust`, `GET /api/stock/adjustments`. Apply uses stock = current + (counted − system at count), so sales made after counting stay sold.
   - UI: Medicines → Stock Count / Adjustments tabs and the Adjust stock action (`src/components/stock/`).
+- **Loyalty points (M10).**
+  - Two switches: `loyalty_feature_allowed` (Developer-only key, in `WRITABLE_DEVELOPER_SETTING_KEYS` and `DEVELOPER_ONLY_SETTING_KEYS`) and `loyalty_enabled` (Admin; `POST /api/settings` refuses `'true'` while the gate is off and drops it without `can_manage_loyalty`). `loyaltyActive()` needs both; `/api/loyalty/*` answers 403 while the gate is off.
+  - Pure rules in `shared/loyalty.ts` (+ spec), used by the server and the POS preview: `applyLoyalty`, `memberDiscount`, `redeemLimit`/`redeemError`, `pointsEarned`, `expiryDate`, `consumeOldestFirst`, `planForSpend`, `returnedShare`/`shareDue`, `LOYALTY_TEMPLATES`.
+  - Ledger helpers in `server/loyalty/loyaltyStore.ts` (caller's transaction): `addPoints`/`removePoints` (lots with `remaining`, never below 0), `expireDuePoints`, `recomputeBalance` (cached `customers.loyalty_points`), `maybeUpgrade`.
+  - `POST /api/sales` applies the plan after `totalSale` (member discount, `redeem_points`), then writes redeem and earn rows; `POST /api/sales/return` reverses by share. Routes: `server/routes/loyalty.ts` (plans, templates, members, `/api/customers/:id/loyalty`, `.../loyalty/adjust`, `PUT /api/customers/:id/plan`). `/api/customers/search` adds `loyalty_plan` and `points_value` while loyalty is on.
+  - UI: `src/components/loyalty/`, POS totals panel, `UnifiedInvoice` rows; the POS draft keeps `customerLoyalty`/`redeemPoints` per invoice tab.
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**

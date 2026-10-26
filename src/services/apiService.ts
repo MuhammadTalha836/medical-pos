@@ -6,6 +6,11 @@ import {
   DayClosing,
   ExpenseInput,
   ExpenseList,
+  CustomerLoyalty,
+  LoyaltyMembers,
+  LoyaltyPlan,
+  LoyaltyPlanInput,
+  LoyaltyTemplate,
   StockAdjustInput,
   StockAdjustmentList,
   StockCount,
@@ -145,6 +150,19 @@ export const api = {
     post<{ success: boolean; new_balance: number }>(`/customers/${customerId}/payment`, data),
   getCustomerLedger: (customerId: number) => get<CustomerLedger>(`/customers/${customerId}/ledger`),
   deleteCustomer: (id: number) => del<Success>(`/customers/${id}`),
+
+  // Loyalty points and plans
+  getLoyaltyPlans: () => get<LoyaltyPlan[]>('/loyalty/plans'),
+  getLoyaltyTemplates: () => get<LoyaltyTemplate[]>('/loyalty/templates'),
+  createLoyaltyPlan: (data: LoyaltyPlanInput) => post<{ success: boolean; plan: LoyaltyPlan }>('/loyalty/plans', data),
+  updateLoyaltyPlan: (id: number, data: LoyaltyPlanInput) => put<{ success: boolean; plan: LoyaltyPlan }>(`/loyalty/plans/${id}`, data),
+  archiveLoyaltyPlan: (id: number, restore = false) => post<Success>(`/loyalty/plans/${id}/archive`, { restore }),
+  deleteLoyaltyPlan: (id: number) => del<Success>(`/loyalty/plans/${id}`),
+  getLoyaltyMembers: (params?: { plan_id?: number; q?: string }) => get<LoyaltyMembers>('/loyalty/members', params),
+  getCustomerLoyalty: (customerId: number) => get<CustomerLoyalty>(`/customers/${customerId}/loyalty`),
+  adjustLoyaltyPoints: (customerId: number, points: number, notes: string) =>
+    post<{ success: boolean; points: number }>(`/customers/${customerId}/loyalty/adjust`, { points, notes }),
+  setCustomerPlan: (customerId: number, planId: number | null) => put<Success>(`/customers/${customerId}/plan`, { plan_id: planId }),
 
   // Companies
   getCompanies: () => get<Company[]>('/companies'),

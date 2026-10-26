@@ -14,6 +14,21 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M10: loyalty points and member plans)
+- **Developer switch:** Developer → Admin permissions → **Allow Loyalty Points for This Store**. Until it is on, the Admin sees nothing about loyalty.
+- **Settings → Loyalty Points** (Admin):
+  - **Loyalty points** on/off switch.
+  - **Plans** (Regular, Silver, Gold, Chronic Care or your own), each with its own rules: points per Rs 100, what 1 point is worth, smallest bill that earns, member discount %, fewest points to use, the most a bill can be paid with points (%), expiry in months (0 = never), whether udhaar sales earn, and "move customers up after Rs X of buying in 12 months".
+  - **Start from a template:** four ready plans to add and edit. Each plan shows a plain example ("A Rs 1,000 bill earns 10 points...").
+  - One plan is the default; new customers start on it. Plans can be archived (members keep them) or deleted while unused.
+- **At the counter (POS):** for a saved customer the plan and points show; the member discount is given on its own (together with any bill discount it stays within the store maximum). **Use points** with **Max** lowers the bill. Any cashier can use points; the limits are checked again when the sale is saved.
+- **Receipt and WhatsApp:** member discount, points used, points earned and the new balance.
+- **Returns** take back the points earned and give back the points used, in proportion; a full return restores the balance exactly. Points never go below zero.
+- **Expiry:** the earliest-expiring points are used first; points past their date are written off.
+- **Automatic move up:** after enough buying in 12 months a customer moves to the higher plan (never down).
+- **Customers page:** plan and points on each customer, a **Points** window (history, expiring soon, change plan, add or take off points with a reason) and a **Loyalty Points** tab with all members, total points and their worth, Print and CSV.
+- New permission **Manage Loyalty Plans & Points** (Admin). Changes are written to the audit log.
+
 ### Added (M9: stock count and stock adjustment)
 - **Medicines → Stock Count:**
   - Start a count (empty, or listing all medicines of one company).

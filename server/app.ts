@@ -26,6 +26,7 @@ import reorderRoutes from './routes/reorder';
 import expenseRoutes from './routes/expenses';
 import dayCloseRoutes from './routes/dayClose';
 import stockRoutes from './routes/stock';
+import loyaltyRoutes from './routes/loyalty';
 
 // SQLite aggregations return BigInt; serialize them as plain numbers
 declare global {
@@ -93,7 +94,7 @@ app.use('/api', sessionGate);
 for (const routes of [
   dashboardRoutes, setupRoutes, authRoutes, userRoutes, developerRoutes, licenseRoutes, developerAdminRoutes, roleRoutes,
   companyRoutes, customerRoutes, productRoutes, saleRoutes, purchaseRoutes, reportRoutes, utilityRoutes, shiftRoutes, settingsRoutes,
-  supplierRoutes, purchaseReturnRoutes, reorderRoutes, expenseRoutes, dayCloseRoutes, stockRoutes
+  supplierRoutes, purchaseReturnRoutes, reorderRoutes, expenseRoutes, dayCloseRoutes, stockRoutes, loyaltyRoutes
 ]) {
   app.use(routes);
 }

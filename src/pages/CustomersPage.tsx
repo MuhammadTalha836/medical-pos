@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, CreditCard, Plus, Users } from 'lucide-react';
+import { Award, CheckCircle2, CreditCard, Plus, Users } from 'lucide-react';
 import { api } from '../services/apiService';
 import { Customer, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
@@ -10,12 +10,14 @@ import { KhataTab } from '../components/customers/KhataTab';
 import { CustomerFormModal } from '../components/customers/CustomerFormModal';
 import { InvoiceModal } from '../components/customers/InvoiceModal';
 import { LedgerState, isLoadedLedger } from '../components/customers/CustomerInvoiceList';
+import { LoyaltyMembersTab } from '../components/loyalty/LoyaltyMembersTab';
+import { CustomerLoyaltyModal } from '../components/loyalty/CustomerLoyaltyModal';
 
 interface CustomersPageProps {
   settings?: SystemSettings | null;
 }
 
-type CustomersTabKey = 'customers' | 'khata';
+type CustomersTabKey = 'customers' | 'khata' | 'loyalty';
 
 // Customers and their khata (udhaar): one list, with each customer's invoices and payments
 export const CustomersPage: React.FC<CustomersPageProps> = ({ settings }) => {
@@ -37,6 +39,12 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ settings }) => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [openSaleId, setOpenSaleId] = useState<number | null>(null);
+  const [loyaltyFor, setLoyaltyFor] = useState<{ id: number; name: string } | null>(null);
+  const [loyaltyRefresh, setLoyaltyRefresh] = useState(0);
+
+  // Loyalty (M10) shows only after the Developer allowed it; managing it needs its own permission
+  const loyaltyAllowed = settings?.loyalty_feature_allowed === 'true';
+  const canManageLoyalty = loyaltyAllowed && hasPermission('can_manage_loyalty');
 
   const money = moneyFormatter(settings);
   const currency = currencySymbol(settings);
@@ -105,7 +113,8 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ settings }) => {
 
   const tabs: { key: CustomersTabKey; label: string; icon: React.ElementType }[] = [
     { key: 'customers', label: 'Customers', icon: Users },
-    { key: 'khata', label: 'Khata (Udhaar)', icon: CreditCard }
+    { key: 'khata', label: 'Khata (Udhaar)', icon: CreditCard },
+    ...(canManageLoyalty ? [{ key: 'loyalty' as const, label: 'Loyalty Points', icon: Award }] : [])
   ];
 
   return (
@@ -152,7 +161,9 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ settings }) => {
         ))}
       </div>
 
-      {tab === 'customers' ? (
+      {tab === 'loyalty' && canManageLoyalty ? (
+        <LoyaltyMembersTab settings={settings} money={money} onOpen={setLoyaltyFor} refreshKey={loyaltyRefresh} />
+      ) : tab === 'customers' ? (
         <CustomersTab
           customers={customers}
           loading={loading}
@@ -162,6 +173,8 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ settings }) => {
           onOpenInvoice={setOpenSaleId}
           onEdit={hasPermission('can_edit_customer') ? openEdit : undefined}
           onDelete={hasPermission('can_delete_customer') ? askDelete : undefined}
+          showLoyalty={loyaltyAllowed}
+          onLoyalty={loyaltyAllowed ? c => setLoyaltyFor({ id: c.id, name: c.name }) : undefined}
         />
       ) : (
         <KhataTab
@@ -210,6 +223,17 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ settings }) => {
       </Modal>
 
       <InvoiceModal saleId={openSaleId} settings={settings} onClose={() => setOpenSaleId(null)} />
+
+      <CustomerLoyaltyModal
+        customer={loyaltyFor}
+        money={money}
+        canManage={canManageLoyalty}
+        onClose={() => setLoyaltyFor(null)}
+        onChanged={() => {
+          setLoyaltyRefresh(n => n + 1);
+          void loadCustomers();
+        }}
+      />
     </div>
   );
 };

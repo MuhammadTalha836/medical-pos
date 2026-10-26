@@ -44,6 +44,13 @@ interface SaleEntity {
   storeNameSnapshot?: string | null;
   storeAddressSnapshot?: string | null;
   invoiceFooterSnapshot?: string | null;
+  memberDiscountPct?: number;
+  memberDiscountAmt?: number;
+  pointsRedeemed?: number;
+  pointsRedeemedValue?: number;
+  pointsEarned?: number;
+  loyaltyPlanName?: string | null;
+  pointsBalance?: number | null;
   createdAt: Date;
   items?: SaleItemEntity[];
 }
@@ -93,6 +100,13 @@ export function formatSale(sale: SaleEntity) {
     store_name_snapshot: sale.storeNameSnapshot ?? null,
     store_address_snapshot: sale.storeAddressSnapshot ?? null,
     invoice_footer_snapshot: sale.invoiceFooterSnapshot ?? null,
+    member_discount_pct: sale.memberDiscountPct ?? 0,
+    member_discount_amt: sale.memberDiscountAmt ?? 0,
+    points_redeemed: sale.pointsRedeemed ?? 0,
+    points_redeemed_value: sale.pointsRedeemedValue ?? 0,
+    points_earned: sale.pointsEarned ?? 0,
+    loyalty_plan_name: sale.loyaltyPlanName ?? null,
+    points_balance: sale.pointsBalance ?? null,
     created_at: sale.createdAt,
     items: sale.items ? sale.items.map(formatSaleItem) : undefined
   };

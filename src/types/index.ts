@@ -106,6 +106,13 @@ export interface Customer {
   total_credit_sales?: number;
   total_payments?: number;
   created_at?: string;
+  /** Loyalty (M10) */
+  loyalty_points?: number;
+  loyalty_plan_id?: number | null;
+  loyalty_plan_name?: string | null;
+  /** Only in the POS search while loyalty is on: the customer's plan (or the default plan) */
+  loyalty_plan?: LoyaltyPlan | null;
+  points_value?: number;
 }
 
 /** One invoice in a customer's history (GET /api/customers/:id/ledger) */
@@ -339,6 +346,15 @@ export interface SaleInvoice {
   store_name_snapshot?: string | null;
   store_address_snapshot?: string | null;
   invoice_footer_snapshot?: string | null;
+
+  // Loyalty (M10)
+  member_discount_pct?: number;
+  member_discount_amt?: number;
+  points_redeemed?: number;
+  points_redeemed_value?: number;
+  points_earned?: number;
+  loyalty_plan_name?: string | null;
+  points_balance?: number | null;
 }
 
 export interface SaleItem {
@@ -553,6 +569,9 @@ export interface SystemSettings {
   /** Days of sales a reorder should cover (Purchases → Reorder) */
   reorder_cover_days?: string;
   auto_day_close?: string;
+  // Loyalty (M10): the Developer's gate and the Admin's switch
+  loyalty_feature_allowed?: string;
+  loyalty_enabled?: string;
   whatsapp_receipt_template?: string;
   whatsapp_reminder_template?: string;
 
@@ -835,4 +854,70 @@ export interface StockAdjustInput {
   loose: number;
   batch_id?: number | null;
   notes?: string;
+}
+
+/** A loyalty plan (M10); the same fields describe a ready-made template */
+export interface LoyaltyPlan {
+  id: number;
+  name: string;
+  points_per_100: number;
+  point_value: number;
+  min_bill_to_earn: number;
+  discount_pct: number;
+  min_redeem_points: number;
+  max_redeem_pct: number;
+  expiry_months: number;
+  earn_on_credit: boolean;
+  upgrade_spend: number;
+  is_default: boolean;
+  status: 'active' | 'archived';
+  members?: number;
+}
+
+export type LoyaltyPlanInput = Omit<LoyaltyPlan, 'id' | 'status' | 'members'>;
+
+export interface LoyaltyTemplate extends Omit<LoyaltyPlanInput, 'is_default'> {
+  key: string;
+  description: string;
+}
+
+export interface LoyaltyHistoryRow {
+  id: number;
+  type: 'earn' | 'redeem' | 'earn_reversed' | 'redeem_refunded' | 'adjust' | 'expire' | 'plan_change';
+  points: number;
+  remaining: number;
+  expires_at: string | null;
+  invoice_no: string | null;
+  notes: string | null;
+  user_name: string | null;
+  created_at: string;
+}
+
+export interface CustomerLoyalty {
+  customer_id: number;
+  name: string;
+  points: number;
+  points_value: number;
+  plan: LoyaltyPlan | null;
+  plan_assigned: boolean;
+  spend_12m: number;
+  expiring_30d: number;
+  active: boolean;
+  history: LoyaltyHistoryRow[];
+}
+
+export interface LoyaltyMember {
+  id: number;
+  name: string;
+  phone: string | null;
+  plan_id: number | null;
+  plan_name: string | null;
+  points: number;
+  points_value: number;
+  last_activity: string | null;
+}
+
+export interface LoyaltyMembers {
+  members: LoyaltyMember[];
+  totals: { members: number; points: number; value: number };
 }

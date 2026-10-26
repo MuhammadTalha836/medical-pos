@@ -82,6 +82,13 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Schedule (M5):** None, Prescription (Rx) or Controlled (`products.schedule`, `shared/schedule.ts`).
      - Controlled medicines need a prescription at the POS (`PrescriptionModal`: patient, doctor and prescription number required; phone, CNIC, doctor reg. no. and notes optional), once per invoice. The server refuses the sale without it and writes one `prescription_records` row per controlled line.
      - Rx medicines only show a reminder on the cart line.
+   - **Loyalty points (M10, `shared/loyalty.ts`, `server/loyalty/loyaltyStore.ts`, `server/routes/loyalty.ts`, `src/components/loyalty/`):**
+     - Gate: `loyalty_feature_allowed` (Developer only, Developer page toggle), then `loyalty_enabled` (Admin, Settings → Loyalty Points; refused while the gate is off). Points work only when both are `'true'`.
+     - Plans (`loyalty_plans`) hold the rules; customers carry `loyalty_plan_id` (null = the default plan) and the cached `loyalty_points`. `loyalty_transactions` is the ledger: plus rows (earn, redeem_refunded, adjust) keep `remaining` and `expires_at`; minus rows use the earliest-expiring points first.
+     - `POST /api/sales` (`redeem_points`): after `totalSale`, `applyLoyalty` adds the member discount (capped with the bill discount by `max_bill_discount_pct`, no `can_discount` needed) and the points value; points are earned on the amount paid (`pointsEarned`). Stored on the sale: `member_discount_*`, `points_redeemed*`, `points_earned`, `points_balance`, `loyalty_plan_name`.
+     - Returns: `returnedShare` + `shareDue` take back earned points and give back used points; the balance never goes below 0.
+     - Auto upgrade (`maybeUpgrade`): last 365 days of net buying vs plans' `upgrade_spend`, up only. Expiry runs when a customer's points are read or used.
+     - UI: Settings → Loyalty Points (`LoyaltySettingsTab`: switch, plans, templates), POS totals panel (member discount, Use points + Max), receipt and WhatsApp lines, Customers → Loyalty Points tab (`LoyaltyMembersTab`) and the Points window (`CustomerLoyaltyModal`). `can_manage_loyalty` for plans, members, plan changes and manual points.
    - **Stock count and adjustment (M9, `src/components/stock/`, `server/routes/stock.ts`):**
      - Opening stock is entered only on a new medicine (saved as an `opening` row). On edit the stock fields are read-only; `PUT /api/products/:id` ignores `stock_boxes`/`stock_loose`.
      - **Adjust stock** (`AdjustStockModal`, `POST /api/products/:id/adjust`, `can_adjust_stock`): reason (damaged/expired/lost only lower, found only adds, correction either way), boxes + loose, optional batch, notes.
