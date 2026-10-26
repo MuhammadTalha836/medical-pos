@@ -19,8 +19,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | M5 | Prescription and controlled-medicine register | ✅ |
 | M6 | Generic / substitute search | ✅ |
 | M7 | WhatsApp receipts and khata reminders | ✅ |
-| M8 | Expenses and day close (cash book) | ✅ built and tested; waiting for the owner's check |
-| M9 | Physical stock count and stock adjustment | ⬜ |
+| M8 | Expenses and day close (cash book) | ✅ |
+| M9 | Physical stock count and stock adjustment | 🟡 built and tested; waiting for the owner's check |
 | M10 | Loyalty points / regular-customer discount | ⬜ |
 | M11 | Multi-PC LAN mode (see `MULTI_PC_LAN_MODE.md`) | ⬜ |
 
@@ -410,6 +410,22 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - deltas;
 - audit rows;
 - permission needed.
+
+**Owner decisions (2026-10-26):**
+- The medicine form keeps opening stock for a new medicine; on edit the stock is locked and changes only through Adjust stock or a count.
+- Staff count (`can_count_stock`, cashier and pharmacist by default); Apply and single adjustments need `can_adjust_stock` (Admin).
+- The loss value is shown only in the Adjustments history; Day Close profit is unchanged.
+
+**Built (2026-10-26):**
+- Data: tables `stock_counts`, `stock_count_items`, `stock_adjustments` (reason, delta, before/after, batch, unit cost, count, user).
+- `shared/stockAdjust.ts` (reasons, labels, direction, `unitsText`) and `server/stock/adjustMath.ts` (pure, with spec).
+- `server/stock/adjustStock.ts`: `adjustProductStock`, the one path for stock changes outside sales and purchases; batches stay equal to stock.
+- `server/routes/stock.ts`: counts (list, detail, create with optional company list, add/count lines by barcode, code or id, remove line, apply, cancel), single adjustment, adjustment history.
+- A product edit ignores stock; a new product's opening stock and Stock Zero resets write adjustment rows.
+- UI: Medicines → **Stock Count** (scan input, counted boxes + loose, difference and value, filters, Apply, Cancel, printable count sheet), **Adjustments** (filters, totals, Print, CSV) and **Adjust stock** on each medicine.
+- **Apply rule:** stock = current + (counted − system when counted), so sales made after counting stay sold; lines not counted are skipped.
+
+**Tests:** `adjustMath.spec.ts` and `test:m9` (8 tests).
 
 ## M10: Loyalty points / regular-customer discount
 **Goal.** Reward regular and chronic-care customers.

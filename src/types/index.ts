@@ -761,3 +761,78 @@ declare global {
     electronAPI?: ElectronAPI;
   }
 }
+
+/** A physical stock count (M9) */
+export interface StockCount {
+  id: number;
+  count_no: string;
+  title: string | null;
+  notes: string | null;
+  company_id: number | null;
+  status: 'open' | 'applied' | 'cancelled';
+  user_name: string | null;
+  applied_at: string | null;
+  applied_by: string | null;
+  created_at: string;
+  items_count?: number;
+  counted_count?: number;
+  differences_count?: number;
+}
+
+export interface StockCountLine {
+  id: number;
+  product_id: number;
+  product_name: string;
+  p_code: string | null;
+  barcode: string | null;
+  location_rack: string | null;
+  unit_type: string;
+  packing: number;
+  unit_cost: number;
+  missing: boolean;
+  current_units: number;
+  system_units: number;
+  counted_units: number | null;
+  difference_units: number | null;
+  difference_value: number;
+  counted_at: string | null;
+  user_name: string | null;
+}
+
+export interface StockCountDetail extends StockCount {
+  items: StockCountLine[];
+  totals: { loss_value: number; gain_value: number; net_value: number; differences_count: number };
+}
+
+export interface StockAdjustmentRow {
+  id: number;
+  product_id: number;
+  product_name: string;
+  packing: number;
+  unit_type: string;
+  delta_units: number;
+  stock_before: number;
+  stock_after: number;
+  reason: string;
+  notes: string | null;
+  batch_no: string | null;
+  unit_cost: number;
+  value: number;
+  count_id: number | null;
+  user_name: string | null;
+  created_at: string;
+}
+
+export interface StockAdjustmentList {
+  adjustments: StockAdjustmentRow[];
+  totals: { count: number; loss_units: number; gain_units: number; loss_value: number; gain_value: number; net_value: number };
+}
+
+export interface StockAdjustInput {
+  reason: string;
+  direction: 'in' | 'out';
+  boxes: number;
+  loose: number;
+  batch_id?: number | null;
+  notes?: string;
+}

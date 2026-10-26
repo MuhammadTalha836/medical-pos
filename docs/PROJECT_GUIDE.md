@@ -82,6 +82,12 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Schedule (M5):** None, Prescription (Rx) or Controlled (`products.schedule`, `shared/schedule.ts`).
      - Controlled medicines need a prescription at the POS (`PrescriptionModal`: patient, doctor and prescription number required; phone, CNIC, doctor reg. no. and notes optional), once per invoice. The server refuses the sale without it and writes one `prescription_records` row per controlled line.
      - Rx medicines only show a reminder on the cart line.
+   - **Stock count and adjustment (M9, `src/components/stock/`, `server/routes/stock.ts`):**
+     - Opening stock is entered only on a new medicine (saved as an `opening` row). On edit the stock fields are read-only; `PUT /api/products/:id` ignores `stock_boxes`/`stock_loose`.
+     - **Adjust stock** (`AdjustStockModal`, `POST /api/products/:id/adjust`, `can_adjust_stock`): reason (damaged/expired/lost only lower, found only adds, correction either way), boxes + loose, optional batch, notes.
+     - **Stock Count tab** (`StockCountTab`): `stock_counts` + `stock_count_items`. Lines are added by barcode/code or name (`PUT /api/stock/counts/:id/items`, `can_count_stock`); the system stock is saved when a line is counted. **Apply** (`can_adjust_stock`) sets stock = current + (counted − system at count), so later sales stay sold; uncounted lines are skipped; a count that is applied or cancelled answers 409.
+     - **Adjustments tab** (`AdjustmentsTab`, `GET /api/stock/adjustments`): every `stock_adjustments` row with value at cost (box trade ÷ packing at the time), loss/gain totals, Print and CSV. Stock Zero also writes rows (`stock_zero`).
+     - All changes go through `adjustProductStock` (`server/stock/adjustStock.ts`), which keeps batches equal to stock (a chosen batch, else earliest expiry first for decreases and the `OPENING` batch for increases). Pure rules: `server/stock/adjustMath.ts`; shared reasons: `shared/stockAdjust.ts`.
 
 8. **Purchase & Stock Inward (`PurchasesPage.tsx`)**:
    - Supplier purchase invoice recording with batch numbers, expiry dates, purchase cost, bonus boxes, and retail rates.

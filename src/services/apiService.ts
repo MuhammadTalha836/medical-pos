@@ -6,6 +6,10 @@ import {
   DayClosing,
   ExpenseInput,
   ExpenseList,
+  StockAdjustInput,
+  StockAdjustmentList,
+  StockCount,
+  StockCountDetail,
   SubstitutesResult,
   CloudBackupFile,
   CloudBackupStatus,
@@ -215,6 +219,22 @@ export const api = {
   createExpense: (data: ExpenseInput) => post<{ success: boolean; id: number; shift_id: number | null }>('/expenses', data),
   updateExpense: (id: number, data: ExpenseInput) => put<Success>(`/expenses/${id}`, data),
   deleteExpense: (id: number) => del<Success>(`/expenses/${id}`),
+
+  // Stock counts and adjustments
+  getStockCounts: () => get<StockCount[]>('/stock/counts'),
+  getStockCount: (id: number) => get<StockCountDetail>(`/stock/counts/${id}`),
+  createStockCount: (data: { title?: string; notes?: string; company_id?: number | null }) =>
+    post<{ success: boolean; count: StockCount }>('/stock/counts', data),
+  saveStockCountItem: (id: number, data: { product_id?: number; barcode?: string; counted_boxes?: number; counted_loose?: number }) =>
+    put<Success>(`/stock/counts/${id}/items`, data),
+  removeStockCountItem: (id: number, productId: number) => del<Success>(`/stock/counts/${id}/items/${productId}`),
+  applyStockCount: (id: number) =>
+    post<{ success: boolean; counted: number; changed: number; loss_value: number; gain_value: number }>(`/stock/counts/${id}/apply`),
+  cancelStockCount: (id: number) => post<Success>(`/stock/counts/${id}/cancel`),
+  adjustStock: (productId: number, data: StockAdjustInput) =>
+    post<{ success: boolean; stock_boxes: number; stock_loose: number }>(`/products/${productId}/adjust`, data),
+  getStockAdjustments: (params?: { from?: string; to?: string; product_id?: number; reason?: string }) =>
+    get<StockAdjustmentList>('/stock/adjustments', params),
 
   // Backups & utilities (backups always go to the saved primary/secondary folders)
   getBackupList: () => get<any>('/utilities/backups'),

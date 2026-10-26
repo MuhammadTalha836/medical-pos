@@ -162,9 +162,9 @@ async function runM4Tests() {
       let b = await invariant(id);
       assert(b.byBatch.OPENING === 50, `Opening batch 50 units, got ${JSON.stringify(b.byBatch)}`);
       await buy(2, 'NEW', day(300), id);
-      const p = await request(`/products/${id}`, devHeaders);
-      const edit = await request(`/products/${id}`, devHeaders, { method: 'PUT', body: JSON.stringify({ ...p.body, stock_boxes: 3, stock_loose: 0 }) });
-      assert(edit.status === 200, `Edit: ${edit.status} ${JSON.stringify(edit.body)}`);
+      // Since M9 stock is lowered with Adjust stock, not the medicine form
+      const adjust = await request(`/products/${id}/adjust`, devHeaders, { method: 'POST', body: JSON.stringify({ reason: 'correction', direction: 'out', boxes: 4 }) });
+      assert(adjust.status === 200, `Adjust: ${adjust.status} ${JSON.stringify(adjust.body)}`);
       b = await invariant(id);
       // 70 units down to 30: the dated batch goes first (expiry order), the opening batch last
       assert(b.byBatch.NEW === 0 && b.byBatch.OPENING === 30, `Trimmed, got ${JSON.stringify(b.byBatch)}`);

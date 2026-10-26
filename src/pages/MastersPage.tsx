@@ -12,9 +12,15 @@ import {
   Layers,
   Trash2,
   CheckCircle2,
+  ClipboardList,
+  History,
+  PackageCheck,
 } from 'lucide-react';
 import { moneyFormatter } from '../utils/format';
 import { BatchListModal } from '../components/masters/BatchListModal';
+import { AdjustStockModal } from '../components/stock/AdjustStockModal';
+import { StockCountTab } from '../components/stock/StockCountTab';
+import { AdjustmentsTab } from '../components/stock/AdjustmentsTab';
 import { ScheduleBadge } from '../components/common/ScheduleBadge';
 import { genericKey } from '../../shared/generic';
 import { MEDICINE_SCHEDULES, MedicineSchedule, SCHEDULE_LABELS, normalizeSchedule } from '../../shared/schedule';
@@ -26,7 +32,10 @@ interface MastersPageProps {
 export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
   const { hasPermission } = useAuthStore();
   const [batchesFor, setBatchesFor] = useState<Product | null>(null);
-  const [activeTab, setActiveTab] = useState<'products' | 'companies'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'companies' | 'stock_count' | 'adjustments'>('products');
+  const [adjustFor, setAdjustFor] = useState<Product | null>(null);
+  const canAdjustStock = hasPermission('can_adjust_stock');
+  const canCountStock = hasPermission('can_count_stock');
   const [products, setProducts] = useState<Product[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
@@ -311,6 +320,32 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             <Building2 className="w-4 h-4" />
             <span>Companies / Suppliers ({companies.length})</span>
           </button>
+          {(canCountStock || canAdjustStock) && (
+            <button
+              onClick={() => setActiveTab('stock_count')}
+              className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'stock_count'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span>Stock Count</span>
+            </button>
+          )}
+          {canAdjustStock && (
+            <button
+              onClick={() => setActiveTab('adjustments')}
+              className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'adjustments'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              <span>Adjustments</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -480,6 +515,16 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                               >
                                 <Layers className="w-4 h-4" />
                               </button>
+                              {canAdjustStock && (
+                                <button
+                                  onClick={() => setAdjustFor(prod)}
+                                  className="btn-secondary"
+                                  title="Adjust stock"
+                                  aria-label={`Adjust stock of ${prod.name}`}
+                                >
+                                  <PackageCheck className="w-4 h-4" />
+                                </button>
+                              )}
                               {hasPermission('can_edit_product') && (
                                 <button
                                   onClick={() => handleOpenEditProduct(prod)}
@@ -510,6 +555,19 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
           </div>
         </div>
       )}
+
+      {activeTab === 'stock_count' && (canCountStock || canAdjustStock) && (
+        <StockCountTab
+          settings={settings}
+          companies={companies}
+          money={money}
+          canCount={canCountStock}
+          canApply={canAdjustStock}
+          onApplied={loadData}
+        />
+      )}
+
+      {activeTab === 'adjustments' && canAdjustStock && <AdjustmentsTab settings={settings} money={money} />}
 
       {/* COMPANIES TAB */}
       {activeTab === 'companies' && (
@@ -884,26 +942,28 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
             </div>
           </div>
 
-          {/* Stock Counts */}
+          {/* Stock: opening stock on a new medicine; afterwards only through Adjust stock or a stock count */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Stock (Boxes)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{editingProduct ? 'Stock (Boxes)' : 'Opening Stock (Boxes)'}</label>
               <input
                 type="number"
                 min="0"
                 value={productForm.stock_boxes}
                 onChange={(e) => setProductForm(prev => ({ ...prev, stock_boxes: parseInt(e.target.value) || 0 }))}
+                readOnly={!!editingProduct}
                 className="field-input w-full font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Stock (Loose Units)</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">{editingProduct ? 'Stock (Loose Units)' : 'Opening Stock (Loose Units)'}</label>
               <input
                 type="number"
                 min="0"
                 value={productForm.stock_loose}
                 onChange={(e) => setProductForm(prev => ({ ...prev, stock_loose: parseInt(e.target.value) || 0 }))}
+                readOnly={!!editingProduct}
                 className="field-input w-full font-mono"
               />
             </div>
@@ -919,6 +979,21 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
               />
             </div>
           </div>
+          {editingProduct && (
+            <p className="field-hint flex flex-wrap items-center gap-2">
+              <span>Stock is changed with Adjust stock (with a reason) or a stock count, so every change is recorded.</span>
+              {canAdjustStock && (
+                <button
+                  type="button"
+                  onClick={() => { const prod = editingProduct; setIsProductModalOpen(false); setAdjustFor(prod); }}
+                  className="btn-secondary btn-sm"
+                >
+                  <PackageCheck className="w-4 h-4" />
+                  <span>Adjust stock</span>
+                </button>
+              )}
+            </p>
+          )}
 
           <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
             <button
@@ -1033,6 +1108,16 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
         </form>
       </Modal>
       <BatchListModal product={batchesFor} canEdit={hasPermission('can_edit_product')} onClose={() => setBatchesFor(null)} />
+      <AdjustStockModal
+        product={adjustFor}
+        onClose={() => setAdjustFor(null)}
+        onSaved={(message) => {
+          setAdjustFor(null);
+          setFeedbackMessage(message);
+          loadData();
+          setTimeout(() => setFeedbackMessage(null), 4000);
+        }}
+      />
     </div>
   );
 };

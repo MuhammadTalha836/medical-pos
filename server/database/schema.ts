@@ -335,6 +335,51 @@ CREATE TABLE IF NOT EXISTS expenses (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 14c. Stock counts and adjustments (M9). Product ids carry no foreign key: the history outlives a deleted medicine.
+-- A count changes nothing until it is applied; every stock change outside sales and purchases is a stock_adjustments row.
+CREATE TABLE IF NOT EXISTS stock_counts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  count_no TEXT NOT NULL UNIQUE,
+  title TEXT,
+  notes TEXT,
+  company_id INTEGER,
+  status TEXT NOT NULL DEFAULT 'open',
+  user_id INTEGER,
+  user_name TEXT,
+  applied_at DATETIME,
+  applied_by TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS stock_count_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  count_id INTEGER NOT NULL REFERENCES stock_counts(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL,
+  product_name TEXT NOT NULL,
+  system_units INTEGER NOT NULL DEFAULT 0,
+  counted_units INTEGER,
+  counted_at DATETIME,
+  user_name TEXT,
+  UNIQUE (count_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS stock_adjustments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id INTEGER NOT NULL,
+  product_name TEXT NOT NULL,
+  delta_units INTEGER NOT NULL,
+  stock_before INTEGER NOT NULL,
+  stock_after INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  notes TEXT,
+  batch_id INTEGER,
+  unit_cost REAL NOT NULL DEFAULT 0.0,
+  count_id INTEGER,
+  user_id INTEGER,
+  user_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 15. System Settings
 CREATE TABLE IF NOT EXISTS system_settings (
   key TEXT PRIMARY KEY,
@@ -417,6 +462,9 @@ CREATE INDEX IF NOT EXISTS idx_prescription_records_sale ON prescription_records
 CREATE INDEX IF NOT EXISTS idx_prescription_records_created ON prescription_records(created_at);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
 CREATE INDEX IF NOT EXISTS idx_expenses_shift ON expenses(shift_id);
+CREATE INDEX IF NOT EXISTS idx_stock_adjustments_created ON stock_adjustments(created_at);
+CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product ON stock_adjustments(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_count_items_count ON stock_count_items(count_id);
 `;
 
 /**

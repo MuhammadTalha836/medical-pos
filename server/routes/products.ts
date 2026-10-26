@@ -5,6 +5,7 @@ import { requirePermission, sendError } from '../http/context';
 import { parseBody, batchEditSchema } from '../validation/schemas';
 import { logSecurityAudit } from '../security/audit';
 import { syncProductBatches } from '../stock/batchStock';
+import { adjustProductStock } from '../stock/adjustStock';
 import { fefoOrder, isExpired, toUnits } from '../stock/batchMath';
 import { localDateString } from '../../shared/dates';
 import { isMedicineSchedule, MEDICINE_SCHEDULES } from '../../shared/schedule';
@@ -172,7 +173,8 @@ router.get('/api/products/:id', async (req: Request, res: Response) => {
 
 router.post('/api/products', async (req: Request, res: Response) => {
   try {
-    if (!(await requirePermission(req, res, 'can_add_product', 'You do not have permission to add medicines.'))) return;
+    const actor = await requirePermission(req, res, 'can_add_product', 'You do not have permission to add medicines.');
+    if (!actor) return;
     const {
       company_id, c_code, p_code, barcode, name, generic_name, unit_type,
       packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
@@ -199,8 +201,6 @@ router.post('/api/products', async (req: Request, res: Response) => {
         unitRetailPrice: parseFloat(unit_retail_price) || 0,
         defaultDiscountPct: parseFloat(default_discount_pct) || 0,
         locationRack: location_rack || null,
-        stockBoxes: parseInt(stock_boxes) || 0,
-        stockLoose: parseInt(stock_loose) || 0,
         minStockAlert: parseInt(min_stock_alert) || 10,
         allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
         minSaleQty: parseInt(min_sale_qty) || 1,
@@ -208,8 +208,9 @@ router.post('/api/products', async (req: Request, res: Response) => {
         status: 'active'
       }
       });
-      // Opening stock becomes the medicine's opening batch
-      await syncProductBatches(tx, created.id);
+      // Opening stock becomes the medicine's opening batch, recorded as an adjustment
+      const openingUnits = toUnits(Math.max(0, parseInt(stock_boxes) || 0), Math.max(0, parseInt(stock_loose) || 0), created.packing);
+      if (openingUnits > 0) await adjustProductStock(tx, created.id, openingUnits, { reason: 'opening', actor });
       return created;
     });
 
@@ -226,7 +227,7 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
     const {
       company_id, c_code, p_code, barcode, name, generic_name, unit_type,
       packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert, status,
+      default_discount_pct, location_rack, min_stock_alert, status,
       allow_open_sale, min_sale_qty
     } = req.body;
     const schedule = readSchedule(req.body.schedule);
@@ -250,8 +251,6 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
         unitRetailPrice: parseFloat(unit_retail_price) || 0,
         defaultDiscountPct: parseFloat(default_discount_pct) || 0,
         locationRack: location_rack || null,
-        stockBoxes: parseInt(stock_boxes) || 0,
-        stockLoose: parseInt(stock_loose) || 0,
         minStockAlert: parseInt(min_stock_alert) || 10,
         allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
         minSaleQty: parseInt(min_sale_qty) || 1,
@@ -259,7 +258,7 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
         status: status || 'active'
       }
       });
-      // Stock edited here keeps its batches in step (added stock: opening batch; lowered: earliest expiry first)
+      // Stock is not edited here (Adjust stock / Stock count, M9); a changed packing still keeps the batches in step
       await syncProductBatches(tx, idNum);
     });
 

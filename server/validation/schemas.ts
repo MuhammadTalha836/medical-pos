@@ -5,6 +5,7 @@ import { BACKUP_MODES } from '../../shared/backup';
 import { PASSWORD_MIN, PASSWORD_MIN_MESSAGE } from '../../shared/passwords';
 import { PRESCRIPTION_NOTES_MAX, PRESCRIPTION_TEXT_MAX, isValidCnic } from '../../shared/schedule';
 import { EXPENSE_AMOUNT_MAX, EXPENSE_CATEGORY_MAX, EXPENSE_PAYMENT_METHODS, EXPENSE_TEXT_MAX } from '../../shared/expenses';
+import { MANUAL_ADJUST_REASONS, STOCK_NOTES_MAX, STOCK_UNITS_MAX } from '../../shared/stockAdjust';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
 // Objects are loose: unknown keys pass through untouched and handlers keep their domain rules.
@@ -222,6 +223,33 @@ export const expenseSchema = z.looseObject({
 export const dayCloseSchema = z.looseObject({
   date: z.string({ error: 'Choose the day to close' }).regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Choose the day to close' }),
   notes: z.string().trim().max(300, { error: 'Notes cannot exceed 300 characters' }).nullish()
+});
+
+const stockUnits = (message: string) => z.coerce.number({ error: message }).int({ error: message }).min(0, { error: message })
+  .max(STOCK_UNITS_MAX, { error: 'The quantity is too large' });
+const stockNotes = z.string().trim().max(STOCK_NOTES_MAX, { error: `Notes cannot exceed ${STOCK_NOTES_MAX} characters` }).nullish();
+
+export const stockCountSchema = z.looseObject({
+  title: z.string().trim().max(60, { error: 'Title cannot exceed 60 characters' }).nullish(),
+  notes: stockNotes,
+  company_id: z.coerce.number().int().positive().nullish()
+});
+
+/** One counted line: the medicine by id or barcode, counted as boxes + loose (or units) */
+export const stockCountItemSchema = z.looseObject({
+  product_id: z.coerce.number().int().positive().optional(),
+  barcode: z.string().trim().min(1).max(60).optional(),
+  counted_boxes: stockUnits('Enter the boxes counted').optional(),
+  counted_loose: stockUnits('Enter the loose units counted').optional()
+}).refine(v => v.product_id !== undefined || v.barcode !== undefined, { error: 'Choose a medicine to count' });
+
+export const stockAdjustSchema = z.looseObject({
+  reason: z.enum(MANUAL_ADJUST_REASONS as [string, ...string[]], { error: 'Choose a reason for the adjustment' }),
+  direction: z.enum(['in', 'out'], { error: 'Choose whether stock is added or taken off' }),
+  boxes: stockUnits('Enter the boxes').default(0),
+  loose: stockUnits('Enter the loose units').default(0),
+  batch_id: z.coerce.number().int().positive().nullish(),
+  notes: stockNotes
 });
 
 export function parseBody<T extends z.ZodType>(schema: T, body: unknown, res: Response): z.infer<T> | null {

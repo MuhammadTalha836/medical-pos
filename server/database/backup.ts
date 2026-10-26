@@ -409,6 +409,14 @@ export async function restoreDatabase(backupFilePath: string): Promise<{ success
 export function resetStockZero(companyId?: number, userId?: number, userName?: string) {
   const transaction = db.transaction(() => {
     let affected = 0;
+    // Each medicine that had stock gets a stock_adjustments row (M9); created_at in the format Prisma writes
+    db.prepare(`
+      INSERT INTO stock_adjustments (product_id, product_name, delta_units, stock_before, stock_after, reason, unit_cost, user_id, user_name, created_at)
+      SELECT id, name, -(stock_boxes * MAX(packing, 1) + stock_loose), stock_boxes * MAX(packing, 1) + stock_loose, 0, 'stock_zero',
+             ROUND(box_trade_price / MAX(packing, 1), 2), ?, ?, ?
+      FROM products
+      WHERE (stock_boxes > 0 OR stock_loose > 0) AND (? IS NULL OR company_id = ?)
+    `).run(userId || null, userName || 'System', new Date().toISOString().replace('Z', '+00:00'), companyId ?? null, companyId ?? null);
     if (companyId) {
       const updateProd = db.prepare('UPDATE products SET stock_boxes = 0, stock_loose = 0, updated_at = CURRENT_TIMESTAMP WHERE company_id = ?');
       const res = updateProd.run(companyId);

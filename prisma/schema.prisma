@@ -450,6 +450,62 @@ model Expense {
   @@map("expenses")
 }
 
+model StockCount {
+  id        Int              @id @default(autoincrement())
+  countNo   String           @unique @map("count_no")
+  title     String?
+  notes     String?
+  companyId Int?             @map("company_id")
+  status    String           @default("open")
+  userId    Int?             @map("user_id")
+  userName  String?          @map("user_name")
+  appliedAt DateTime?        @map("applied_at")
+  appliedBy String?          @map("applied_by")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  items     StockCountItem[]
+
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id           Int        @id @default(autoincrement())
+  countId      Int        @map("count_id")
+  productId    Int        @map("product_id")
+  productName  String     @map("product_name")
+  systemUnits  Int        @default(0) @map("system_units")
+  countedUnits Int?       @map("counted_units")
+  countedAt    DateTime?  @map("counted_at")
+  userName     String?    @map("user_name")
+
+  count        StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+
+  @@unique([countId, productId])
+  @@index([countId], name: "idx_stock_count_items_count")
+  @@map("stock_count_items")
+}
+
+model StockAdjustment {
+  id          Int      @id @default(autoincrement())
+  productId   Int      @map("product_id")
+  productName String   @map("product_name")
+  deltaUnits  Int      @map("delta_units")
+  stockBefore Int      @map("stock_before")
+  stockAfter  Int      @map("stock_after")
+  reason      String
+  notes       String?
+  batchId     Int?     @map("batch_id")
+  unitCost    Float    @default(0.0) @map("unit_cost")
+  countId     Int?     @map("count_id")
+  userId      Int?     @map("user_id")
+  userName    String?  @map("user_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt], name: "idx_stock_adjustments_created")
+  @@index([productId], name: "idx_stock_adjustments_product")
+  @@map("stock_adjustments")
+}
+
 model SystemSetting {
   key   String @id
   value String

@@ -24,6 +24,8 @@ export const PERMISSION_GROUPS = [
       { key: 'can_add_product', label: 'Add New Medicine' },
       { key: 'can_edit_product', label: 'Edit Medicine Details' },
       { key: 'can_delete_product', label: 'Delete Medicine' },
+      { key: 'can_count_stock', label: 'Count Shelf Stock' },
+      { key: 'can_adjust_stock', label: 'Adjust Stock & Apply Counts' },
       { key: 'can_add_company', label: 'Add Company / Supplier' },
       { key: 'can_edit_company', label: 'Edit Company' },
       { key: 'can_delete_company', label: 'Delete Company' }
@@ -83,14 +85,14 @@ export const DEFAULT_ADMIN_PERMISSIONS: RolePermissions = permissionsWith(PERMIS
 export const DEFAULT_CASHIER_PERMISSIONS: RolePermissions = permissionsWith([
   'pos', 'sales', 'khata', 'masters', 'expenses',
   'can_add_product', 'can_add_company', 'can_return_sale', 'can_add_customer', 'can_receive_payment', 'can_discount', 'can_shift_close',
-  'can_add_expense'
+  'can_add_expense', 'can_count_stock'
 ]);
 
 export const DEFAULT_PHARMACIST_PERMISSIONS: RolePermissions = permissionsWith([
   'dashboard', 'pos', 'sales', 'khata', 'masters', 'purchases', 'expenses',
   'can_add_product', 'can_edit_product', 'can_add_company', 'can_edit_company', 'can_return_sale', 'can_view_all_sales',
   'can_add_purchase', 'can_add_customer', 'can_receive_payment', 'can_edit_customer', 'can_discount', 'can_shift_close',
-  'can_add_expense'
+  'can_add_expense', 'can_count_stock'
 ]);
 
 // Starting point for a new custom role: counter sales only

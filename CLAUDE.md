@@ -37,6 +37,7 @@ npm run test:m5          # controlled medicines: prescription required, register
 npm run test:m6          # substitutes: formula matching (case/spacing/order/strength), in-stock first, exclusions, generics list, login
 npm run test:m7          # WhatsApp templates: defaults, save, cashier 403, length limit; supplier phone on the reorder list
 npm run test:m8          # expenses and day close: cash expense lowers shift cash, closed shift/day locks, own-only list, day-close figures, automatic midnight close, range report
+npm run test:m9          # stock count and adjustment: count changes nothing until Apply, later sales kept, batches = stock, adjustments by batch/reason, permissions, history
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -169,6 +170,12 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - **Automatic close** (`server/dayClose/autoClose.ts`): the backup scheduler tick calls `autoDayCloseTick` once per local day. `runAutoDayClose(now)` closes every finished day of the last 31 days that had activity and is not closed (a reopened day is closed again), through the same `closeDay` helper (`closeDay.ts`) as the route, with `user_name` "Automatic" and `auto_closed = 1`. The setting `auto_day_close` (default `'true'`) turns it off.
   - `GET /api/day-close/range?from=&to=` (max 366 days) returns the period totals plus one row per active day; `loadPeriod` (`loadDayClose.ts`) loads the range once and splits it with `inputForDay` / `activeDays` (`dayCloseMath.ts`).
   - The UI is `src/pages/ExpensesPage.tsx` and Reports → Day Close (`DayCloseReport.tsx`).
+- **Stock count and adjustment (M9).**
+  - Tables `stock_counts`, `stock_count_items`, `stock_adjustments` (no foreign key to products, so history outlives a deleted medicine). Keys `can_count_stock` (cashier/pharmacist have it) and `can_adjust_stock` (Admin). Reasons and their direction are in `shared/stockAdjust.ts`; pure rules in `server/stock/adjustMath.ts` (+ spec).
+  - **Every stock change outside sales, purchases and returns goes through `adjustProductStock`** (`server/stock/adjustStock.ts`, inside the caller's transaction): it moves the product total and its batches together (a chosen batch, else `syncProductBatches`) and writes a `stock_adjustments` row with the unit cost.
+  - `PUT /api/products/:id` no longer changes stock; `POST /api/products` records opening stock as an `opening` adjustment. `resetStockZero` writes `stock_zero` rows by raw SQL (with `created_at` in Prisma's ISO format).
+  - Routes (`server/routes/stock.ts`): `/api/stock/counts` (list, detail, create, `PUT .../items`, `DELETE .../items/:productId`, `apply`, `cancel`), `POST /api/products/:id/adjust`, `GET /api/stock/adjustments`. Apply uses stock = current + (counted − system at count), so sales made after counting stay sold.
+  - UI: Medicines → Stock Count / Adjustments tabs and the Adjust stock action (`src/components/stock/`).
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**

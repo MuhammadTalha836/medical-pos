@@ -14,6 +14,18 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M9: stock count and stock adjustment)
+- **Medicines → Stock Count:**
+  - Start a count (empty, or listing all medicines of one company).
+  - Scan a barcode or type a name, then enter the boxes and loose units on the shelf.
+  - The table shows system stock, counted stock and the difference (red for shortage, green for extra) with its value at cost. Filters: All, Differences only, Not counted. **Print count sheet** gives a blank sheet to fill in on the shelf.
+  - Counting changes nothing until a manager presses **Apply to stock**. Sales made after a medicine was counted stay sold. Medicines not counted are left as they are. A count can also be cancelled.
+- **Adjust stock** (button on each medicine): take off or add stock with a reason (Damaged, Expired, Lost, Found, Correction), optionally from one batch, with notes and a "stock after" preview.
+- **Medicine form:** opening stock is still entered on a new medicine. When editing, the stock fields are locked; stock changes only through Adjust stock or a count, so every change is recorded.
+- **Medicines → Adjustments:** every stock change with date, reason, before and after, value at cost and who did it. Filters by dates and reason, loss and gain totals, Print and Export CSV. Opening stock and Stock Zero resets are listed too.
+- New permissions: **Count Shelf Stock** (cashier and pharmacist have it) and **Adjust Stock & Apply Counts** (Admin). Existing roles get them with the built-in defaults.
+- Day Close profit does not change because of adjustments.
+
 ### Added (M8: expenses and day close)
 - **Expenses** (new sidebar page):
   - Record rent, bills, wages, tea and other spending with a category, amount, paid by (Cash, Bank, Cheque, Online), date, bill number and notes.
