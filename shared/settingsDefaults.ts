@@ -68,6 +68,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   low_stock_threshold: '10',
   max_bill_discount_pct: '14',
   reorder_cover_days: '7',
+  // Close each finished day on its own after midnight (M8)
+  auto_day_close: 'true',
   whatsapp_receipt_template: DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
   whatsapp_reminder_template: DEFAULT_WHATSAPP_REMINDER_TEMPLATE,
   ...DEFAULT_INVOICE_SETTINGS,

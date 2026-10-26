@@ -18,4 +18,14 @@ describe('computeShiftTotals', () => {
   it('a return without an invoice counts as cash', () => {
     expect(computeShiftTotals(0, [], [{ refundAmount: 40, originalPaymentType: null }], []).expectedCash).toBe(-40);
   });
+
+  it('cash expenses leave the drawer; bank and online ones do not', () => {
+    const t = computeShiftTotals(1000, [{ netTotal: 800, paymentType: 'Cash' }], [], [], [
+      { amount: 150, paymentMethod: 'cash' },
+      { amount: 5000, paymentMethod: 'bank' },
+      { amount: 70, paymentMethod: 'online' }
+    ]);
+    expect(t.totalExpensesCash).toBe(150);
+    expect(t.expectedCash).toBe(1000 + 800 - 150);
+  });
 });

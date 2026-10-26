@@ -26,7 +26,8 @@ import {
   X,
   Receipt,
   RotateCcw,
-  CreditCard
+  CreditCard,
+  Banknote
 } from 'lucide-react';
 import { currencySymbol, formatDuration, moneyFormatter } from '../utils/format';
 import { saleStatus } from '../utils/saleStatus';
@@ -51,7 +52,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
   const [inspectShiftId, setInspectShiftId] = useState<number | null>(null);
   const [inspectData, setInspectData] = useState<any | null>(null);
   const [loadingInspect, setLoadingInspect] = useState(false);
-  const [inspectTab, setInspectTab] = useState<'sales' | 'returns' | 'payments'>('sales');
+  const [inspectTab, setInspectTab] = useState<'sales' | 'returns' | 'payments' | 'expenses'>('sales');
 
   // Print modal
   const [printShift, setPrintShift] = useState<CashierShift | null>(null);
@@ -191,7 +192,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
     const headers = [
       'Shift #', 'Cashier Name', 'Cashier ID', 'Start Time', 'Close Time',
       'Duration (min)', 'Opening Cash', 'Total Sales', 'Cash Sales', 'Card Sales',
-      'Credit Sales', 'Returns', 'Expected Cash', 'Actual Cash', 'Variance', 'Status'
+      'Credit Sales', 'Returns', 'Cash Expenses', 'Expected Cash', 'Actual Cash', 'Variance', 'Status'
     ];
     const rows = filteredShifts.map(s => [
       s.shift_no,
@@ -206,6 +207,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
       (s.total_card_sales || 0).toFixed(2),
       (s.total_credit_sales || 0).toFixed(2),
       (s.total_returns_amount || 0).toFixed(2),
+      (s.total_expenses_cash || 0).toFixed(2),
       (s.expected_cash || 0).toFixed(2),
       s.closing_cash !== null && s.closing_cash !== undefined ? s.closing_cash.toFixed(2) : '',
       s.cash_difference !== null && s.cash_difference !== undefined ? s.cash_difference.toFixed(2) : '',
@@ -594,6 +596,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                 { label: 'Cash Sales', value: `${money((inspectData.shift?.total_cash_sales || 0))}`, mono: true },
                 { label: 'Card Sales', value: `${money((inspectData.shift?.total_card_sales || 0))}`, mono: true },
                 { label: 'Credit Sales', value: `${money((inspectData.shift?.total_credit_sales || 0))}`, mono: true },
+                { label: 'Cash Expenses', value: `${money((inspectData.shift?.total_expenses_cash || 0))}`, mono: true },
                 { label: 'Expected Cash', value: `${money((inspectData.shift?.expected_cash || 0))}`, mono: true },
                 {
                   label: 'Actual / Variance',
@@ -615,7 +618,8 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
               {([
                 { id: 'sales' as const, label: 'Sales', Icon: Receipt, count: inspectData.sales?.length },
                 { id: 'returns' as const, label: 'Returns', Icon: RotateCcw, count: inspectData.returns?.length },
-                { id: 'payments' as const, label: 'Khata Payments', Icon: CreditCard, count: inspectData.payments?.length }
+                { id: 'payments' as const, label: 'Khata Payments', Icon: CreditCard, count: inspectData.payments?.length },
+                { id: 'expenses' as const, label: 'Expenses', Icon: Banknote, count: inspectData.expenses?.length }
               ]).map(tab => (
                 <button key={tab.id} onClick={() => setInspectTab(tab.id)}
                   className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all ${inspectTab === tab.id
@@ -695,6 +699,31 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                         <td className="py-1.5 px-3 text-slate-500 italic">{p.notes || 'Khata Recovery'}</td>
                         <td className="py-1.5 px-3 text-slate-500 font-mono text-xs">{new Date(p.payment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="py-1.5 px-3 text-right font-mono font-bold text-teal-600 dark:text-teal-400">+{money(Number(p.amount))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {inspectTab === 'expenses' && (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 text-2xs sticky top-0">
+                    <tr>
+                      <th className="py-2 px-3">Category</th><th className="py-2 px-3">Paid by</th>
+                      <th className="py-2 px-3">Time</th><th className="py-2 px-3 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                    {!inspectData.expenses?.length ? (
+                      <tr><td colSpan={4} className="py-6 text-center text-slate-400 text-xs">No expenses were paid from this shift's cash.</td></tr>
+                    ) : inspectData.expenses.map((e: any) => (
+                      <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-[#162032]">
+                        <td className="py-1.5 px-3 font-bold text-slate-900 dark:text-white">
+                          {e.category}
+                          {e.notes && <span className="block font-normal text-slate-500">{e.notes}</span>}
+                        </td>
+                        <td className="py-1.5 px-3 text-slate-500">{e.payment_method}</td>
+                        <td className="py-1.5 px-3 text-slate-500 font-mono text-xs">{new Date(e.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td className="py-1.5 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">-{money(Number(e.amount))}</td>
                       </tr>
                     ))}
                   </tbody>

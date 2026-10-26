@@ -308,9 +308,31 @@ CREATE TABLE IF NOT EXISTS daily_closings (
   expected_cash REAL NOT NULL DEFAULT 0.0,
   actual_cash REAL NOT NULL DEFAULT 0.0,
   difference REAL NOT NULL DEFAULT 0.0,
+  invoices_count INTEGER NOT NULL DEFAULT 0,
+  total_cost_of_goods REAL NOT NULL DEFAULT 0.0,
+  customer_payments_cash REAL NOT NULL DEFAULT 0.0,
+  net_profit REAL NOT NULL DEFAULT 0.0,
+  open_shifts_at_close INTEGER NOT NULL DEFAULT 0,
+  auto_closed INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
   is_closed INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 14b. Shop expenses (M8). expense_date is the local calendar day; cash expenses paid during a shift carry its id
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT NOT NULL,
+  amount REAL NOT NULL,
+  payment_method TEXT NOT NULL DEFAULT 'cash',
+  reference TEXT,
+  notes TEXT,
+  expense_date TEXT NOT NULL,
+  shift_id INTEGER REFERENCES cashier_shifts(id),
+  user_id INTEGER,
+  user_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 15. System Settings
@@ -371,6 +393,7 @@ CREATE TABLE IF NOT EXISTS cashier_shifts (
   total_credit_sales REAL DEFAULT 0.0,
   total_returns_amount REAL DEFAULT 0.0,
   total_customer_payments REAL DEFAULT 0.0,
+  total_expenses_cash REAL DEFAULT 0.0,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'open',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -392,6 +415,8 @@ CREATE INDEX IF NOT EXISTS idx_supplier_payments_company ON supplier_payments(co
 CREATE INDEX IF NOT EXISTS idx_sale_item_batches_item ON sale_item_batches(sale_item_id);
 CREATE INDEX IF NOT EXISTS idx_prescription_records_sale ON prescription_records(sale_id);
 CREATE INDEX IF NOT EXISTS idx_prescription_records_created ON prescription_records(created_at);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
+CREATE INDEX IF NOT EXISTS idx_expenses_shift ON expenses(shift_id);
 `;
 
 /**
@@ -428,5 +453,12 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definitio
   { table: 'purchase_return_items', column: 'product_name', definition: 'TEXT' },
   { table: 'purchase_return_items', column: 'purchase_item_id', definition: 'INTEGER REFERENCES purchase_items(id)' },
   { table: 'purchase_return_items', column: 'batch_no', definition: 'TEXT' },
-  { table: 'products', column: 'schedule', definition: "TEXT NOT NULL DEFAULT 'none'" }
+  { table: 'products', column: 'schedule', definition: "TEXT NOT NULL DEFAULT 'none'" },
+  { table: 'cashier_shifts', column: 'total_expenses_cash', definition: 'REAL DEFAULT 0.0' },
+  { table: 'daily_closings', column: 'invoices_count', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'daily_closings', column: 'total_cost_of_goods', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'daily_closings', column: 'customer_payments_cash', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'daily_closings', column: 'net_profit', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'daily_closings', column: 'open_shifts_at_close', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'daily_closings', column: 'auto_closed', definition: 'INTEGER NOT NULL DEFAULT 0' }
 ];

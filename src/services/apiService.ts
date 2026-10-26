@@ -1,6 +1,11 @@
 import {
   BackupStatus,
   ControlledRegisterRow,
+  DayCloseRange,
+  DayCloseReport,
+  DayClosing,
+  ExpenseInput,
+  ExpenseList,
   SubstitutesResult,
   CloudBackupFile,
   CloudBackupStatus,
@@ -199,6 +204,17 @@ export const api = {
   getProductWiseSalesReport: () => get<any[]>('/reports/sales/product-wise'),
   getCompanyWiseSalesReport: () => get<any[]>('/reports/sales/company-wise'),
   getControlledRegister: (params?: DateRange) => get<ControlledRegisterRow[]>('/reports/controlled-register', params),
+  getDayClose: (date: string) => get<DayCloseReport>('/day-close', { date }),
+  getDayCloseRange: (from: string, to: string) => get<DayCloseRange>('/day-close/range', { from, to }),
+  getDayCloseHistory: () => get<DayClosing[]>('/day-close/history'),
+  closeDay: (date: string, notes?: string) => post<{ success: boolean; closing: DayClosing }>('/day-close', { date, notes }),
+  reopenDay: (date: string) => post<Success>(`/day-close/${date}/reopen`),
+
+  // Shop expenses
+  getExpenses: (params?: DateRange & { category?: string }) => get<ExpenseList>('/expenses', params),
+  createExpense: (data: ExpenseInput) => post<{ success: boolean; id: number; shift_id: number | null }>('/expenses', data),
+  updateExpense: (id: number, data: ExpenseInput) => put<Success>(`/expenses/${id}`, data),
+  deleteExpense: (id: number) => del<Success>(`/expenses/${id}`),
 
   // Backups & utilities (backups always go to the saved primary/secondary folders)
   getBackupList: () => get<any>('/utilities/backups'),
@@ -224,7 +240,7 @@ export const api = {
     post<{ success: boolean; message: string; shift: CashierShift; backup?: any }>(`/shifts/${shiftId}/close`, data),
   getShifts: (params?: DateRange & { user_id?: number; status?: string }) => get<CashierShift[]>('/shifts', params),
   getShiftDetails: (shiftId: number) =>
-    get<{ shift: CashierShift; sales: any[]; returns: any[]; payments: any[] }>(`/shifts/${shiftId}`),
+    get<{ shift: CashierShift; sales: any[]; returns: any[]; payments: any[]; expenses: any[] }>(`/shifts/${shiftId}`),
   reopenShiftByAdmin: (shiftId: number, data: AdminShiftAction) =>
     post<SuccessMessage & { shift: CashierShift }>(`/shifts/${shiftId}/admin/reopen`, data),
   correctShiftByAdmin: (shiftId: number, data: AdminShiftAction & { corrected_closing_cash: number }) =>

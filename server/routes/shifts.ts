@@ -34,6 +34,7 @@ function shiftPayload(shift: ShiftRecord, live: ShiftTotals | null, durationMinu
     total_credit_sales: live ? live.totalCreditSales : shift.totalCreditSales,
     total_returns_amount: live ? live.totalReturnsCash : shift.totalReturnsAmount,
     total_customer_payments: live ? live.totalCustomerPaymentsCash : shift.totalCustomerPayments,
+    total_expenses_cash: live ? live.totalExpensesCash : shift.totalExpensesCash,
     notes: shift.notes,
     status: shift.status,
     created_at: shift.createdAt,
@@ -49,6 +50,7 @@ function summaryPayload(shift: ShiftRecord, totals: ShiftTotals, durationMinutes
     total_sales_credit: totals.totalCreditSales,
     total_returns_cash: totals.totalReturnsCash,
     total_customer_payments_cash: totals.totalCustomerPaymentsCash,
+    total_expenses_cash: totals.totalExpensesCash,
     expected_cash: totals.expectedCash,
     invoices_count: totals.salesCount,
     returns_count: totals.returnsCount,
@@ -82,6 +84,7 @@ async function closeShiftRecord(shift: ShiftRecord, closingCash: number, notes: 
         totalCreditSales: totals.totalCreditSales,
         totalReturnsAmount: totals.totalReturnsCash,
         totalCustomerPayments: totals.totalCustomerPaymentsCash,
+        totalExpensesCash: totals.totalExpensesCash,
         notes
       }
     });
@@ -234,6 +237,7 @@ router.get('/api/shifts/:id/summary', async (req: Request, res: Response) => {
         totalCreditSales: shift.totalCreditSales,
         totalReturnsCash: shift.totalReturnsAmount,
         totalCustomerPaymentsCash: shift.totalCustomerPayments,
+        totalExpensesCash: shift.totalExpensesCash,
         expectedCash: shift.expectedCash ?? totals.expectedCash
       }, durationMinutes)
     });
@@ -369,6 +373,10 @@ router.get('/api/shifts/:id', async (req: Request, res: Response) => {
             paymentDate: true
           },
           orderBy: { id: 'desc' }
+        },
+        expenses: {
+          select: { id: true, category: true, amount: true, paymentMethod: true, notes: true, createdAt: true },
+          orderBy: { id: 'desc' }
         }
       }
     });
@@ -405,6 +413,14 @@ router.get('/api/shifts/:id', async (req: Request, res: Response) => {
         payment_method: p.paymentMethod,
         notes: p.notes,
         payment_date: p.paymentDate
+      })),
+      expenses: shift.expenses.map(e => ({
+        id: e.id,
+        category: e.category,
+        amount: e.amount,
+        payment_method: e.paymentMethod,
+        notes: e.notes,
+        created_at: e.createdAt
       }))
     });
   } catch (error: unknown) {

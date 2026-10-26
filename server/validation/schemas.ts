@@ -4,6 +4,7 @@ import { CUSTOMER_NAME_MAX, PHONE_MAX_DIGITS, PHONE_MIN_DIGITS, isValidPhone } f
 import { BACKUP_MODES } from '../../shared/backup';
 import { PASSWORD_MIN, PASSWORD_MIN_MESSAGE } from '../../shared/passwords';
 import { PRESCRIPTION_NOTES_MAX, PRESCRIPTION_TEXT_MAX, isValidCnic } from '../../shared/schedule';
+import { EXPENSE_AMOUNT_MAX, EXPENSE_CATEGORY_MAX, EXPENSE_PAYMENT_METHODS, EXPENSE_TEXT_MAX } from '../../shared/expenses';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
 // Objects are loose: unknown keys pass through untouched and handlers keep their domain rules.
@@ -207,6 +208,22 @@ export const customerSchema = z.looseObject({
  * Validates a request body. On failure sends 400 with the first issue's message and returns null,
  * so handlers keep their existing check order (e.g. setup lock 403 before input 400).
  */
+export const expenseSchema = z.looseObject({
+  category: z.string({ error: 'Choose or type a category' }).trim().min(1, { error: 'Choose or type a category' })
+    .max(EXPENSE_CATEGORY_MAX, { error: `Category cannot exceed ${EXPENSE_CATEGORY_MAX} characters` }),
+  amount: z.coerce.number({ error: 'Enter the amount spent' }).positive({ error: 'Enter the amount spent' })
+    .max(EXPENSE_AMOUNT_MAX, { error: 'The amount is too large' }),
+  payment_method: z.enum(EXPENSE_PAYMENT_METHODS, { error: 'Payment method must be cash, bank, cheque or online' }).optional(),
+  expense_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Expense date must be a valid date' }).optional(),
+  reference: z.string().trim().max(60, { error: 'Reference cannot exceed 60 characters' }).nullish(),
+  notes: z.string().trim().max(EXPENSE_TEXT_MAX, { error: `Notes cannot exceed ${EXPENSE_TEXT_MAX} characters` }).nullish()
+});
+
+export const dayCloseSchema = z.looseObject({
+  date: z.string({ error: 'Choose the day to close' }).regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Choose the day to close' }),
+  notes: z.string().trim().max(300, { error: 'Notes cannot exceed 300 characters' }).nullish()
+});
+
 export function parseBody<T extends z.ZodType>(schema: T, body: unknown, res: Response): z.infer<T> | null {
   const result = schema.safeParse(body ?? {});
   if (!result.success) {

@@ -33,6 +33,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 2. **Cashier Register & Shift Management (`ShiftsAdminPage.tsx`, `ShiftClosingModal.tsx`, `ShiftThermalReceipt.tsx`)**:
    - **Active Register Tracking**: Cashiers start shifts with a recorded opening cash float. All POS sales, returns, and payment types are tracked against the active shift.
    - **Multi-Payment Reconciliation**: Tracks Cash, Card/Online (digital) and Credit (Khata) totals in real time. One calculation (`server/shifts/shiftTotals.ts`) serves the live summary, the close, the shift list and details, and the admin force-close. Expected cash = opening + cash sales + cash khata recoveries − refunds of cash invoices (a credit return lowers the khata balance instead).
+   - **Cash expenses (M8)**: an expense paid in cash during the cashier's own open shift is linked to it (`expenses.shift_id`) and lowers the expected cash; the close saves it as `total_expenses_cash`. The shift details have an Expenses tab, and the shift slip prints the line.
    - **Closing**: needs the counted cash, runs in one transaction (a second close fails), and only the shift's cashier or a user with `can_manage_shifts` may close it. A closed shift is not reopened while that cashier has another open shift.
    - **Shift Balancing & Discrepancies**: Calculates expected closing cash versus counted cash, recording exact cash shortage or excess.
    - **Admin Shift Hub**: Dedicated admin section with cashier, date range, and status filters, and line-item invoice inspector.
@@ -109,9 +110,13 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - Invoice-Wise Profit & Loss (individual invoice margin %, cost basis, net profit).
    - Product-Wise and Company-Wise sales analytics.
    - **Controlled Register (M5)** (`GET /api/reports/controlled-register`): controlled sales with patient, CNIC, doctor, prescription number and the quantity returned since. It has a date filter (this month by default) and an A4 print via `printDocument`.
+   - **Day Close (M8)** (`DayCloseReport.tsx`, `GET /api/day-close?date=`, `reports` + `can_view_financial_kpis`): one day's sales by payment, returns (counted on the day of the refund), cost of medicines sold minus the cost of returned ones, gross profit, expenses by category and **net profit**, plus the cash of that day's shifts, khata cash received and payments to suppliers (not in the profit). **Close day** (`can_day_close`) saves the figures in `daily_closings` and locks that day's expenses; **Reopen day** unlocks them. Both are audit-logged. A day can be closed while a shift is open (a warning lists it). Maths: `server/dayClose/dayCloseMath.ts`; loading: `loadDayClose.ts`.
+     - **Automatic close:** after midnight every finished day with activity closes on its own ("Closed automatically", `auto_closed`), catching up the last 31 days if the computer was off. A reopened day closes again after the next midnight. The checkbox "Close each day automatically at midnight" (setting `auto_day_close`, `settings` permission) turns it off.
+     - **Periods:** Day, **Month** and **Date range** (with Today, Yesterday, Last 7 days, This month, Last month). A month or range shows the totals plus a day-by-day table (invoices, net sales, cost, expenses, net profit, status), with Print and Export CSV (`GET /api/day-close/range`, max 366 days).
    - CSV export for all reports.
+10. **Shop Expenses (M8, `ExpensesPage.tsx`, sidebar "Expenses", module key `expenses`)**: add, edit and delete expenses (`can_add_expense`; cashiers have it by default) with a category (suggested list in `shared/expenses.ts` plus any used before), amount, paid by (cash, bank, cheque, online), date (not in the future), bill number and notes. A date-range and category filter shows the total and a by-category summary. Users without `can_day_close` see and change only their own entries. A closed day or a closed shift locks the row (`409`). Routes: `server/routes/expenses.ts`.
 
-10. **Multi-Destination Backup, Vault & Disaster Recovery (`UtilitiesPage.tsx`, `backup.ts`, `docs/DISASTER_RECOVERY_GUIDE.md`)**:
+11. **Multi-Destination Backup, Vault & Disaster Recovery (`UtilitiesPage.tsx`, `backup.ts`, `docs/DISASTER_RECOVERY_GUIDE.md`)**:
     - **Multi-Destination Vault**: Snapshots go to the saved primary folder (`auto_backup_dir`, default `./backups`) and an optional secondary folder (USB drive / network share), copied only when its SHA-256 matches.
     - **Verify-then-commit backups**: Each backup is written to `*.db.partial`, switched to a self-contained journal mode, checked with `PRAGMA integrity_check` and for the core tables, checksummed, and only then renamed into place and recorded in `backup_history` (`verified = 1`). Failed attempts are recorded with `status = 'failed'` and an error message. A per-process queue makes sure two backups never run at the same time.
     - **Retention limit (Developer)**: `backup_retention_limit` (1–365) keeps the newest N verified routine backups (`manual`, `scheduled`, `shift_close`, legacy `auto_daily`) per folder. Pruning runs only right after a verified success, never deletes the newest good backup, and only touches files recorded in `backup_history`.
@@ -124,12 +129,12 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
     - **Stock Zero Audit Utility**: Protected by confirmation code `RESET-ZERO-CONFIRM`.
     - **Database Optimization**: `VACUUM`, `PRAGMA optimize`, `ANALYZE`.
 
-11. **System Settings & Granular Staff Roles (`SettingsPage.tsx`)**:
+12. **System Settings & Granular Staff Roles (`SettingsPage.tsx`)**:
     - Pharmacy business profile, drug license number, tax/NTN number, custom receipt headers/footers/terms, currency symbol, maximum bill discount cap.
     - 32 granular staff permissions covering POS operations, sales, returns, discounts, customer khata, product/company masters, purchases, reports, utilities, user accounts, and shift management.
 
 
-12. **Developer-Controlled Installation, License & Sessions (`SetupWizardModal.tsx`, `server/security/*`)**:
+13. **Developer-Controlled Installation, License & Sessions (`SetupWizardModal.tsx`, `server/security/*`)**:
     - **Developer master key**: one TOTP key (one authenticator entry) for every installation, created with `npm run developer:key` (`.env.developer`, never committed) and baked into packaged builds. Developer sign-in uses the fixed developer email + a code from that key; each code works once (replay protection). Staff (Admin, Cashier, custom roles) sign in with username + password only.
     - **Setup wizard (7 steps)**: unlock with the developer code → store name/address → first Admin (full name, username, password) → backup type (Offline / Online / Both, with Connect Google Drive), folder, frequency and time → Admin permissions and policies → Demo (N days) or Full → review and lock. No default staff accounts exist on a fresh install.
     - **Demo / Full license**: signed `license_*` settings; Developer Settings → License extends the demo, starts a new one or activates Full. When a demo ends, Admin/Cashier cannot sign in (the login screen shows a notice) and signed-in staff are signed out; the Developer still can. Clock rollback and database edits cannot extend it. The header shows a countdown badge.

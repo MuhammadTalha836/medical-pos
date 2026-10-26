@@ -14,6 +14,23 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M8: expenses and day close)
+- **Expenses** (new sidebar page):
+  - Record rent, bills, wages, tea and other spending with a category, amount, paid by (Cash, Bank, Cheque, Online), date, bill number and notes.
+  - Filter by dates and category, with the total and a by-category summary.
+  - Cashiers can add expenses and see only their own; managers see everyone's.
+- **Cash from the drawer:** a cash expense paid during your shift lowers that shift's expected cash. The shift close, the shift slip, the shift details (new Expenses tab) and the shift CSV show "Cash expenses".
+- **Reports → Day Close:**
+  - one day's sales by payment, returns, cost of medicines sold, gross profit, expenses by category and **net profit**;
+  - the cash of that day's shifts (opening, expected, counted, short/over);
+  - khata cash received and payments to suppliers;
+  - Print, and a list of recent closes.
+- **Close day** saves the figures and locks that day's expenses. **Reopen day** unlocks them. Both need the new "Close & Reopen the Day" permission and are written to the audit log.
+- A warning shows when a shift of that day is still open.
+- **Automatic day close:** after 12:00 midnight every finished day with sales or expenses closes on its own and shows "Closed automatically". If the computer was off at midnight, missed days are closed the next time the app starts. A reopened day closes again after the next midnight. The Admin can switch this off in Reports → Day Close.
+- **Day / Month / Date range:** the Day Close report shows one day, a whole month or any date range, with quick picks (Today, Yesterday, Last 7 days, This month, Last month). A month or range shows the totals plus a day-by-day table, with Print and Export CSV.
+- New permissions: Shop Expenses, Record Shop Expenses, Close & Reopen the Day. Existing roles get them with the built-in defaults (Admin all; cashier and pharmacist can record expenses).
+
 ### Added (M7: WhatsApp receipts and khata reminders)
 - **Send on WhatsApp:** the button opens WhatsApp with the message already typed; staff check it and press Send. No paid service is used, and the POS keeps working offline.
   - **POS receipt** and **invoice reprint:** "Send receipt on WhatsApp" when the customer has a phone.

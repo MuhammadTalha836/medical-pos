@@ -38,3 +38,5 @@ counter sale for black
 when total price is 198 we also can udpate the 198 to 200 
 add note and warnung  for medician shortage
 add item vise search in sales with every all those invoice thats get this medician
+also add the medician type dynamic like ml, litre, and other
+also check the waleed invoices  how can we calculate

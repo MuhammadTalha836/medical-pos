@@ -18,8 +18,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | M4 | Batch-wise expiry (FEFO) and near-expiry alerts | ✅ |
 | M5 | Prescription and controlled-medicine register | ✅ |
 | M6 | Generic / substitute search | ✅ |
-| M7 | WhatsApp receipts and khata reminders | ✅ built and tested; waiting for the owner's check |
-| M8 | Expenses and day close (cash book) | ⬜ |
+| M7 | WhatsApp receipts and khata reminders | ✅ |
+| M8 | Expenses and day close (cash book) | ✅ built and tested; waiting for the owner's check |
 | M9 | Physical stock count and stock adjustment | ⬜ |
 | M10 | Loyalty points / regular-customer discount | ⬜ |
 | M11 | Multi-PC LAN mode (see `MULTI_PC_LAN_MODE.md`) | ⬜ |
@@ -347,6 +347,46 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 - expense lowers shift cash;
 - day-close maths;
 - the lock.
+
+**Owner decisions (2026-10-25):**
+- Cashiers may record expenses (`can_add_expense` by default) and see only their own.
+- A day can be closed while a shift is still open; a warning lists the open shifts.
+- Anyone with `can_day_close` may reopen a closed day; both are audit-logged.
+- Expenses is its own sidebar page; Day close is in Reports.
+
+**Built (2026-10-25):**
+- Data:
+  - new table `expenses` (`expense_date` is the local day, `shift_id` for cash paid from a drawer);
+  - `cashier_shifts.total_expenses_cash`;
+  - new `daily_closings` columns `invoices_count`, `total_cost_of_goods`, `customer_payments_cash`, `net_profit`, `open_shifts_at_close`.
+- `shared/expenses.ts`: payment methods, suggested categories, limits.
+- `computeShiftTotals` takes the shift's expenses. Cash ones lower the expected cash.
+- `server/dayClose/dayCloseMath.ts` (pure, with spec) and `loadDayClose.ts`:
+  - sales by payment, counted on the sale day;
+  - returns, counted on the refund day;
+  - cost of goods sold, minus the cost of returned lines (the sale line's `unit_cost`);
+  - expenses by category and net profit;
+  - the day's shifts (opening, expected, counted, difference);
+  - khata cash and supplier payments (information only).
+- `server/routes/expenses.ts`:
+  - list (own entries without `can_day_close`), add, edit, delete;
+  - 409 on a closed day or a closed shift.
+- `server/routes/dayClose.ts`: `GET /api/day-close`, `GET /api/day-close/history`, `POST /api/day-close`, `POST /api/day-close/:date/reopen`.
+- New permission keys: `expenses` (module), `can_add_expense`, `can_day_close`. `backfillRolePermissions` adds them to existing roles with the built-in defaults.
+- UI:
+  - **Expenses** page;
+  - Reports → **Day Close** with Print and the recent closes;
+  - "Cash expenses" on the shift close, shift slip, shift details (Expenses tab) and the shift CSV.
+
+- **Automatic day close** (owner request 2026-10-26):
+  - after midnight the scheduler closes every finished day with activity (catch-up over 31 days; reopened days close again);
+  - `auto_closed` column; setting `auto_day_close` to switch it off.
+- **Day / Month / Date-range** report:
+  - `GET /api/day-close/range`;
+  - totals plus a day-by-day table;
+  - Print and CSV.
+
+**Tests:** `dayCloseMath.spec.ts`, `shiftTotals.spec.ts`, and `test:m8` (8 tests).
 
 ## M9: Physical stock count and stock adjustment
 **Goal.** Count the shelves and fix differences, with an audit trail. This also replaces stock editing in the medicine form (audit phase 3).

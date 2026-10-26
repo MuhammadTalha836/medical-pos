@@ -2,6 +2,7 @@ import { prisma } from '../database/prisma';
 import { createBackup, BackupResult, BackupType, getConfiguredBackupDir } from '../database/backup';
 import { logSecurityAudit } from '../security/audit';
 import { queueCloudUpload, runCloudUploads } from './cloud/cloudBackup';
+import { autoDayCloseTick } from '../dayClose/autoClose';
 import {
   computeSchedule,
   DEFAULT_BACKUP_TIME,
@@ -153,6 +154,12 @@ export async function runSchedulerTick(now: Date = new Date()): Promise<boolean>
   try {
     // Retry online uploads that waited for the internet (backoff is handled inside)
     void runCloudUploads({ now: now.getTime() });
+    // Close finished days on their own (once per day); a failure here never stops the backup check
+    try {
+      await autoDayCloseTick(now);
+    } catch (err: any) {
+      console.error('[DayClose] Automatic close failed:', err?.message || err);
+    }
     const { schedule } = await getScheduleState(now);
     if (!schedule.isDue) return false;
     console.log('[Backup Scheduler] Scheduled backup is due, starting...');

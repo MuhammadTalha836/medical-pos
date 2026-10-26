@@ -15,10 +15,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Timer,
+  Banknote,
   ShieldAlert
 } from 'lucide-react';
 
-export type TabType = 'dashboard' | 'pos' | 'sales' | 'shifts' | 'masters' | 'purchases' | 'khata' | 'reports' | 'utilities' | 'settings' | 'developer';
+export type TabType = 'dashboard' | 'pos' | 'sales' | 'shifts' | 'expenses' | 'masters' | 'purchases' | 'khata' | 'reports' | 'utilities' | 'settings' | 'developer';
 
 interface SidebarProps {
   currentTab: TabType;
@@ -46,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, setti
   const adminNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'shifts', label: 'Shifts', icon: Timer },
+    { id: 'expenses', label: 'Expenses', icon: Banknote },
     { id: 'masters', label: 'Medicines', icon: Package },
     { id: 'purchases', label: 'Purchases', icon: Truck },
     { id: 'reports', label: 'Reports', icon: BarChart3 },

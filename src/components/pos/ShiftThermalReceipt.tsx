@@ -47,7 +47,8 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
   const creditSales = shift.total_credit_sales || 0;
   const returns = shift.total_returns_amount || 0;
   const recoveries = shift.total_customer_payments || 0;
-  const expected = shift.expected_cash ?? (opening + cashSales + recoveries - returns);
+  const expenses = shift.total_expenses_cash || 0;
+  const expected = shift.expected_cash ?? (opening + cashSales + recoveries - returns - expenses);
   const actual = shift.closing_cash ?? 0;
   const diff = shift.cash_difference ?? (actual - expected);
 
@@ -143,6 +144,10 @@ export const ShiftThermalReceipt: React.FC<ShiftThermalReceiptProps> = ({
           <div className="flex justify-between text-rose-700">
             <span>(-) Cash Returns:</span>
             <span>-{money(returns)}</span>
+          </div>
+          <div className="flex justify-between text-rose-700">
+            <span>(-) Cash Expenses:</span>
+            <span>-{money(expenses)}</span>
           </div>
           <div className="flex justify-between font-bold pt-1 border-t border-black text-[12px]">
             <span>EXPECTED CASH:</span>

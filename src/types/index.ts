@@ -192,6 +192,115 @@ export interface ControlledRegisterRow {
   created_at: string;
 }
 
+export interface Expense {
+  id: number;
+  category: string;
+  amount: number;
+  payment_method: 'cash' | 'bank' | 'cheque' | 'online';
+  reference: string | null;
+  notes: string | null;
+  expense_date: string;
+  shift_id: number | null;
+  shift_no: string | null;
+  user_id: number | null;
+  user_name: string | null;
+  created_at: string;
+  /** Why it cannot be changed (closed day or closed shift), or null */
+  locked_reason: string | null;
+}
+
+export interface ExpenseList {
+  expenses: Expense[];
+  total: number;
+  categories: string[];
+  closed_dates: string[];
+  sees_all: boolean;
+}
+
+export interface ExpenseInput {
+  category: string;
+  amount: number;
+  payment_method: Expense['payment_method'];
+  expense_date: string;
+  reference?: string;
+  notes?: string;
+}
+
+export interface DayCloseFigures {
+  invoices_count: number;
+  sales_total: number;
+  sales_cash: number;
+  sales_card: number;
+  sales_credit: number;
+  returns_count: number;
+  returns_total: number;
+  net_sales: number;
+  cost_of_goods: number;
+  gross_profit: number;
+  expenses_total: number;
+  expenses_cash: number;
+  expenses_by_category: { category: string; amount: number; count: number }[];
+  net_profit: number;
+  customer_payments_cash: number;
+  supplier_paid: number;
+  shifts: { count: number; open_count: number; opening_cash: number; expected_cash: number; counted_cash: number; difference: number };
+}
+
+export interface DayClosing {
+  date: string;
+  is_closed: boolean;
+  closing_time: string | null;
+  user_name: string | null;
+  /** Closed by the midnight run, not by a person */
+  auto_closed: boolean;
+  notes: string | null;
+  invoices_count: number;
+  sales_cash: number;
+  sales_card: number;
+  sales_credit: number;
+  returns_total: number;
+  cost_of_goods: number;
+  expenses_total: number;
+  net_profit: number;
+  supplier_paid: number;
+  customer_payments_cash: number;
+  opening_cash: number;
+  expected_cash: number;
+  counted_cash: number;
+  difference: number;
+  open_shifts_at_close: number;
+}
+
+export interface DayCloseReport {
+  date: string;
+  today: string;
+  figures: DayCloseFigures;
+  closing: DayClosing | null;
+  open_shifts: { shift_no: string; user_name: string; day: string }[];
+  can_close: boolean;
+}
+
+export interface DayCloseRangeDay {
+  date: string;
+  invoices_count: number;
+  sales_total: number;
+  returns_total: number;
+  net_sales: number;
+  cost_of_goods: number;
+  gross_profit: number;
+  expenses_total: number;
+  net_profit: number;
+  closing: { is_closed: boolean; auto_closed: boolean; user_name: string | null } | null;
+}
+
+export interface DayCloseRange {
+  from: string;
+  to: string;
+  totals: DayCloseFigures;
+  days: DayCloseRangeDay[];
+  open_shifts: { shift_no: string; user_name: string; day: string }[];
+}
+
 export interface CartItem {
   product: Product;
   is_loose: boolean; // false = Full Box/Strip, true = Loose Unit
@@ -443,6 +552,7 @@ export interface SystemSettings {
   max_bill_discount_pct?: string;
   /** Days of sales a reorder should cover (Purchases → Reorder) */
   reorder_cover_days?: string;
+  auto_day_close?: string;
   whatsapp_receipt_template?: string;
   whatsapp_reminder_template?: string;
 
@@ -506,6 +616,8 @@ export interface CashierShift {
   total_credit_sales: number;
   total_returns_amount: number;
   total_customer_payments: number;
+  /** Shop expenses paid out of the drawer during the shift */
+  total_expenses_cash?: number;
   notes?: string | null;
   status: 'open' | 'closed';
   created_at?: string;
@@ -520,6 +632,7 @@ export interface ShiftSummary {
   total_sales_credit: number;
   total_returns_cash: number;
   total_customer_payments_cash: number;
+  total_expenses_cash?: number;
   expected_cash: number;
   actual_cash?: number;
   difference?: number;

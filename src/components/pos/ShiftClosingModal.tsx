@@ -258,6 +258,13 @@ export const ShiftClosingModal: React.FC<ShiftClosingModalProps> = ({
                 </span>
               </div>
 
+              <div className="flex justify-between items-center text-xs text-rose-600 dark:text-rose-400">
+                <span>(-) Cash Expenses:</span>
+                <span className="font-mono font-semibold">
+                  -{money((activeSummary?.total_expenses_cash || 0))}
+                </span>
+              </div>
+
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <span className="font-bold text-slate-900 dark:text-white">Expected Cash in Drawer:</span>
                 <span className="font-mono font-bold text-sm text-teal-600 dark:text-teal-400">

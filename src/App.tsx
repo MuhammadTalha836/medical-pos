@@ -11,6 +11,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { UtilitiesPage } from './pages/UtilitiesPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ShiftsAdminPage } from './pages/ShiftsAdminPage';
+import { ExpensesPage } from './pages/ExpensesPage';
 import { DeveloperSettingsPage } from './pages/DeveloperSettingsPage';
 import { api } from './services/apiService';
 import { SystemSettings } from './types';
@@ -137,6 +138,9 @@ export const App: React.FC = () => {
           {currentTab === 'shifts' && (
             <ShiftsAdminPage settings={settings} />
           )}
+          {currentTab === 'expenses' && (
+            <ExpensesPage settings={settings} />
+          )}
           {currentTab === 'khata' && (
             <CustomersPage settings={settings} />
           )}
@@ -147,7 +151,7 @@ export const App: React.FC = () => {
             <PurchasesPage settings={settings} onRefreshSettings={loadSettings} />
           )}
           {currentTab === 'reports' && (
-            <ReportsPage settings={settings} />
+            <ReportsPage settings={settings} onRefreshSettings={loadSettings} />
           )}
           {currentTab === 'utilities' && (
             <UtilitiesPage settings={settings} onRefreshSettings={loadSettings} />

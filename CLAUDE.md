@@ -36,6 +36,7 @@ npm run test:m4          # batches: FEFO sales, splits, returns to batch, expire
 npm run test:m5          # controlled medicines: prescription required, register rows per line, Rx-only free, register filter/returns/access
 npm run test:m6          # substitutes: formula matching (case/spacing/order/strength), in-stock first, exclusions, generics list, login
 npm run test:m7          # WhatsApp templates: defaults, save, cashier 403, length limit; supplier phone on the reorder list
+npm run test:m8          # expenses and day close: cash expense lowers shift cash, closed shift/day locks, own-only list, day-close figures, automatic midnight close, range report
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -57,7 +58,7 @@ Testing notes:
 **Server layout.**
 - `server/api.ts` is the entry point (Prisma init, backup scheduler) and re-exports `app`; Electron and the tests call `listen` themselves.
 - `server/app.ts` builds the Express app: JSON body parser, the session/license gate, `PUBLIC_API_ROUTES`, the routers and a JSON error handler. No CORS: the UI is always same-origin (Vite proxy in dev, served by the API when packaged).
-- `server/routes/*.ts`: one `Router` per area (`setup`, `auth`, `users`, `developer`, `license`, `developerAdmin`, `roles`, `companies`, `customers`, `products`, `sales`, `purchases`, `reports`, `utilities`, `shifts`, `settings`, `dashboard`). Routes keep their full `/api/...` paths.
+- `server/routes/*.ts`: one `Router` per area (`setup`, `auth`, `users`, `developer`, `license`, `developerAdmin`, `roles`, `companies`, `customers`, `products`, `sales`, `purchases`, `reports`, `utilities`, `shifts`, `settings`, `dashboard`, `expenses`, `dayClose`, ...). Routes keep their full `/api/...` paths.
 - `server/http/context.ts`: `getActingUser`, `sessionIdentity`, `hasRolePermission`, `requirePermission(req, res, key, message)`, `isSetupLocked`, and `sendError(res, error, status?)`. Always answer failures with `sendError`: our own `Error` messages pass through, while database/driver errors become a plain message (and are logged), so internals never reach the screen.
 - `server/http/formatters.ts`: `formatSale`, `sessionUserPayload` (Prisma camelCase → snake_case client contract). Some list endpoints use `prisma.$queryRaw` with `SELECT *`, so they return DB column names directly. Keep both paths in sync when you add columns.
 
@@ -158,6 +159,16 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - Used on the POS receipt, the invoice reprint, Khata (Send reminder) and the Reorder List (supplier `company_phone`).
   - Texts: settings `whatsapp_receipt_template` / `whatsapp_reminder_template` (max 1000 characters, blank = default), edited in Settings → Store.
   - Every message (receipts, reminders, supplier orders) ends with `withDeveloperCredit` → `composeWhatsAppCredit` (`shared/developerProfile.ts`). It uses the developer placement `whatsapp` (`developer_info_whatsapp`) plus `developer_whatsapp_lead`, both Developer-only keys. They are edited in the Developer Profile's WhatsApp Advertising section, not in the placement table.
+- **Expenses and day close (M8).**
+  - `expenses` table, module key `expenses`, `can_add_expense` (cashiers have it) and `can_day_close`. Suggested categories and payment methods are in `shared/expenses.ts`.
+  - A **cash** expense dated today is linked to the user's own open shift (`shift_id`), and `computeShiftTotals` subtracts it from the expected cash. A closed shift saves it as `total_expenses_cash`.
+  - Without `can_day_close`, users list and change only their own expenses.
+  - The day close maths is `server/dayClose/dayCloseMath.ts` (pure + spec), loaded by `loadDayClose.ts`. Sales count on the sale day and returns on the refund day; cost of goods = sold lines' `unit_cost` minus returned lines' cost; net profit = net sales − cost − expenses.
+  - `POST /api/day-close` saves a `daily_closings` row with `is_closed = 1`. While it is closed, adding, changing or deleting that day's expenses gets 409. So does changing an expense of a closed shift.
+  - `POST /api/day-close/:date/reopen` unlocks the day.
+  - **Automatic close** (`server/dayClose/autoClose.ts`): the backup scheduler tick calls `autoDayCloseTick` once per local day. `runAutoDayClose(now)` closes every finished day of the last 31 days that had activity and is not closed (a reopened day is closed again), through the same `closeDay` helper (`closeDay.ts`) as the route, with `user_name` "Automatic" and `auto_closed = 1`. The setting `auto_day_close` (default `'true'`) turns it off.
+  - `GET /api/day-close/range?from=&to=` (max 366 days) returns the period totals plus one row per active day; `loadPeriod` (`loadDayClose.ts`) loads the range once and splits it with `inputForDay` / `activeDays` (`dayCloseMath.ts`).
+  - The UI is `src/pages/ExpensesPage.tsx` and Reports → Day Close (`DayCloseReport.tsx`).
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**

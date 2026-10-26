@@ -5,6 +5,7 @@ export interface ShiftSaleRow { netTotal: number; paymentType: string }
 /** originalPaymentType: how the returned invoice was paid (null for a return without an invoice) */
 export interface ShiftReturnRow { refundAmount: number; originalPaymentType: string | null }
 export interface ShiftPaymentRow { amount: number; paymentMethod: string }
+export interface ShiftExpenseRow { amount: number; paymentMethod: string }
 
 export interface ShiftTotals {
   salesCount: number;
@@ -17,12 +18,20 @@ export interface ShiftTotals {
   /** Refunds paid out of the drawer: returns of cash invoices */
   totalReturnsCash: number;
   totalCustomerPaymentsCash: number;
+  /** Shop expenses paid out of the drawer during the shift */
+  totalExpensesCash: number;
   expectedCash: number;
 }
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
-export function computeShiftTotals(openingCash: number, sales: ShiftSaleRow[], returns: ShiftReturnRow[], payments: ShiftPaymentRow[]): ShiftTotals {
+export function computeShiftTotals(
+  openingCash: number,
+  sales: ShiftSaleRow[],
+  returns: ShiftReturnRow[],
+  payments: ShiftPaymentRow[],
+  expenses: ShiftExpenseRow[] = []
+): ShiftTotals {
   let totalSalesAmount = 0, totalCashSales = 0, totalCardSales = 0, totalCreditSales = 0;
   for (const sale of sales) {
     totalSalesAmount += sale.netTotal;
@@ -38,6 +47,10 @@ export function computeShiftTotals(openingCash: number, sales: ShiftSaleRow[], r
   const totalCustomerPaymentsCash = payments
     .filter(p => p.paymentMethod.toLowerCase() === 'cash')
     .reduce((sum, p) => sum + p.amount, 0);
+  // Bank, cheque and online expenses never touch the drawer
+  const totalExpensesCash = expenses
+    .filter(e => e.paymentMethod.toLowerCase() === 'cash')
+    .reduce((sum, e) => sum + e.amount, 0);
 
   return {
     salesCount: sales.length,
@@ -48,6 +61,7 @@ export function computeShiftTotals(openingCash: number, sales: ShiftSaleRow[], r
     totalCreditSales: round2(totalCreditSales),
     totalReturnsCash: round2(totalReturnsCash),
     totalCustomerPaymentsCash: round2(totalCustomerPaymentsCash),
-    expectedCash: round2(openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash)
+    totalExpensesCash: round2(totalExpensesCash),
+    expectedCash: round2(openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash - totalExpensesCash)
   };
 }

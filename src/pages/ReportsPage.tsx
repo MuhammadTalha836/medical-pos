@@ -11,13 +11,17 @@ import {
   TrendingUp,
   Building2,
   Printer,
-  ClipboardList
+  ClipboardList,
+  CalendarCheck
 } from 'lucide-react';
 import { moneyFormatter } from '../utils/format';
 import { ControlledRegister } from '../components/reports/ControlledRegister';
+import { DayCloseReport } from '../components/reports/DayCloseReport';
+import { useAuthStore } from '../store/useAuthStore';
 
 interface ReportsPageProps {
   settings?: SystemSettings | null;
+  onRefreshSettings?: () => void;
 }
 
 type ReportType =
@@ -28,9 +32,11 @@ type ReportType =
   | 'invoice_pnl'
   | 'product_sales'
   | 'company_sales'
-  | 'controlled_register';
+  | 'controlled_register'
+  | 'day_close';
 
-export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
+export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSettings }) => {
+  const { hasPermission } = useAuthStore();
   const [currentReport, setCurrentReport] = useState<ReportType>('available_stock');
   const [reportData, setReportData] = useState<any[]>([]);
   const [pnlSummary, setPnlSummary] = useState<any>(null);
@@ -63,7 +69,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
       } else if (currentReport === 'company_sales') {
         const data = await api.getCompanyWiseSalesReport();
         setReportData(data);
-      } else if (currentReport === 'controlled_register') {
+      } else if (currentReport === 'controlled_register' || currentReport === 'day_close') {
         // ControlledRegister loads its own rows (with its own date range) and hands them back for CSV
         setReportData([]);
       }
@@ -101,6 +107,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
     { id: 'product_sales' as ReportType, label: 'Product-wise Sales', icon: BarChart3 },
     { id: 'company_sales' as ReportType, label: 'Company-wise Sales', icon: Building2 },
     { id: 'controlled_register' as ReportType, label: 'Controlled Register', icon: ClipboardList },
+    // The day close shows profit, so it needs the financial permission like the P&L reports
+    ...(hasPermission('can_view_financial_kpis') ? [{ id: 'day_close' as ReportType, label: 'Day Close', icon: CalendarCheck }] : []),
   ];
 
   return (
@@ -271,6 +279,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings }) => {
       )}
 
       {currentReport === 'controlled_register' && <ControlledRegister settings={settings} onData={setReportData} />}
+
+      {currentReport === 'day_close' && <DayCloseReport settings={settings} onRefreshSettings={onRefreshSettings} />}
 
       {/* 2. EXPIRED & NEAR-EXPIRY REPORT */}
       {currentReport === 'expired_stock' && (
