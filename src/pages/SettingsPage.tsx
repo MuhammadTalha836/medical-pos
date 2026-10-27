@@ -12,6 +12,7 @@ import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { ReceiptPrinterCard } from '../components/settings/ReceiptPrinterCard';
 import { LoyaltySettingsTab } from '../components/loyalty/LoyaltySettingsTab';
 import { CountersTab } from '../components/lan/CountersTab';
+import { AuditLogPanel } from '../components/audit/AuditLogPanel';
 import { moneyFormatter } from '../utils/format';
 import {
   DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
@@ -44,7 +45,8 @@ import {
   Sliders,
   Sparkles,
   Check,
-  Network
+  Network,
+  ScrollText
 } from 'lucide-react';
 
 const TEMPLATE_CARDS: { id: InvoiceTemplateType; title: string; description: string; icon: React.ElementType }[] = [
@@ -154,7 +156,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   const { theme, setTheme } = useThemeStore();
   const { user, hasPermission } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles' | 'loyalty' | 'counters'>('store');
+  const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles' | 'loyalty' | 'counters' | 'audit'>('store');
   const showLoyalty = settings?.loyalty_feature_allowed === 'true' && hasPermission('can_manage_loyalty');
   // Counters exist only once the Developer turned on several computers (Developer → Network (LAN)) and this
   // computer runs as the main computer; a single-PC pharmacy never sees the tab
@@ -359,6 +361,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           >
             <Award className="w-4 h-4" />
             <span>Loyalty Points</span>
+          </button>
+        )}
+
+        {hasPermission('can_view_audit_log') && (
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
+              activeTab === 'audit'
+                ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <ScrollText className="w-4 h-4" />
+            <span>Audit Log</span>
           </button>
         )}
 
@@ -1147,6 +1163,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       )}
 
       {activeTab === 'counters' && showCounters && <CountersTab onLanOff={hideCounters} />}
+
+      {/* Read only: what staff did and what was refused (the Developer account's own actions are not listed) */}
+      {activeTab === 'audit' && hasPermission('can_view_audit_log') && <AuditLogPanel load={api.getAuditLogs} />}
     </div>
   );
 };

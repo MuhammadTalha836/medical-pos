@@ -40,6 +40,7 @@ npm run test:m8          # expenses and day close: cash expense lowers shift cas
 npm run test:m9          # stock count and adjustment: count changes nothing until Apply, later sales kept, batches = stock, adjustments by batch/reason, permissions, history
 npm run test:m10         # loyalty: Developer gate + Admin switch, plans, earn/redeem/member discount, returns, expiry, auto upgrade, manual points
 npm run test:m11         # LAN: pairing, unpaired/remote refusals, local-only routes, version check, revoke, one login, shift per counter, idempotent sale, last unit
+npm run test:phaseB      # docs/NEXT_PHASES.md Phase B: credit returns in the ledger, sales customer/medicine filters + paging, report date ranges, dashboard today/active shifts, Admin audit log, version
 npm run test:phaseA      # docs/NEXT_PHASES.md Phase A: scoped reads, one open shift race, DENIED audit, restore version/upgrade, local-day dates, P&L discount, product input
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
@@ -100,6 +101,9 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - `GET /api/sales/:id` needs one of: own bill, `can_view_all_sales`, `can_return_sale`, `khata`, `dashboard`.
   - Shift list, detail and summary are the user's own unless they have the `shifts` module or `can_manage_shifts`. `/api/shifts/active` is always the session user. Closing your own shift needs `can_shift_close`.
   - `GET /api/customers` and `/:id/ledger` need `khata`; `/api/customers/search` stays login-only for the POS.
+- The audit log has two readers, both through `queryAuditLogs` (`server/security/auditQuery.ts`) and the UI `AuditLogPanel` (`src/components/audit/`):
+  - the Developer (`/api/developer/audit-logs`, everything);
+  - the Admin (`/api/audit-logs`, `can_view_audit_log`, Settings → Audit Log), which never sees the Developer account's own rows.
 - Every 403 from `requirePermission`, `requireDeveloper` and the scoped reads writes a `PERMISSION_DENIED` audit row with status `DENIED` (`logDenied`, `server/security/audit.ts`), throttled to one per user + permission + path per 10 minutes.
 - One open shift per user is also a database rule: the partial unique index `idx_shifts_one_open` (`ONE_OPEN_SHIFT_INDEX_SQL`; skipped with a warning when an old database already has two open shifts for one user).
 - Product and company writes are validated with `productSchema` / `companySchema`:
@@ -131,7 +135,7 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - `src/components/pos/UnifiedInvoice.tsx` renders three designs (`classic` | `compact` | `detailed`) at `58mm` | `80mm`. `ThermalReceipt.tsx` is a thin wrapper around it.
 - The valid values and normalizers live in `shared/invoice.ts`; `server/invoice/invoiceSettings.ts` only holds the startup migration of legacy values. The server rejects anything else with 400.
 - Each sale stores `store_name_snapshot`, `store_address_snapshot` and `invoice_footer_snapshot`. Receipts prefer these snapshots over current settings, so reprints match the original.
-- Page-sized documents (statements) print with `printDocument` (`src/utils/printDocument.ts`, a hidden frame with plain A4 styles).
+- Page-sized documents (statements, Reports → Print Report) print with `printDocument` (`src/utils/printDocument.ts`, a hidden frame with plain A4 styles; `.print-only` blocks show only on paper). New CSV exports use `downloadCsv` (`src/utils/csv.ts`).
 - Printing goes through `src/utils/printReceipt.ts`. With "Print without dialog" on (per computer, `localStorage`), the receipt's HTML plus the app CSS is sent to the `print:thermal` IPC, which prints it silently from a hidden sandboxed window sized to the receipt. Otherwise `window.print()` runs, and `@media print` in `src/index.css` hides everything except `#thermal-receipt-printable`.
 
 **Sales and shifts.**

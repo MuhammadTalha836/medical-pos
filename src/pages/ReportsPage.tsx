@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/apiService';
 import { SystemSettings } from '../types';
 import {
@@ -18,6 +18,8 @@ import { moneyFormatter } from '../utils/format';
 import { ControlledRegister } from '../components/reports/ControlledRegister';
 import { DayCloseReport } from '../components/reports/DayCloseReport';
 import { useAuthStore } from '../store/useAuthStore';
+import { printDocument } from '../utils/printDocument';
+import { downloadCsv } from '../utils/csv';
 
 interface ReportsPageProps {
   settings?: SystemSettings | null;
@@ -43,6 +45,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [expiryDays, setExpiryDays] = useState('60');
+  const printRef = useRef<HTMLDivElement>(null);
 
   const money = moneyFormatter(settings);
 
@@ -60,14 +63,16 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
       } else if (currentReport === 'pnl_summary') {
         const data = await api.getPnlSummaryReport({ date_from: dateFrom, date_to: dateTo });
         setPnlSummary(data);
+        // The summary is not a list; its CSV is built from the figures (handleExportCSV)
+        setReportData([]);
       } else if (currentReport === 'invoice_pnl') {
         const data = await api.getInvoicePnlReport({ date_from: dateFrom, date_to: dateTo });
         setReportData(data);
       } else if (currentReport === 'product_sales') {
-        const data = await api.getProductWiseSalesReport();
+        const data = await api.getProductWiseSalesReport({ date_from: dateFrom || undefined, date_to: dateTo || undefined });
         setReportData(data);
       } else if (currentReport === 'company_sales') {
-        const data = await api.getCompanyWiseSalesReport();
+        const data = await api.getCompanyWiseSalesReport({ date_from: dateFrom || undefined, date_to: dateTo || undefined });
         setReportData(data);
       } else if (currentReport === 'controlled_register' || currentReport === 'day_close') {
         // ControlledRegister loads its own rows (with its own date range) and hands them back for CSV
@@ -82,21 +87,29 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
     loadCurrentReport();
   }, [currentReport, expiryDays]);
 
+  const usesDateRange = ['pnl_summary', 'invoice_pnl', 'product_sales', 'company_sales'].includes(currentReport);
+  const rangeText = usesDateRange
+    ? (dateFrom || dateTo ? `${dateFrom || 'start'} to ${dateTo || 'today'}` : 'All dates')
+    : currentReport === 'expired_stock' ? `Expiring within ${expiryDays} days` : '';
+  const fileDate = new Date().toISOString().split('T')[0];
+
   const handleExportCSV = () => {
+    if (currentReport === 'pnl_summary') {
+      if (!pnlSummary) return;
+      const revenue = Number(pnlSummary.total_revenue || 0);
+      const profit = Number(pnlSummary.gross_profit || 0);
+      downloadCsv(`pharmacy_report_pnl_summary_${fileDate}.csv`,
+        ['Period', 'Invoices', 'Net sales revenue', 'Cost of goods sold', 'Gross profit', 'Profit margin %'],
+        [[rangeText, pnlSummary.total_invoices || 0, revenue.toFixed(2), Number(pnlSummary.total_cost_of_goods || 0).toFixed(2), profit.toFixed(2), revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : '0.0']]);
+      return;
+    }
     if (reportData.length === 0) return;
-    const headers = Object.keys(reportData[0]).join(',');
-    const rows = reportData.map(row =>
-      Object.values(row).map(val => `"${String(val ?? '').replace(/"/g, '""')}"`).join(',')
-    );
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `pharmacy_report_${currentReport}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(`pharmacy_report_${currentReport}_${fileDate}.csv`, Object.keys(reportData[0]), reportData.map(row => Object.values(row) as Array<string | number | null>));
   };
+
+  // Controlled Register and Day Close print themselves
+  const printsItself = currentReport === 'controlled_register' || currentReport === 'day_close';
+  const canExport = currentReport === 'pnl_summary' ? !!pnlSummary : reportData.length > 0;
 
   const navButtons = [
     { id: 'available_stock' as ReportType, label: 'Available Stock Valuation', icon: Package },
@@ -110,6 +123,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
     // The day close shows profit, so it needs the financial permission like the P&L reports
     ...(hasPermission('can_view_financial_kpis') ? [{ id: 'day_close' as ReportType, label: 'Day Close', icon: CalendarCheck }] : []),
   ];
+  const reportTitle = navButtons.find(b => b.id === currentReport)?.label ?? 'Report';
 
   return (
     <div className="page-container">
@@ -123,19 +137,21 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
         <div className="flex space-x-2">
           <button
             onClick={handleExportCSV}
-            disabled={reportData.length === 0}
+            disabled={!canExport}
             className="flex items-center space-x-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 dark:bg-[#162032] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors disabled:opacity-40 shadow-xs"
           >
             <Download className="w-4 h-4" />
             <span>Export CSV</span>
           </button>
-          <button
-            onClick={() => window.print()}
-            className="btn-print btn-sm"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print Report</span>
-          </button>
+          {!printsItself && (
+            <button
+              onClick={() => printDocument(printRef.current, reportTitle)}
+              className="btn-print btn-sm"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print Report</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -162,7 +178,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
       </div>
 
       {/* Filters Bar for Date / Expiry parameters */}
-      {(currentReport === 'pnl_summary' || currentReport === 'invoice_pnl') && (
+      {usesDateRange && (
         <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-3.5 rounded-xl flex items-center space-x-3 text-xs shadow-xs">
           <span className="text-slate-600 dark:text-slate-400 font-semibold flex items-center space-x-1">
             <Calendar className="w-4 h-4 text-teal-600 dark:text-teal-400" />
@@ -206,7 +222,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
         </div>
       )}
 
-      {/* REPORT CONTENT AREA */}
+      {/* REPORT CONTENT AREA (printed as an A4 page by Print Report) */}
+      <div ref={printRef} className="space-y-5">
+      {/* Heading on paper only (printDocument shows .print-only and hides the screen-only parts) */}
+      <div className="print-only hidden">
+        <h1>{settings?.store_name || 'PharmaCare Pro'}: {reportTitle}</h1>
+        <p className="muted">{rangeText ? `${rangeText}. ` : ''}Printed {new Date().toLocaleString()}</p>
+      </div>
 
       {/* 1. AVAILABLE STOCK VALUATION REPORT */}
       {currentReport === 'available_stock' && (
@@ -475,6 +497,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
       {/* 6. PRODUCT-WISE SALES */}
       {currentReport === 'product_sales' && (
         <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 muted">
+            Top 50 medicines by sales{dateFrom || dateTo ? ` (${rangeText})` : ''}
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-100 dark:bg-surface-inset-dark text-slate-700 dark:text-slate-300 font-semibold text-xs border-b border-slate-200 dark:border-slate-800">
@@ -549,6 +574,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ settings, onRefreshSet
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

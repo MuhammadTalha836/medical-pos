@@ -1,13 +1,15 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
-import { hasRolePermission, requirePermission, sendError } from '../http/context';
+import { hasAnyPermission, hasRolePermission, requirePermission, sendError } from '../http/context';
+import { appVersion } from '../lan/lanGate';
+import { localDateSql } from '../http/sqlDates';
 import { localDateString } from '../../shared/dates';
 
 // Health check and dashboard KPIs
 const router = Router();
 
 router.get('/api/status', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', version: '1.0.0', time: new Date().toISOString() });
+  res.json({ status: 'ok', version: appVersion(), time: new Date().toISOString() });
 });
 
 router.get('/api/dashboard/stats', async (req: Request, res: Response) => {
@@ -15,30 +17,20 @@ router.get('/api/dashboard/stats', async (req: Request, res: Response) => {
     const actor = await requirePermission(req, res, 'dashboard', 'You do not have access to the dashboard.');
     if (!actor) return;
     const canSeeRevenue = await hasRolePermission(actor.role, 'can_view_financial_kpis');
-    const today = new Date().toISOString().split('T')[0];
-    const startOfToday = new Date(today + 'T00:00:00.000Z');
-    const endOfToday = new Date(today + 'T23:59:59.999Z');
+    // Today in the shop's own calendar, whatever format a sale's date was stored in (localDateSql); UTC
+    // boundaries used to put sales made after midnight on the day before
+    const today = localDateString();
+    const todayRaw = await prisma.$queryRaw<Array<{ invoices: bigint | number; net: number | null; gross: number | null }>>`
+      SELECT COUNT(*) AS invoices, SUM(net_total) AS net, SUM(total_gross) AS gross
+      FROM sales
+      WHERE status IN ('completed', 'partially_returned') AND ${localDateSql('sale_date')} = ${today}
+    `;
 
-    const todaySalesAgg = await prisma.sale.aggregate({
-      where: {
-        saleDate: {
-          gte: startOfToday,
-          lte: endOfToday
-        },
-        status: { in: ['completed', 'partially_returned'] }
-      },
-      _count: { id: true },
-      _sum: {
-        netTotal: true,
-        totalGross: true
-      }
-    });
-
-    const totalRevenue = todaySalesAgg._sum.netTotal || 0;
-    const totalGross = todaySalesAgg._sum.totalGross || 0;
+    const totalRevenue = Number(todayRaw[0]?.net || 0);
+    const totalGross = Number(todayRaw[0]?.gross || 0);
     // Revenue figures only for roles allowed to see them; the page hides the card for everyone else
     const todaySales = {
-      total_invoices: todaySalesAgg._count.id || 0,
+      total_invoices: Number(todayRaw[0]?.invoices || 0),
       total_revenue: canSeeRevenue ? totalRevenue : null,
       total_discount: canSeeRevenue ? totalGross - totalRevenue : null
     };
@@ -102,8 +94,20 @@ router.get('/api/dashboard/stats', async (req: Request, res: Response) => {
       LIMIT 8
     `;
 
+    // Who is selling right now, for shift managers only (the card has no cash figures)
+    const activeShifts = await hasAnyPermission(actor.role, ['shifts', 'can_manage_shifts'])
+      ? (await prisma.cashierShift.findMany({ where: { status: 'open' }, orderBy: { startTime: 'asc' } })).map(s => ({
+          id: s.id,
+          shift_no: s.shiftNo,
+          user_name: s.userName,
+          terminal_name: s.terminalName,
+          start_time: s.startTime
+        }))
+      : null;
+
     res.json({
       todaySales,
+      activeShifts,
       totalProducts,
       lowStockCount,
       outOfStockCount,

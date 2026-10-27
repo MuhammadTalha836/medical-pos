@@ -275,7 +275,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   }, []);
 
   keyHandlerRef.current = (e: KeyboardEvent) => {
-      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null || prescriptionPrompt !== null || substitutesFor !== null;
+      // The shift dialogs live in the shift store (opened from the header too), so they are read here directly
+      const shiftDialogOpen = useShiftStore.getState().isStartModalOpen || useShiftStore.getState().isClosingModalOpen;
+      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null || prescriptionPrompt !== null || substitutesFor !== null || shiftDialogOpen;
       const ctrl = e.ctrlKey || e.metaKey;
       // The close-invoice question takes Enter/Esc itself; no other shortcut runs behind it
       if (pendingCloseId !== null && e.key !== 'Escape') return;
@@ -314,19 +316,21 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       // 2. F3: Focus the product search field
       else if (e.key === 'F3') {
         e.preventDefault();
+        if (anyModalOpen) return;
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
       }
       // 3. F4: Focus the customer selection field
       else if (e.key === 'F4') {
         e.preventDefault();
+        if (anyModalOpen) return;
         customerNameInputRef.current?.focus();
         customerNameInputRef.current?.select();
       }
       // F7: Substitutes (same formula) for the highlighted search result, else the newest cart line
       else if (e.key === 'F7') {
         e.preventDefault();
-        if (e.repeat) return;
+        if (e.repeat || anyModalOpen) return;
         const target = searchResults[selectedResultIdx] ?? cart[0]?.product;
         if (target) openSubstitutes(target);
         else setErrorMessage('Search for a medicine first, then press F7 to see substitutes with the same formula.');
@@ -334,6 +338,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       // 4. F6: Apply a discount, subject to permissions
       else if (e.key === 'F6') {
         e.preventDefault();
+        if (anyModalOpen) return;
         if (!hasPermission('can_discount')) {
           setErrorMessage('Permission Denied: You do not have authorization to apply bill discounts. Please contact an administrator.');
           return;
@@ -344,13 +349,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       // 5. F8: Open the payment section (Focus cash tendered)
       else if (e.key === 'F8') {
         e.preventDefault();
+        if (anyModalOpen) return;
         tenderedInputRef.current?.focus();
         tenderedInputRef.current?.select();
       }
       // 6. F9: Save or finalize the invoice, subject to validation
       else if (e.key === 'F9' || (e.ctrlKey && e.key === 'Enter')) {
         e.preventDefault();
-        if (e.repeat) return; // Prevent repeated submission when key is held down
+        if (e.repeat || anyModalOpen) return; // Held key, or a dialog is open over the POS
         if (isSubmittingRef.current || loadingSale) return;
         handleCompleteSale(false);
       }

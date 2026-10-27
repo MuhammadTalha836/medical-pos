@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { logSecurityAudit } from '../security/audit';
 import { DEFAULT_ADMIN_PERMISSIONS, normalizePermissions, parsePermissions } from '../../shared/permissions';
-import { getActingUser, sendError } from '../http/context';
+import { getActingUser, requirePermission, sendError } from '../http/context';
+import { queryAuditLogs } from '../security/auditQuery';
 
 // Developer-only Admin permissions and audit log
 const router = Router();
@@ -56,55 +56,18 @@ router.get('/api/developer/audit-logs', async (req: Request, res: Response) => {
     if (!actingUser || actingUser.role !== 'developer') {
       return res.status(403).json({ error: 'Access denied: Developer role required' });
     }
+    res.json(await queryAuditLogs(req.query));
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
 
-    const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-    const limit = Math.max(1, Math.min(200, parseInt(String(req.query.limit || '50'), 10)));
-    const skip = (page - 1) * limit;
-
-    const whereClause: Prisma.AuditLogWhereInput = {};
-    if (req.query.module) {
-      whereClause.module = String(req.query.module);
-    }
-    if (req.query.action) {
-      whereClause.action = String(req.query.action);
-    }
-    if (req.query.status) {
-      whereClause.status = String(req.query.status);
-    }
-    if (req.query.user) {
-      const u = String(req.query.user);
-      whereClause.OR = [
-        { userName: { contains: u } },
-        { affectedUser: { contains: u } }
-      ];
-    }
-
-    const [total, logs] = await Promise.all([
-      prisma.auditLog.count({ where: whereClause }),
-      prisma.auditLog.findMany({
-        where: whereClause,
-        orderBy: { id: 'desc' },
-        skip,
-        take: limit
-      })
-    ]);
-
-    res.json({
-      logs: logs.map(l => ({
-        id: l.id,
-        action: l.action,
-        module: l.module,
-        details: l.details,
-        affected_user: l.affectedUser,
-        status: l.status,
-        user_id: l.userId,
-        user_name: l.userName,
-        created_at: l.createdAt.toISOString()
-      })),
-      total,
-      page,
-      totalPages: Math.ceil(total / limit)
-    });
+// The Admin's read-only view of the same log, without the Developer account's own actions
+router.get('/api/audit-logs', async (req: Request, res: Response) => {
+  try {
+    if (!(await requirePermission(req, res, 'can_view_audit_log', 'You do not have permission to view the audit log.'))) return;
+    const developers = await prisma.user.findMany({ where: { role: 'developer' }, select: { id: true } });
+    res.json(await queryAuditLogs(req.query, { excludeUserIds: developers.map(d => d.id) }));
   } catch (error: unknown) {
     sendError(res, error);
   }

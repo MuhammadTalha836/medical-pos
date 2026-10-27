@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/apiService';
 import { useAuthStore } from '../store/useAuthStore';
-import { DeveloperSettingsPayload, AuditLogEntry, User, SaleInvoice, BackupFrequency } from '../types';
+import { DeveloperSettingsPayload, User, SaleInvoice, BackupFrequency } from '../types';
+import { AuditLogPanel } from '../components/audit/AuditLogPanel';
 import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../../shared/invoice';
@@ -29,10 +30,7 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Filter,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CalendarClock,
   ListChecks,
   Megaphone,
@@ -115,14 +113,8 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
   const [resetErrorMsg, setResetErrorMsg] = useState<string | null>(null);
 
   // Audit Logs state
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  // Number of audit rows, shown on the audit tab (the table itself is AuditLogPanel)
   const [totalLogs, setTotalLogs] = useState(0);
-  const [auditPage, setAuditPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [filterModule, setFilterModule] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterUser, setFilterUser] = useState('');
 
   // Fetch developer settings
   const fetchSettings = async () => {
@@ -150,33 +142,21 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
     }
   };
 
-  // Fetch audit logs
-  const fetchAuditLogs = async (page = 1) => {
-    setAuditLoading(true);
+  // Refreshes the audit count on the tab after a change that writes to the log
+  const refreshAuditCount = async () => {
     try {
-      const res = await api.getDeveloperAuditLogs({
-        page,
-        limit: 20,
-        module: filterModule || undefined,
-        status: filterStatus || undefined,
-        user: filterUser || undefined
-      });
-      setAuditLogs(res.logs);
-      setTotalLogs(res.total);
-      setAuditPage(res.page);
-      setTotalPages(res.totalPages);
+      setTotalLogs((await api.getDeveloperAuditLogs({ page: 1, limit: 1 })).total);
     } catch (err: any) {
       console.error('Failed to load audit logs:', err);
-    } finally {
-      setAuditLoading(false);
     }
   };
+
 
   useEffect(() => {
     if (user?.role === 'developer') {
       fetchSettings();
       fetchUsers();
-      fetchAuditLogs(1);
+      refreshAuditCount();
     }
   }, [user]);
 
@@ -187,12 +167,6 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
       .catch(() => setOnlineBackupAvailable(false));
   }, [activeTab, user]);
 
-  useEffect(() => {
-    if (activeTab === 'audit' && user?.role === 'developer') {
-      fetchAuditLogs(1);
-    }
-  }, [filterModule, filterStatus, activeTab]);
-
   // Handle Save Settings
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,7 +176,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
       const res = await api.updateDeveloperSettings(settings);
       setSaveSuccessMsg(res.message || 'Developer settings updated successfully');
       setTimeout(() => setSaveSuccessMsg(null), 4000);
-      fetchAuditLogs(1);
+      refreshAuditCount();
     } catch (err: any) {
       setSaveErrorMsg(err.message || 'Failed to save developer settings');
     }
@@ -228,7 +202,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
         setSelectedUserForReset(null);
         setResetSuccessMsg(null);
       }, 2000);
-      fetchAuditLogs(1);
+      refreshAuditCount();
     } catch (err: any) {
       setResetErrorMsg(err.message || 'Failed to reset password');
     } finally {
@@ -280,7 +254,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
             onClick={() => {
               fetchSettings();
               fetchUsers();
-              fetchAuditLogs(auditPage);
+              refreshAuditCount();
             }}
             className="flex items-center space-x-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition"
           >
@@ -420,7 +394,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
         </div>
       )}
 
-      {activeTab === 'license' && <LicensePanel onChanged={() => fetchAuditLogs(1)} />}
+      {activeTab === 'license' && <LicensePanel onChanged={() => refreshAuditCount()} />}
 
       {activeTab === 'profile' && <DeveloperProfilePanel onSaved={onRefreshSettings} />}
 
@@ -918,161 +892,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
       )}
 
       {/* TAB 5: SECURITY AUDIT TRAIL */}
-      {activeTab === 'audit' && (
-        <div className="space-y-4">
-          {/* Audit Filters Bar */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <div className="flex items-center space-x-1 text-xs text-slate-500">
-                <Filter className="w-4 h-4 text-purple-500" />
-                <span>Filters:</span>
-              </div>
-
-              <select
-                value={filterModule}
-                onChange={(e) => setFilterModule(e.target.value)}
-                className="field-select field-sm"
-              >
-                <option value="">All Modules</option>
-                <option value="AUTH">AUTH</option>
-                <option value="USERS">USERS</option>
-                <option value="SETTINGS">SETTINGS</option>
-                <option value="DEVELOPER_SETTINGS">DEVELOPER_SETTINGS</option>
-                <option value="Inventory">Inventory</option>
-                <option value="Shifts">Shifts</option>
-              </select>
-
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="field-select field-sm"
-              >
-                <option value="">All Statuses</option>
-                <option value="SUCCESS">SUCCESS</option>
-                <option value="FAILED">FAILED</option>
-                <option value="DENIED">DENIED</option>
-              </select>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  value={filterUser}
-                  onChange={(e) => setFilterUser(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && fetchAuditLogs(1)}
-                  placeholder="Filter by user..."
-                  className="field-input field-sm w-36"
-                />
-              </div>
-
-              <button
-                onClick={() => fetchAuditLogs(1)}
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1"
-              >
-                <Search className="w-4 h-4" />
-                <span>Filter</span>
-              </button>
-            </div>
-
-            <div className="text-xs text-slate-500 dark:text-slate-400 self-end md:self-center">
-              Total Records: <span className="font-mono font-bold text-slate-900 dark:text-white">{totalLogs}</span>
-            </div>
-          </div>
-
-          {/* Audit Logs Table */}
-          <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-surface-inset-dark/50 text-slate-500 dark:text-slate-400 text-2xs">
-                    <th className="py-3 px-3">Timestamp</th>
-                    <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-3">Action</th>
-                    <th className="py-3 px-3">Module</th>
-                    <th className="py-3 px-3">Acting User</th>
-                    <th className="py-3 px-3">Affected Account</th>
-                    <th className="py-3 px-3">Details</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 font-mono">
-                  {auditLoading ? (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400 font-sans">
-                        Loading security audit trail...
-                      </td>
-                    </tr>
-                  ) : auditLogs.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400 font-sans">
-                        No audit events recorded matching current criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    auditLogs.map(log => (
-                      <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
-                        <td className="py-2.5 px-3 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-                          {new Date(log.created_at).toLocaleString()}
-                        </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded text-2xs font-bold ${
-                            log.status === 'SUCCESS'
-                              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                              : log.status === 'DENIED'
-                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                          }`}>
-                            {log.status}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap font-bold text-slate-900 dark:text-white">
-                          {log.action}
-                        </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-purple-600 dark:text-purple-400">
-                          {log.module}
-                        </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                          {log.user_name || 'System'}
-                        </td>
-                        <td className="py-2.5 px-3 whitespace-nowrap text-slate-500 dark:text-slate-400">
-                          {log.affected_user || '-'}
-                        </td>
-                        <td className="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate" title={log.details || ''}>
-                          {log.details || '-'}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
-                <span className="text-slate-500">
-                  Page <span className="font-bold text-slate-900 dark:text-white">{auditPage}</span> of {totalPages}
-                </span>
-
-                <div className="flex items-center space-x-1">
-                  <button
-                    disabled={auditPage <= 1 || auditLoading}
-                    onClick={() => fetchAuditLogs(auditPage - 1)}
-                    className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    disabled={auditPage >= totalPages || auditLoading}
-                    onClick={() => fetchAuditLogs(auditPage + 1)}
-                    className="p-1.5 rounded-lg border border-slate-300 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {activeTab === 'audit' && <AuditLogPanel load={api.getDeveloperAuditLogs} onTotal={setTotalLogs} />}
 
       {/* MODAL: RESET PASSWORD */}
       <Modal

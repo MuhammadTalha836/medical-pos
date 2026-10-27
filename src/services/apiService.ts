@@ -36,7 +36,8 @@ import {
   SetupCompletePayload,
   LoginResponse,
   LicenseStatus,
-  AuditLogEntry,
+  AuditLogPage,
+  AuditLogQuery,
   DeveloperSettingsPayload,
   SupplierSummary,
   SupplierLedger,
@@ -205,7 +206,8 @@ export const api = {
       /** The sale as the server priced and stored it */
       sale: SaleInvoice;
     }>('/sales', data),
-  getSales: (params?: DateRange & { invoice_no?: string }) => get<SaleInvoice[]>('/sales', params),
+  getSales: (params?: DateRange & { invoice_no?: string; customer?: string; medicine?: string; limit?: number; offset?: number }) =>
+    get<SaleInvoice[]>('/sales', params),
   getSaleById: (id: number) => get<SaleInvoice>(`/sales/${id}`),
   createSaleReturn: (data: unknown) => post<any>('/sales/return', data),
 
@@ -238,8 +240,8 @@ export const api = {
   getFinishedStockReport: () => get<any[]>('/reports/stock/finished'),
   getPnlSummaryReport: (params?: DateRange) => get<any>('/reports/financial/pnl-summary', params),
   getInvoicePnlReport: (params?: DateRange) => get<any[]>('/reports/financial/invoice-pnl', params),
-  getProductWiseSalesReport: () => get<any[]>('/reports/sales/product-wise'),
-  getCompanyWiseSalesReport: () => get<any[]>('/reports/sales/company-wise'),
+  getProductWiseSalesReport: (params?: DateRange) => get<any[]>('/reports/sales/product-wise', params),
+  getCompanyWiseSalesReport: (params?: DateRange) => get<any[]>('/reports/sales/company-wise', params),
   getControlledRegister: (params?: DateRange) => get<ControlledRegisterRow[]>('/reports/controlled-register', params),
   getDayClose: (date: string) => get<DayCloseReport>('/day-close', { date }),
   getDayCloseRange: (from: string, to: string) => get<DayCloseRange>('/day-close/range', { from, to }),
@@ -319,8 +321,11 @@ export const api = {
     post<{ available: boolean; connected: boolean; account_email: string | null; connect: CloudConnectProgress }>('/setup/cloud/status', { setupToken }),
   developerResetPassword: (userId: number, newPassword: string) =>
     post<SuccessMessage>(`/developer/users/${userId}/reset-password`, { new_password: newPassword }),
-  getDeveloperAuditLogs: (params?: { page?: number; limit?: number; module?: string; action?: string; status?: string; user?: string }) =>
-    get<{ logs: AuditLogEntry[]; total: number; page: number; totalPages: number }>('/developer/audit-logs', params),
+  getDeveloperAuditLogs: (params?: AuditLogQuery) =>
+    get<AuditLogPage>('/developer/audit-logs', params),
+  /** The Admin's read-only audit log (without the Developer account's own actions) */
+  getAuditLogs: (params?: AuditLogQuery) => get<AuditLogPage>('/audit-logs', params),
+  getStatus: () => get<{ status: string; version: string; time: string }>('/status'),
   updateLicense: (data: { action: 'full' } | { action: 'demo' | 'extend'; demoDays: number }) =>
     put<LicenseStatus & { success: boolean }>('/developer/license', data),
   getAdminPermissions: () => get<Record<string, boolean>>('/developer/admin-permissions'),

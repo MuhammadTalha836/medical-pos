@@ -358,6 +358,10 @@ router.get('/api/sales', async (req: Request, res: Response) => {
     const { date_from, date_to, invoice_no, customer_id } = req.query;
     const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
     const invoiceText = invoice_no ? String(invoice_no).trim() : '';
+    const customerText = req.query.customer ? String(req.query.customer).trim() : '';
+    const medicineText = req.query.medicine ? String(req.query.medicine).trim() : '';
+    const limit = Math.min(500, Math.max(1, Number.parseInt(String(req.query.limit ?? ''), 10) || 100));
+    const offset = Math.max(0, Number.parseInt(String(req.query.offset ?? ''), 10) || 0);
 
     // Without "View All Staff Invoices" a user lists only their own bills. A user who processes returns may still
     // open another cashier's bill by its complete invoice number (the customer brings the receipt back).
@@ -379,6 +383,13 @@ router.get('/api/sales', async (req: Request, res: Response) => {
     if (customer_id) {
       conditions.push(Prisma.sql`customer_id = ${Number(customer_id)}`);
     }
+    // A customer's name or phone, and every bill that has a medicine (by name or P-Code)
+    if (customerText) {
+      conditions.push(Prisma.sql`(customer_name LIKE ${`%${customerText}%`} OR customer_phone LIKE ${`%${customerText}%`})`);
+    }
+    if (medicineText) {
+      conditions.push(Prisma.sql`id IN (SELECT sale_id FROM sale_items WHERE product_name LIKE ${`%${medicineText}%`} OR p_code = ${medicineText})`);
+    }
 
     const whereClause = Prisma.join(conditions, ' AND ');
 
@@ -386,7 +397,7 @@ router.get('/api/sales', async (req: Request, res: Response) => {
       SELECT * FROM sales
       WHERE ${whereClause}
       ORDER BY id DESC
-      LIMIT 100
+      LIMIT ${limit} OFFSET ${offset}
     `;
     res.json(sales);
   } catch (error: unknown) {

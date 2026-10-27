@@ -7,7 +7,6 @@ import { AppLogo } from '../common/AppLogo';
 import { api } from '../../services/apiService';
 import { LanInfo, LicenseStatus, SystemSettings } from '../../types';
 import { SupportModal } from './SupportModal';
-import { developerInfoFor } from '../../../shared/developerProfile';
 import {
   Clock,
   Database,
@@ -35,7 +34,11 @@ export const Header: React.FC<HeaderProps> = ({ settings, onQuickBackup, onOpenC
   const { activeShift, setStartModalOpen, setClosingModalOpen } = useShiftStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
-  const hasSupportInfo = developerInfoFor(settings, 'about').length > 0;
+  // The running version, shown in the header badge and the About window
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    api.getStatus().then(s => setAppVersion(s.version)).catch(() => undefined);
+  }, []);
   const [time, setTime] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [license, setLicense] = useState<LicenseStatus | null>(null);
@@ -91,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({ settings, onQuickBackup, onOpenC
                 PharmaCare Pro
               </span>
               <span className="badge-info">
-                POS v1.0
+                {appVersion ? `POS v${appVersion}` : 'POS'}
               </span>
               {showDemoBadge && (
                 <span
@@ -159,17 +162,15 @@ export const Header: React.FC<HeaderProps> = ({ settings, onQuickBackup, onOpenC
           )}
         </button>
 
-        {/* Developer support contact (shown once the Developer fills it in) */}
-        {hasSupportInfo && (
-          <button
-            onClick={() => setIsSupportOpen(true)}
-            title="Software support contact"
-            className="btn-secondary btn-sm"
-          >
-            <LifeBuoy className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-            <span className="hidden sm:inline">Support</span>
-          </button>
-        )}
+        {/* About the software (version) and the Developer's support contact */}
+        <button
+          onClick={() => setIsSupportOpen(true)}
+          title="About PharmaCare Pro and software support"
+          className="btn-secondary btn-sm"
+        >
+          <LifeBuoy className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+          <span className="hidden sm:inline">About</span>
+        </button>
 
         {/* Quick Backup button (Protected by permission) */}
         {onQuickBackup && hasPermission('can_backup') && (
@@ -252,7 +253,7 @@ export const Header: React.FC<HeaderProps> = ({ settings, onQuickBackup, onOpenC
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
       />
-      <SupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} settings={settings} />
+      <SupportModal isOpen={isSupportOpen} onClose={() => setIsSupportOpen(false)} settings={settings} version={appVersion} />
     </header>
   );
 };

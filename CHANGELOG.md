@@ -4,6 +4,22 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 
 ## [Unreleased] — 2026-10-24
 
+### Fixes and small additions (Phase B, `docs/NEXT_PHASES.md`)
+- **Reports → Print Report** prints the report on an A4 page, with the store name, report name and dates. Before, it printed a blank page.
+- **P&L Summary → Export CSV** exports the summary figures. Before, it exported the previous report.
+- **Khata statement:** a **Statement** button on every customer in Khata. It lists credit bills, returns and payments with the running balance, and can be printed or saved as CSV.
+- **Sales History:**
+  - search by **customer** (name or phone);
+  - search by **medicine** (name or P-Code), which shows every bill with that medicine;
+  - **Load more**, so you are no longer limited to 100 bills.
+- **Product-wise and Company-wise sales** can be filtered by dates. The product list shows the top 50.
+- **POS:** function keys no longer act behind an open window (receipt, shortcuts, start or close shift).
+- **Dashboard:**
+  - an **Active shifts** card (who is selling, on which counter, for how long) for shift managers;
+  - "today" now counts every sale made today, including after midnight.
+- **Settings → Audit Log** (Admin): a read-only view of the security audit trail, including refused actions. The Developer account's own actions are not listed. New permission "View Security Audit Log".
+- **About:** the header button opens About & Support, with the version, copyright and the developer's contact details. The header shows the real version.
+
 ### Security and fixes (Phase A, `docs/NEXT_PHASES.md`)
 - **Staff see only their own invoices and shifts** unless their role has "View All Staff Invoices" or shift management.
   - A cashier who handles returns can still open another cashier's bill by typing its full invoice number; Sales History says so under the search box.

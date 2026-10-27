@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, CreditCard, DollarSign, Phone, Wallet } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, CreditCard, DollarSign, FileText, Phone, Wallet } from 'lucide-react';
 import { api } from '../../services/apiService';
 import { Customer, SystemSettings } from '../../types';
 import { Modal } from '../common/Modal';
 import { useShiftStore } from '../../store/useShiftStore';
 import { CustomerInvoiceList, LedgerState, isLoadedLedger } from './CustomerInvoiceList';
 import { WhatsAppButton } from '../common/WhatsAppButton';
+import { CustomerStatementModal } from './CustomerStatementModal';
 import { reminderMessage } from '../../../shared/whatsapp';
 
 interface KhataTabProps {
@@ -39,6 +40,7 @@ export const KhataTab: React.FC<KhataTabProps> = ({
   const [notes, setNotes] = useState('');
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const [statementFor, setStatementFor] = useState<number | null>(null);
 
   const withBalance = customers.filter(c => Number(c.current_balance) > 0);
   const rows = (showAll ? customers : withBalance).slice().sort((a, b) => Number(b.current_balance) - Number(a.current_balance));
@@ -193,6 +195,10 @@ export const KhataTab: React.FC<KhataTabProps> = ({
                           {balance > 0 && (
                             <WhatsAppButton phone={cust.phone} message={() => reminderMessage(cust, settings, money)} label="Send reminder" />
                           )}
+                          <button type="button" onClick={() => setStatementFor(cust.id)} className="btn-secondary btn-sm">
+                            <FileText className="w-4 h-4" />
+                            <span>Statement</span>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -259,6 +265,8 @@ export const KhataTab: React.FC<KhataTabProps> = ({
           </tbody>
         </table>
       </div>
+
+      <CustomerStatementModal customerId={statementFor} settings={settings} money={money} onClose={() => setStatementFor(null)} />
 
       {/* Receive payment */}
       <Modal

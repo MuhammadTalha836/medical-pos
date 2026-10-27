@@ -14,6 +14,7 @@ const DOCUMENT_CSS = `
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .muted { color: #555; }
   .no-print { display: none !important; }
+  .print-only { display: block !important; }
 `;
 
 /** Opens the print dialog for one element; resolves after the dialog closes. */

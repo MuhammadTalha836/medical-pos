@@ -66,7 +66,8 @@ export const PERMISSION_GROUPS = [
       { key: 'can_stock_zero', label: 'Reset Stock Zero Audit' },
       { key: 'can_manage_users', label: 'Manage Staff Logins' },
       { key: 'can_manage_roles', label: 'Manage Cashier & Custom Roles' },
-      { key: 'can_manage_terminals', label: 'Manage Counter Computers (LAN)' }
+      { key: 'can_manage_terminals', label: 'Manage Counter Computers (LAN)' },
+      { key: 'can_view_audit_log', label: 'View Security Audit Log' }
     ]
   }
 ] as const;

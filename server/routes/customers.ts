@@ -256,6 +256,13 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
       orderBy: { id: 'desc' }
     });
 
+    // Returns of credit bills lowered the khata balance, so the statement lists them as credits
+    const returns = await prisma.saleReturn.findMany({
+      where: { sale: { customerId: idNum, paymentType: 'Credit' } },
+      select: { id: true, returnNo: true, originalInvoiceNo: true, refundAmount: true, createdAt: true },
+      orderBy: { id: 'desc' }
+    });
+
     res.json({
       customer: {
         id: customer.id,
@@ -284,6 +291,13 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
         new_balance: p.newBalance,
         payment_date: p.paymentDate,
         user_name: p.userName
+      })),
+      returns: returns.map(r => ({
+        id: r.id,
+        return_no: r.returnNo,
+        invoice_no: r.originalInvoiceNo,
+        refund_amount: r.refundAmount,
+        created_at: r.createdAt
       }))
     });
   } catch (error: unknown) {

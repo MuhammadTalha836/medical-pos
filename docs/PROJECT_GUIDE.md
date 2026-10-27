@@ -66,7 +66,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - **Credit (Khata) sales require a saved customer** (checked by the server). The sale raises the customer's balance, is blocked past the customer's credit limit (0 = no limit), and a return on it lowers the balance.
    - Every customer needs a phone number, unique by digits (`normalizePhone` in `shared/customers.ts`).
    - Partial or full cash recovery payment recording.
-   - Customer account statements and history export.
+   - Customer account statements and history export: Khata → **Statement** (`CustomerStatementModal`, built by `customerStatement` in `shared/customers.ts`) lists credit bills, credit-bill returns and payments with a running balance; Print and CSV.
 
 6. **Sales History & Returns (`SalesHistoryPage.tsx`)**:
    - Filterable invoice history by invoice number, customer, and date range.
@@ -150,7 +150,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 
 12. **System Settings & Granular Staff Roles (`SettingsPage.tsx`)**:
     - Pharmacy business profile, drug license number, tax/NTN number, custom receipt headers/footers/terms, currency symbol, maximum bill discount cap.
-    - 42 staff permissions (11 modules + 31 actions, `shared/permissions.ts`) covering POS operations, sales, returns, discounts, customer khata, product/company masters, purchases, reports, utilities, user accounts, shift management and LAN counters.
+    - 43 staff permissions (11 modules + 32 actions, `shared/permissions.ts`) covering POS operations, sales, returns, discounts, customer khata, product/company masters, purchases, reports, utilities, user accounts, shift management and LAN counters.
     - The server enforces reads as well as writes (Phase A): staff see only their own invoices and shifts unless granted "View All Staff Invoices" or shift management. A returns user opens another bill by its full invoice number. Every refusal is written to the audit trail as DENIED.
 
 

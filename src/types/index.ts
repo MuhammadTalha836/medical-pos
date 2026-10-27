@@ -138,10 +138,20 @@ export interface CustomerPaymentRow {
   user_name?: string | null;
 }
 
+/** A return of one of the customer's credit bills (it lowered the khata balance) */
+export interface CustomerReturnRow {
+  id: number;
+  return_no: string;
+  invoice_no: string | null;
+  refund_amount: number;
+  created_at: string;
+}
+
 export interface CustomerLedger {
   customer: Customer;
   sales: CustomerInvoiceRow[];
   payments: CustomerPaymentRow[];
+  returns: CustomerReturnRow[];
 }
 
 export interface Product {
@@ -675,6 +685,22 @@ export interface AuditLogEntry {
   user_id?: number | null;
   user_name?: string | null;
   created_at: string;
+}
+
+export type AuditLogQuery = {
+  page?: number;
+  limit?: number;
+  module?: string;
+  action?: string;
+  status?: string;
+  user?: string;
+};
+
+export interface AuditLogPage {
+  logs: AuditLogEntry[];
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 // Phase 4: Developer-controlled automatic backup frequency

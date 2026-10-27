@@ -35,6 +35,8 @@ interface ReturnLine {
   qty: number;
 }
 
+const PAGE_SIZE = 100;
+
 export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) => {
   const { hasPermission } = useAuthStore();
   const { activeShift, fetchShiftSummary } = useShiftStore();
@@ -43,6 +45,11 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
   const [searchInvoice, setSearchInvoice] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [searchCustomer, setSearchCustomer] = useState('');
+  const [searchMedicine, setSearchMedicine] = useState('');
+  // Paging: the list loads PAGE_SIZE bills at a time; "Load more" appends the next page
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Modals
   const [selectedInvoice, setSelectedInvoice] = useState<SaleInvoice | null>(null);
@@ -58,20 +65,42 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
 
   const money = moneyFormatter(settings);
 
-  const loadSales = async () => {
+  const filters = (overrides: Partial<{ invoice: string; customer: string; medicine: string; from: string; to: string }> = {}) => {
+    const f = { invoice: searchInvoice, customer: searchCustomer, medicine: searchMedicine, from: dateFrom, to: dateTo, ...overrides };
+    return {
+      invoice_no: f.invoice.trim() || undefined,
+      customer: f.customer.trim() || undefined,
+      medicine: f.medicine.trim() || undefined,
+      date_from: f.from || undefined,
+      date_to: f.to || undefined,
+      limit: PAGE_SIZE
+    };
+  };
+
+  const loadSales = async (overrides?: Parameters<typeof filters>[0]) => {
     try {
       setLoading(true);
-      const data = await api.getSales({
-        invoice_no: searchInvoice.trim() || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined
-      });
+      const data = await api.getSales(filters(overrides));
       setSales(data);
+      setHasMore(data.length === PAGE_SIZE);
       setPageError(null);
     } catch (err: any) {
       setPageError(`Could not load invoices: ${err.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    try {
+      setLoadingMore(true);
+      const data = await api.getSales({ ...filters(), offset: sales.length });
+      setSales(prev => [...prev, ...data.filter(d => !prev.some(p => p.id === d.id))]);
+      setHasMore(data.length === PAGE_SIZE);
+    } catch (err: any) {
+      setPageError(`Could not load more invoices: ${err.message}`);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -202,6 +231,23 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
           )}
         </div>
 
+        <input
+          type="text"
+          value={searchCustomer}
+          onChange={(e) => setSearchCustomer(e.target.value)}
+          placeholder="Customer name or phone"
+          aria-label="Customer name or phone"
+          className="field-input w-48"
+        />
+        <input
+          type="text"
+          value={searchMedicine}
+          onChange={(e) => setSearchMedicine(e.target.value)}
+          placeholder="Medicine name or P-Code"
+          aria-label="Medicine name or P-Code"
+          className="field-input w-48"
+        />
+
         <div className="flex items-center space-x-2">
           <span className="text-xs text-slate-600 dark:text-slate-400 flex items-center space-x-1">
             <Calendar className="w-4 h-4" />
@@ -232,14 +278,16 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
           Filter Invoices
         </button>
 
-        {(searchInvoice || dateFrom || dateTo) && (
+        {(searchInvoice || searchCustomer || searchMedicine || dateFrom || dateTo) && (
           <button
             type="button"
             onClick={() => {
               setSearchInvoice('');
+              setSearchCustomer('');
+              setSearchMedicine('');
               setDateFrom('');
               setDateTo('');
-              api.getSales().then(setSales);
+              loadSales({ invoice: '', customer: '', medicine: '', from: '', to: '' });
             }}
             className="btn-secondary"
           >
@@ -355,6 +403,13 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             </tbody>
           </table>
         </div>
+        {hasMore && !loading && (
+          <div className="p-3 border-t border-slate-200 dark:border-slate-800 text-center">
+            <button type="button" onClick={loadMore} disabled={loadingMore} className="btn-secondary btn-sm">
+              {loadingMore ? 'Loading…' : `Load more (showing ${sales.length})`}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Thermal Receipt Preview Modal */}

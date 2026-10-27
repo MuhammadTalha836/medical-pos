@@ -154,6 +154,14 @@ router.get('/api/reports/financial/invoice-pnl', async (req: Request, res: Respo
   }
 });
 
+/** Counted sales, optionally within ?date_from=&date_to= (the shop's local days) */
+function saleDateRange(req: Request): Prisma.Sql {
+  const conditions: Prisma.Sql[] = [Prisma.sql`s.status IN ('completed', 'partially_returned')`];
+  if (isDateParam(req.query.date_from)) conditions.push(Prisma.sql`${localDateSql('s.sale_date')} >= ${String(req.query.date_from)}`);
+  if (isDateParam(req.query.date_to)) conditions.push(Prisma.sql`${localDateSql('s.sale_date')} <= ${String(req.query.date_to)}`);
+  return Prisma.join(conditions, ' AND ');
+}
+
 // Product-wise sales
 router.get('/api/reports/sales/product-wise', async (req: Request, res: Response) => {
   try {
@@ -167,7 +175,7 @@ router.get('/api/reports/sales/product-wise', async (req: Request, res: Response
         (SUM(si.net_amount) - SUM(si.quantity * si.unit_cost)) as gross_profit
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
-      WHERE s.status IN ('completed', 'partially_returned')
+      WHERE ${saleDateRange(req)}
       GROUP BY si.product_id
       ORDER BY total_sales_amount DESC
       LIMIT 50
@@ -192,7 +200,7 @@ router.get('/api/reports/sales/company-wise', async (req: Request, res: Response
       FROM sale_items si
       JOIN sales s ON si.sale_id = s.id
       LEFT JOIN companies c ON si.c_code = c.code
-      WHERE s.status IN ('completed', 'partially_returned')
+      WHERE ${saleDateRange(req)}
       GROUP BY si.c_code
       ORDER BY total_revenue DESC
     `;

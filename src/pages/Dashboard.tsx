@@ -16,9 +16,10 @@ import {
   Receipt,
   Eye,
   CheckCircle2,
-  Lock
+  Lock,
+  Timer
 } from 'lucide-react';
-import { moneyFormatter } from '../utils/format';
+import { formatDuration, moneyFormatter } from '../utils/format';
 
 interface DashboardProps {
   settings?: SystemSettings | null;
@@ -202,6 +203,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ settings, onNavigateTab })
           </div>
         </div>
       </div>
+
+      {/* Who is selling right now (shift managers only; the server sends null to everyone else) */}
+      {Array.isArray(stats?.activeShifts) && (
+        <button
+          type="button"
+          onClick={() => onNavigateTab('shifts')}
+          className="card-premium p-5 w-full text-left hover:border-teal-500/40 transition-colors"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <Timer className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              Active shifts
+            </span>
+            <span className={stats.activeShifts.length > 0 ? 'badge-success' : 'badge-info'}>{stats.activeShifts.length} open</span>
+          </div>
+          {stats.activeShifts.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">No one has a shift open right now.</p>
+          ) : (
+            <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+              {stats.activeShifts.map((s: { id: number; shift_no: string; user_name: string; terminal_name: string | null; start_time: string }) => (
+                <li key={s.id} className="p-3 rounded-xl bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white">{s.user_name}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {s.terminal_name ? `${s.terminal_name}, ` : ''}open for {formatDuration((Date.now() - new Date(s.start_time).getTime()) / 60000)} ({s.shift_no})
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </button>
+      )}
 
       {/* Main Content: Low Stock Priority Table & Recent Invoices */}
       {/* Backup Health (Phase 4) */}

@@ -31,7 +31,7 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | Phase | Area | Status |
 |---|---|---|
 | A | Security and correctness (server) | 🟡 built and tested; waiting for the owner's check |
-| B | Visible bugs and small gaps | ⬜ |
+| B | Visible bugs and small gaps | 🟡 built and tested; waiting for the owner's check |
 | C | New features (owner picks), including **C8 Print Quotation** | ⬜ |
 | D | Large structural changes (owner decision; not recommended now) | ⬜ |
 | E | Docs that are out of date | ⬜ |
@@ -139,6 +139,26 @@ Files: `server/routes/products.ts` and `server/routes/companies.ts`.
 | B7 | Dashboard has no active shifts | **Active shifts** card |
 | B8 | Admin cannot read the audit log | Read-only `GET /api/audit-logs` with a new permission `can_view_audit_log` |
 | B9 | No version on screen | **About** window: app name, version, copyright, developer details (extend `SupportModal.tsx`) |
+
+### Built (2026-10-27)
+- **B1:** the report body prints as an A4 page through `printDocument`, with a heading (store, report, period, printed at). Controlled Register and Day Close keep their own print.
+- **B2:** the P&L Summary exports its own figures; new helper `downloadCsv` (`src/utils/csv.ts`).
+- **B3:**
+  - The ledger now includes credit-bill returns.
+  - `customerStatement` (`shared/customers.ts`, with a spec) gives the running balance and an "Opening / other changes" line.
+  - `CustomerStatementModal` (Print + CSV) opens from **Statement** on every Khata row.
+- **B4:** `GET /api/sales` takes `customer`, `medicine` (name or P-Code), `limit` and `offset`. Sales History has Customer and Medicine fields and **Load more**.
+- **B5:** product-wise and company-wise reports filter by local date on the server (they had no filter at all) and in the UI. Product-wise says "Top 50".
+- **B6:** POS F3/F4/F6–F9 do nothing while any dialog is open, the shift dialogs included.
+- **B7:**
+  - **Active shifts** card (managers only; no cash figures).
+  - **Extra fix:** the Dashboard's "today" was in UTC and missed sales stored as integers; it now uses `localDateSql`.
+- **B8:**
+  - New permission `can_view_audit_log` (Admin by default).
+  - `GET /api/audit-logs` without the Developer account's rows (owner decision); shared `queryAuditLogs` (`server/security/auditQuery.ts`).
+  - The audit table is now `AuditLogPanel`, used by the Developer page and the new Settings → **Audit Log** tab.
+- **B9:** `GET /api/status` returns the real version. **About & Support** shows the logo, version and copyright; the header badge shows the version.
+- **Tests:** `test:phaseB` (6 tests) and the `customerStatement` spec.
 
 ---
 
