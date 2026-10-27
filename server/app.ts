@@ -27,6 +27,8 @@ import expenseRoutes from './routes/expenses';
 import dayCloseRoutes from './routes/dayClose';
 import stockRoutes from './routes/stock';
 import loyaltyRoutes from './routes/loyalty';
+import lanRoutes from './routes/lan';
+import { lanGate } from './lan/lanGate';
 
 // SQLite aggregations return BigInt; serialize them as plain numbers
 declare global {
@@ -49,7 +51,9 @@ const PUBLIC_API_ROUTES = new Set([
   'POST /api/auth/login',
   'POST /api/auth/developer-login',
   'GET /api/license/status',
-  'GET /api/settings'
+  'GET /api/settings',
+  'GET /api/lan/health',
+  'POST /api/lan/pair'
 ]);
 
 // Resolves the bearer token into res.locals.actor, then enforces login and the license on every /api route
@@ -89,12 +93,14 @@ export const app = express();
 // The UI is always served from the same origin (Vite proxy in development, the API itself when packaged),
 // so no CORS headers are sent and other websites cannot call the API from a browser.
 app.use(express.json());
+// LAN mode (M11): counter PCs need their paired key; some routes stay on the main computer. Also guards the UI files.
+app.use(lanGate);
 app.use('/api', sessionGate);
 
 for (const routes of [
   dashboardRoutes, setupRoutes, authRoutes, userRoutes, developerRoutes, licenseRoutes, developerAdminRoutes, roleRoutes,
   companyRoutes, customerRoutes, productRoutes, saleRoutes, purchaseRoutes, reportRoutes, utilityRoutes, shiftRoutes, settingsRoutes,
-  supplierRoutes, purchaseReturnRoutes, reorderRoutes, expenseRoutes, dayCloseRoutes, stockRoutes, loyaltyRoutes
+  supplierRoutes, purchaseReturnRoutes, reorderRoutes, expenseRoutes, dayCloseRoutes, stockRoutes, loyaltyRoutes, lanRoutes
 ]) {
   app.use(routes);
 }

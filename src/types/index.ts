@@ -328,6 +328,8 @@ export interface SaleInvoice {
   customer_phone?: string | null;
   user_id?: number | null;
   user_name: string;
+  /** The counter computer the bill was made on (multi-PC shops) */
+  terminal_name?: string | null;
   sale_date: string;
   total_gross: number;
   total_item_discount: number;
@@ -621,6 +623,9 @@ export interface CashierShift {
   shift_no: string;
   user_id: number;
   user_name: string;
+  /** The counter computer the shift was opened on (multi-PC shops) */
+  terminal_id?: number | null;
+  terminal_name?: string | null;
   start_time: string;
   end_time?: string | null;
   duration_minutes?: number | null;
@@ -773,6 +778,58 @@ export interface ElectronAPI {
   openCloudSignIn: (url: string) => Promise<boolean>;
   /** Opens a https://wa.me/ link (message ready to send) in WhatsApp */
   openWhatsApp: (url: string) => Promise<boolean>;
+
+  // LAN mode (M11)
+  lanInfo: () => Promise<LanInfo>;
+  /** Shows this computer's counter pairing screen */
+  lanOpenCounterSetup: () => Promise<boolean>;
+  lanCancelSetup: () => Promise<unknown>;
+  lanCheckServer: (host: string, port: number) => Promise<{ ok: boolean; error?: string; serverName?: string; fingerprintShort?: string }>;
+  lanPair: (input: { host: string; port: number; code: string; name: string }) => Promise<{ ok: boolean; error?: string }>;
+  /** Counter: check the main computer again (after it was unreachable or this counter was removed) */
+  lanRetry: () => Promise<unknown>;
+  lanLeaveCounter: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Main computer: opens the counters' port in Windows Firewall (asks for administrator approval) */
+  lanAllowFirewall: () => Promise<{ success: boolean; error?: string }>;
+  lanGetAutoStart: () => Promise<boolean>;
+  lanSetAutoStart: (on: boolean) => Promise<boolean>;
+  relaunch: () => Promise<void>;
+}
+
+export interface LanInfo {
+  /** The role this run started with */
+  mode: 'standalone' | 'server' | 'client';
+  /** The role saved by the Developer (used after the next restart) */
+  savedMode: 'standalone' | 'server' | 'client';
+  port: number;
+  terminalName: string | null;
+  serverHost: string | null;
+  serverPort: number | null;
+}
+
+/** Settings → Counters (LAN): GET /api/lan/status */
+export interface LanTerminal {
+  id: number;
+  name: string;
+  is_server: boolean;
+  paired_at: string | null;
+  last_seen_at: string | null;
+  last_ip: string | null;
+  app_version: string | null;
+  revoked: boolean;
+  online: boolean;
+}
+
+export interface LanStatus {
+  mode: 'standalone' | 'server' | 'client';
+  port: number;
+  addresses: string[];
+  fingerprint: string | null;
+  fingerprint_short: string;
+  version: string;
+  this_terminal: { id: number; name: string; isServer: boolean } | null;
+  pairing_code_active: boolean;
+  terminals: LanTerminal[];
 }
 
 declare global {

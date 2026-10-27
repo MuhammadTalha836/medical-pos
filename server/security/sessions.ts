@@ -10,6 +10,8 @@ interface SessionRecord {
   role: string;
   createdAt: number;
   lastSeenAt: number;
+  /** The LAN terminal (counter or main computer) the login came from; null outside LAN mode tests */
+  terminalId: number | null;
 }
 
 export const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
@@ -26,9 +28,9 @@ function idleLimit(role: string): number {
   return role === 'developer' ? DEVELOPER_SESSION_IDLE_MS : SESSION_IDLE_MS;
 }
 
-export function createSession(user: { id: number; role: string }, now: number = Date.now()): string {
+export function createSession(user: { id: number; role: string }, now: number = Date.now(), terminalId: number | null = null): string {
   const token = crypto.randomBytes(32).toString('base64url');
-  sessions.set(hashToken(token), { userId: user.id, role: user.role, createdAt: now, lastSeenAt: now });
+  sessions.set(hashToken(token), { userId: user.id, role: user.role, createdAt: now, lastSeenAt: now, terminalId });
   return token;
 }
 
@@ -55,6 +57,13 @@ export function revokeUserSessions(userId: number, exceptToken?: string | null):
   const keep = exceptToken ? hashToken(exceptToken) : null;
   for (const [key, session] of sessions) {
     if (session.userId === userId && key !== keep) sessions.delete(key);
+  }
+}
+
+/** Ends every session started on a counter, e.g. when its access is removed (M11). */
+export function revokeTerminalSessions(terminalId: number): void {
+  for (const [key, session] of sessions) {
+    if (session.terminalId === terminalId) sessions.delete(key);
   }
 }
 

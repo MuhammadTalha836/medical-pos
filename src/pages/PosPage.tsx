@@ -173,6 +173,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   const discountInputRef = useRef<HTMLInputElement>(null);
   const customerNameInputRef = useRef<HTMLInputElement>(null);
   const isSubmittingRef = useRef<boolean>(false);
+  // One id per bill attempt: pressing F9 again for the same unchanged bill (e.g. after the main computer did not
+  // answer) sends the same id, so the server never saves it twice
+  const saleAttemptRef = useRef<{ payload: string; id: string } | null>(null);
   const receiptContainerRef = useRef<HTMLDivElement>(null);
 
   const canDiscount = hasPermission('can_discount');
@@ -532,7 +535,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         redeem_points: loyaltyPreview?.used || 0
       };
 
-      const result = await api.createSale(salePayload);
+      const payloadKey = JSON.stringify(salePayload);
+      if (saleAttemptRef.current?.payload !== payloadKey) {
+        saleAttemptRef.current = { payload: payloadKey, id: crypto.randomUUID() };
+      }
+      const result = await api.createSale({ ...salePayload, client_request_id: saleAttemptRef.current.id });
+      saleAttemptRef.current = null;
 
       if (result.success) {
         // The receipt shows the sale exactly as the server priced and stored it
@@ -554,7 +562,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         }
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to process sale');
+      // No answer at all (a counter that lost the main computer): the bill stays as it is
+      if (err instanceof TypeError) {
+        setErrorMessage('The main computer is not reachable. The bill is kept; press F9 again when it is connected.');
+      } else {
+        setErrorMessage(err.message || 'Failed to process sale');
+      }
     } finally {
       isSubmittingRef.current = false;
       setLoadingSale(false);

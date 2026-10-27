@@ -21,8 +21,8 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 | M7 | WhatsApp receipts and khata reminders | ✅ |
 | M8 | Expenses and day close (cash book) | ✅ |
 | M9 | Physical stock count and stock adjustment | ✅ |
-| M10 | Loyalty points / regular-customer discount | 🟡 built and tested; waiting for the owner's check |
-| M11 | Multi-PC LAN mode (see `MULTI_PC_LAN_MODE.md`) | ⬜ |
+| M10 | Loyalty points / regular-customer discount | ✅ |
+| M11 | Multi-PC LAN mode (see `MULTI_PC_LAN_MODE.md`, installer guide `LAN_SETUP_GUIDE.md`) | 🟡 built and tested on one computer; waiting for the owner's two-PC check |
 
 FBR POS integration is left out: it needs the internet and FBR registration, which breaks the "100% Offline" promise.
 
@@ -465,3 +465,15 @@ Supplier payments are not taken from a shift's cash drawer: owners usually pay d
 
 ## M11: Multi-PC LAN mode
 Follows `docs/MULTI_PC_LAN_MODE.md` (audit-first, with its own phases). It is started only after M1–M10, because every module above must work with several counters.
+
+**Owner decisions (2026-10-26):** HTTPS with a self-signed certificate made by the main computer, pinned by each counter (library `selfsigned`); one login at a time except Admin and Developer; an in-app **Allow through firewall** button plus the manual command; the installer guide in Roman Urdu + English.
+
+**Built:**
+- Per-computer role in `<dataDir>/lan-config.json`: `standalone` (default), `server` (main computer: the API also listens with HTTPS on 0.0.0.0, port 4545), `client` (counter: no database; the window loads the main computer's app).
+- `terminals` table; pairing with a 6-digit code (5 minutes, once, 5 wrong tries lock 15 minutes); counter key sent by the main process only; Remove access ends that counter's sessions.
+- `lanGate`: remote requests need a paired key; Developer, setup, restore, backup folders and the network setting are main-computer only; versions must match.
+- Shifts belong to the counter they were opened on; sales, returns and shifts store the counter name; `client_request_id` makes a retried sale return the saved one.
+- UI: Settings → **Counters (LAN)**, Developer → **Network (LAN)**, setup wizard link "This computer is a counter", header pill, counter name on shifts, sales history and receipts. Counter screens (pairing, connecting, update, leave) in `electron/lan/connectPage.ts`.
+- Docs: `docs/LAN_SETUP_GUIDE.md` (step-by-step installation, troubleshooting, acceptance checklist).
+
+**Tests:** `server/lan/lanMath.spec.ts` and `test:m11` (10 tests). Not testable on one computer: TLS pinning between two PCs, tray, firewall and auto-start; these are in the guide's acceptance checklist.

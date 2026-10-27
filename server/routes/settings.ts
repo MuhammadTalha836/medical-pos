@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { LOCAL_ONLY_SETTING_KEYS } from '../lan/lanMath';
 import { prisma } from '../database/prisma';
 import { logSecurityAudit } from '../security/audit';
 import { DEVELOPER_TOTP_STATE_KEYS } from '../security/developerAuth';
@@ -122,6 +123,8 @@ router.post('/api/settings', async (req: Request, res: Response) => {
     delete settings.setup_completed;
     delete settings.developer_email;
     for (const key of INTERNAL_SETTING_KEYS) delete settings[key];
+    // Backup folders are on the main computer's disk: a counter PC cannot change them (M11)
+    if (res.locals.lanRemote) for (const key of LOCAL_ONLY_SETTING_KEYS) delete settings[key];
 
     // Thermal-only invoices: reject A3/A4/A5 sizes and retired sheet templates
     if (settings.default_invoice_template !== undefined && !isValidTemplate(settings.default_invoice_template)) {

@@ -8,6 +8,7 @@ import { createSession, revokeSession, revokeUserSessions } from '../security/se
 import { getLicenseState } from '../security/license';
 import { parseBody, developerLoginSchema, loginSchema } from '../validation/schemas';
 import { getActingUser, sendError, SESSION_REQUIRED_ERROR, LICENSE_EXPIRED_ERROR } from '../http/context';
+import { requestTerminal } from '../lan/lanGate';
 import { sessionUserPayload } from '../http/formatters';
 import { PASSWORD_MIN_MESSAGE, isValidPassword } from '../../shared/passwords';
 
@@ -95,7 +96,7 @@ router.post('/api/auth/developer-login', async (req: Request, res: Response) => 
 
     res.json({
       success: true,
-      token: createSession(devUser),
+      token: createSession(devUser, Date.now(), requestTerminal(res)?.id ?? null),
       user: await sessionUserPayload(devUser)
     });
   } catch (error: unknown) {
@@ -213,9 +214,12 @@ router.post('/api/auth/login', async (req: Request, res: Response) => {
       userName: user.username
     });
 
+    // One sign-in at a time for counter staff: signing in on another counter ends the earlier session (M11)
+    if (user.role !== 'admin' && user.role !== 'developer') revokeUserSessions(user.id);
+
     res.json({
       success: true,
-      token: createSession(user),
+      token: createSession(user, Date.now(), requestTerminal(res)?.id ?? null),
       user: await sessionUserPayload(user)
     });
   } catch (error: unknown) {

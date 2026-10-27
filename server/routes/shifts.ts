@@ -7,6 +7,7 @@ import { getActingUser, sessionIdentity, hasRolePermission, sendError } from '..
 import { loadShiftTotals } from '../shifts/loadShiftTotals';
 import type { ShiftTotals } from '../shifts/shiftTotals';
 import { localDateKey } from '../../shared/dates';
+import { requestTerminal } from '../lan/lanGate';
 
 // Cashier shifts and drawer reconciliation
 const router = Router();
@@ -37,6 +38,8 @@ function shiftPayload(shift: ShiftRecord, live: ShiftTotals | null, durationMinu
     total_expenses_cash: live ? live.totalExpensesCash : shift.totalExpensesCash,
     notes: shift.notes,
     status: shift.status,
+    terminal_id: shift.terminalId,
+    terminal_name: shift.terminalName,
     created_at: shift.createdAt,
     updated_at: shift.updatedAt
   };
@@ -168,24 +171,35 @@ router.post('/api/shifts/start', async (req: Request, res: Response) => {
       });
     }
 
-    // Generate unique shift number: e.g. SH-YYYYMMDD-0001
+    // Unique shift number, e.g. SH-YYYYMMDD-0001. Two counters may start shifts at the same moment (LAN mode),
+    // so a number taken in between is retried with the next one.
     const today = localDateKey();
-    const countToday = await prisma.cashierShift.count({
-      where: { shiftNo: { startsWith: `SH-${today}-` } }
-    });
-    const shiftNo = `SH-${today}-${String(countToday + 1).padStart(4, '0')}`;
-
-    const newShift = await prisma.cashierShift.create({
-      data: {
-        shiftNo,
-        userId: Number(user_id),
-        userName: user_name || 'Cashier',
-        startTime: new Date(),
-        openingCash,
-        notes: notes || null,
-        status: 'open'
+    const terminal = requestTerminal(res);
+    let newShift: Awaited<ReturnType<typeof prisma.cashierShift.create>> | null = null;
+    for (let attempt = 0; !newShift; attempt++) {
+      const countToday = await prisma.cashierShift.count({
+        where: { shiftNo: { startsWith: `SH-${today}-` } }
+      });
+      try {
+        newShift = await prisma.cashierShift.create({
+          data: {
+            shiftNo: `SH-${today}-${String(countToday + 1 + attempt).padStart(4, '0')}`,
+            userId: Number(user_id),
+            userName: user_name || 'Cashier',
+            startTime: new Date(),
+            openingCash,
+            notes: notes || null,
+            status: 'open',
+            terminalId: terminal?.id ?? null,
+            terminalName: terminal?.name ?? null
+          }
+        });
+      } catch (err: any) {
+        if (attempt < 4 && (err?.code === 'P2002' || String(err?.message).includes('Unique constraint'))) continue;
+        throw err;
       }
-    });
+    }
+    const shiftNo = newShift.shiftNo;
 
     await prisma.auditLog.create({
       data: {

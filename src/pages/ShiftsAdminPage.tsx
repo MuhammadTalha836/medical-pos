@@ -43,6 +43,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [cashierFilter, setCashierFilter] = useState<string>('all');
+  const [terminalFilter, setTerminalFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -190,7 +191,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
 
   const handleExportCSV = () => {
     const headers = [
-      'Shift #', 'Cashier Name', 'Cashier ID', 'Start Time', 'Close Time',
+      'Shift #', 'Cashier Name', 'Cashier ID', 'Counter', 'Start Time', 'Close Time',
       'Duration (min)', 'Opening Cash', 'Total Sales', 'Cash Sales', 'Card Sales',
       'Credit Sales', 'Returns', 'Cash Expenses', 'Expected Cash', 'Actual Cash', 'Variance', 'Status'
     ];
@@ -198,6 +199,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
       s.shift_no,
       s.user_name,
       s.user_id,
+      s.terminal_name || '',
       s.start_time ? new Date(s.start_time).toLocaleString() : '',
       s.end_time ? new Date(s.end_time).toLocaleString() : 'Active',
       s.duration_minutes ?? '',
@@ -233,13 +235,21 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [shifts]);
 
+  // Counters (multi-PC shops); the filter shows only when shifts came from more than one computer
+  const terminalsList = React.useMemo(
+    () => [...new Set(shifts.map(s => s.terminal_name).filter((n): n is string => !!n))].sort((a, b) => a.localeCompare(b)),
+    [shifts]
+  );
+
   const filteredShifts = shifts.filter(s => {
     if (cashierFilter !== 'all' && s.user_id !== Number(cashierFilter)) return false;
+    if (terminalFilter !== 'all' && (s.terminal_name || '') !== terminalFilter) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
       s.shift_no?.toLowerCase().includes(q) ||
       s.user_name?.toLowerCase().includes(q) ||
+      s.terminal_name?.toLowerCase().includes(q) ||
       String(s.user_id).includes(q)
     );
   });
@@ -274,8 +284,9 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
     setSearchQuery('');
     setStatusFilter('all');
     setCashierFilter('all');
+    setTerminalFilter('all');
   };
-  const hasFilters = !!(dateFrom || dateTo || searchQuery || statusFilter !== 'all' || cashierFilter !== 'all');
+  const hasFilters = !!(dateFrom || dateTo || searchQuery || statusFilter !== 'all' || cashierFilter !== 'all' || terminalFilter !== 'all');
 
   return (
     <div className="flex-1 p-6 space-y-6 overflow-y-auto bg-slate-50 dark:bg-[#0a0e17] text-slate-800 dark:text-slate-100 transition-colors duration-200">
@@ -393,6 +404,23 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
             </select>
             <ChevronDown className="w-4 h-4 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
           </div>
+          {terminalsList.length > 1 && (
+            <div className="relative">
+              <select
+                id="shift-terminal-filter"
+                value={terminalFilter}
+                onChange={e => setTerminalFilter(e.target.value)}
+                className="field-select field-sm"
+                aria-label="Counter"
+              >
+                <option value="all">All Counters</option>
+                {terminalsList.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 absolute right-2 top-2.5 text-slate-400 pointer-events-none" />
+            </div>
+          )}
           <div className="relative">
             <select
               id="shift-status-filter"
@@ -474,7 +502,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                     <td className="py-2.5 px-3 font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">{shift.shift_no}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="font-semibold text-slate-800 dark:text-slate-200">{shift.user_name}</div>
-                      <div className="text-2xs text-slate-400 font-mono">ID #{shift.user_id}</div>
+                      <div className="text-2xs text-slate-400 font-mono">ID #{shift.user_id}{shift.terminal_name ? ` · ${shift.terminal_name}` : ''}</div>
                     </td>
                     <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-xs whitespace-nowrap">
                       {new Date(shift.start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}

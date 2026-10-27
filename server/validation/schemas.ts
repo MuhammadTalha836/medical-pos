@@ -6,6 +6,7 @@ import { PASSWORD_MIN, PASSWORD_MIN_MESSAGE } from '../../shared/passwords';
 import { PRESCRIPTION_NOTES_MAX, PRESCRIPTION_TEXT_MAX, isValidCnic } from '../../shared/schedule';
 import { EXPENSE_AMOUNT_MAX, EXPENSE_CATEGORY_MAX, EXPENSE_PAYMENT_METHODS, EXPENSE_TEXT_MAX } from '../../shared/expenses';
 import { LOYALTY_ADJUST_MAX, LOYALTY_NOTES_MAX, LOYALTY_PLAN_NAME_MAX } from '../../shared/loyalty';
+import { TERMINAL_NAME_MAX } from '../lan/lanMath';
 import { MANUAL_ADJUST_REASONS, STOCK_NOTES_MAX, STOCK_UNITS_MAX } from '../../shared/stockAdjust';
 
 // Request-body schemas for the API. Messages match the API's existing error contract.
@@ -134,6 +135,7 @@ const prescriptionSchema = z.looseObject({
 export const createSaleSchema = z.looseObject({
   items: z.array(saleItemSchema, { error: 'Sale must include at least one item.' }).min(1, { error: 'Sale must include at least one item.' }),
   prescription: prescriptionSchema.nullish(),
+  client_request_id: z.string().trim().min(8).max(64).regex(/^[A-Za-z0-9_-]+$/, { error: 'Invalid request id' }).optional(),
   redeem_points: z.coerce.number({ error: 'Points to use must be a whole number' }).int({ error: 'Points to use must be a whole number' })
     .min(0, { error: 'Points to use must be a whole number' }).max(10_000_000).optional()
 });
@@ -285,6 +287,24 @@ export const loyaltyAdjustSchema = z.looseObject({
 
 export const customerPlanSchema = z.looseObject({
   plan_id: z.coerce.number({ error: 'Choose a plan' }).int().positive({ error: 'Choose a plan' }).nullable()
+});
+
+const terminalName = z.string({ error: 'Give this counter a name, e.g. Counter 1' }).trim()
+  .min(1, { error: 'Give this counter a name, e.g. Counter 1' })
+  .max(TERMINAL_NAME_MAX, { error: `The counter name cannot exceed ${TERMINAL_NAME_MAX} characters` });
+
+export const lanPairSchema = z.looseObject({
+  code: z.string({ error: 'Enter the 6-digit code shown on the main computer' }).trim().regex(/^\d{6}$/, { error: 'Enter the 6-digit code shown on the main computer' }),
+  name: terminalName,
+  version: z.string().max(40).optional()
+});
+
+export const terminalRenameSchema = z.looseObject({ name: terminalName });
+
+export const lanModeSchema = z.looseObject({
+  mode: z.enum(['standalone', 'server'], { error: 'Choose Standalone or Main computer' }),
+  port: z.coerce.number({ error: 'The port must be a number between 1024 and 65535' }).int()
+    .min(1024, { error: 'The port must be a number between 1024 and 65535' }).max(65535, { error: 'The port must be a number between 1024 and 65535' }).optional()
 });
 
 export function parseBody<T extends z.ZodType>(schema: T, body: unknown, res: Response): z.infer<T> | null {

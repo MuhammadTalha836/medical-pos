@@ -109,6 +109,8 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
       <div className={`flex flex-wrap justify-between gap-x-2 ${fs.xs} text-gray-700`}>
         {isVisible('show_invoice_date') && <span>{dateText}</span>}
         {isVisible('show_cashier_name') && <span>Cashier: {invoice.user_name || 'Staff'}</span>}
+        {/* Multi-PC shops: the counter, except for bills made on the main computer itself (SERVER_TERMINAL_NAME) */}
+        {invoice.terminal_name && invoice.terminal_name !== 'Main computer' && <span>{invoice.terminal_name}</span>}
       </div>
       {isVisible('show_customer_name') && invoice.customer_name && (
         <div className={fs.xs}>

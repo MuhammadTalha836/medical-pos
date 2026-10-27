@@ -8,4 +8,5 @@ if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
+export const DATA_DIR = DB_DIR;
 export const DB_PATH = path.join(DB_DIR, 'pharmacy.db');

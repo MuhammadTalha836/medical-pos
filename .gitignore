@@ -14,6 +14,10 @@ dist-server/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+# LAN mode (per computer): role file and the main computer's certificate + private key
+data/lan-config.json
+data/lan-config.json.tmp
+data/lan-cert/
 *.sqlite
 *.sqlite3
 

@@ -11,6 +11,7 @@ import { RolesTab } from '../components/settings/RolesTab';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { ReceiptPrinterCard } from '../components/settings/ReceiptPrinterCard';
 import { LoyaltySettingsTab } from '../components/loyalty/LoyaltySettingsTab';
+import { CountersTab } from '../components/lan/CountersTab';
 import { moneyFormatter } from '../utils/format';
 import {
   DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
@@ -42,7 +43,8 @@ import {
   Eye,
   Sliders,
   Sparkles,
-  Check
+  Check,
+  Network
 } from 'lucide-react';
 
 const TEMPLATE_CARDS: { id: InvoiceTemplateType; title: string; description: string; icon: React.ElementType }[] = [
@@ -152,8 +154,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
   const { theme, setTheme } = useThemeStore();
   const { user, hasPermission } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles' | 'loyalty'>('store');
+  const [activeTab, setActiveTab] = useState<'store' | 'invoice' | 'users' | 'roles' | 'loyalty' | 'counters'>('store');
   const showLoyalty = settings?.loyalty_feature_allowed === 'true' && hasPermission('can_manage_loyalty');
+  // Counters exist only once the Developer turned on several computers (Developer → Network (LAN)) and this
+  // computer runs as the main computer; a single-PC pharmacy never sees the tab
+  const [isMainComputer, setIsMainComputer] = useState(false);
+  const showCounters = isMainComputer && hasPermission('can_manage_terminals');
+  useEffect(() => {
+    void window.electronAPI?.lanInfo()
+      .then(info => setIsMainComputer(info.mode === 'server' && info.savedMode === 'server'))
+      .catch(() => undefined);
+  }, []);
+  const hideCounters = () => {
+    setIsMainComputer(false);
+    setActiveTab('store');
+  };
   const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplateType>('classic');
   const [previewPaperSize, setPreviewPaperSize] = useState<InvoicePaperSize>('80mm');
   const previewMountRef = useRef<HTMLDivElement>(null);
@@ -344,6 +359,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
           >
             <Award className="w-4 h-4" />
             <span>Loyalty Points</span>
+          </button>
+        )}
+
+        {showCounters && (
+          <button
+            onClick={() => setActiveTab('counters')}
+            className={`flex items-center space-x-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all ${
+              activeTab === 'counters'
+                ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            <Network className="w-4 h-4" />
+            <span>Counters (LAN)</span>
           </button>
         )}
       </div>
@@ -1116,6 +1145,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
       {activeTab === 'loyalty' && showLoyalty && (
         <LoyaltySettingsTab settings={settings} money={moneyFormatter(settings)} onRefreshSettings={onRefreshSettings} />
       )}
+
+      {activeTab === 'counters' && showCounters && <CountersTab onLanOff={hideCounters} />}
     </div>
   );
 };

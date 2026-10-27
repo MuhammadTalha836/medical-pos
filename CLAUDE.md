@@ -39,6 +39,7 @@ npm run test:m7          # WhatsApp templates: defaults, save, cashier 403, leng
 npm run test:m8          # expenses and day close: cash expense lowers shift cash, closed shift/day locks, own-only list, day-close figures, automatic midnight close, range report
 npm run test:m9          # stock count and adjustment: count changes nothing until Apply, later sales kept, batches = stock, adjustments by batch/reason, permissions, history
 npm run test:m10         # loyalty: Developer gate + Admin switch, plans, earn/redeem/member discount, returns, expiry, auto upgrade, manual points
+npm run test:m11         # LAN: pairing, unpaired/remote refusals, local-only routes, version check, revoke, one login, shift per counter, idempotent sale, last unit
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -183,6 +184,13 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - Ledger helpers in `server/loyalty/loyaltyStore.ts` (caller's transaction): `addPoints`/`removePoints` (lots with `remaining`, never below 0), `expireDuePoints`, `recomputeBalance` (cached `customers.loyalty_points`), `maybeUpgrade`.
   - `POST /api/sales` applies the plan after `totalSale` (member discount, `redeem_points`), then writes redeem and earn rows; `POST /api/sales/return` reverses by share. Routes: `server/routes/loyalty.ts` (plans, templates, members, `/api/customers/:id/loyalty`, `.../loyalty/adjust`, `PUT /api/customers/:id/plan`). `/api/customers/search` adds `loyalty_plan` and `points_value` while loyalty is on.
   - UI: `src/components/loyalty/`, POS totals panel, `UnifiedInvoice` rows; the POS draft keeps `customerLoyalty`/`redeemPoints` per invoice tab.
+- **Multi-PC LAN mode (M11).** Installer guide: `docs/LAN_SETUP_GUIDE.md`.
+  - Each computer's role is in `<dataDir>/lan-config.json` (`server/lan/lanConfig.ts`), never in the database: `standalone` (default), `server` (main computer; `electron/lan/serverMode.ts` adds an HTTPS listener on 0.0.0.0, default port 4545, with a self-signed certificate in `<dataDir>/lan-cert/`, a tray and close-to-tray) or `client` (counter; `electron/lan/clientMode.ts` starts **no API and no database** and loads `https://host:port/`).
+  - The counter pins the certificate fingerprint at pairing (`certificate-error` accepts only it) and its main process adds `X-Terminal-Key` / `X-App-Version` (`onBeforeSendHeaders`); the page never sees the key. Its own screens (pairing, connecting, update, leave with the Developer code) are `electron/lan/connectPage.ts`.
+  - `lanGate` (`server/lan/lanGate.ts`, before `sessionGate`): a loopback request is the main computer; a remote one needs a paired, non-revoked key (`terminals`, sha256 hash) or gets 401 `TERMINAL_NOT_PAIRED`. `isLocalOnly` (`server/lan/lanMath.ts`) blocks setup, Developer login/routes, restore and the LAN mode/pairing-code routes remotely (403); `LOCAL_ONLY_SETTING_KEYS` are stripped from remote settings writes; a version mismatch gets 426. Tests mark a request remote with `x-test-remote: 1` under `TEST_MODE`.
+  - `requestTerminal(res)` gives the request's terminal. Shifts store it; sales and returns from another terminal get 403 `SHIFT_ON_OTHER_COUNTER`; sales, returns and shifts store `terminal_id` / `terminal_name`. Sessions carry `terminalId`; a non-admin/developer login revokes that user's other sessions; Remove access calls `revokeTerminalSessions`.
+  - `POST /api/sales` takes `client_request_id`: a repeat returns the saved sale (`duplicate: true`). The POS keeps one id per unchanged bill attempt.
+  - Routes `server/routes/lan.ts`; permission `can_manage_terminals`. Status, pairing code, pair, rename and revoke answer 403 `LAN_OFF` unless this computer's mode is `server` (the Developer's switch). UI: Settings → Counters (LAN) (`src/components/lan/CountersTab.tsx`, main computer only), Developer → Network (LAN) (`NetworkPanel.tsx`), header pill, setup wizard link.
 - The module roadmap (M1–M11) is `docs/FEATURE_ROADMAP.md`.
 
 **Frontend.**

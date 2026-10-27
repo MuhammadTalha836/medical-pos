@@ -65,7 +65,8 @@ export const PERMISSION_GROUPS = [
       { key: 'can_manage_shifts', label: 'Manage & Reopen Shifts' },
       { key: 'can_stock_zero', label: 'Reset Stock Zero Audit' },
       { key: 'can_manage_users', label: 'Manage Staff Logins' },
-      { key: 'can_manage_roles', label: 'Manage Cashier & Custom Roles' }
+      { key: 'can_manage_roles', label: 'Manage Cashier & Custom Roles' },
+      { key: 'can_manage_terminals', label: 'Manage Counter Computers (LAN)' }
     ]
   }
 ] as const;

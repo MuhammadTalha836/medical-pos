@@ -290,6 +290,7 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                     </td>
                     <td className="py-3 px-4 text-slate-600 dark:text-slate-300">
                       {new Date(sale.sale_date).toLocaleDateString()} {new Date(sale.sale_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {sale.terminal_name && <div className="text-2xs text-slate-500 dark:text-slate-400">{sale.terminal_name}</div>}
                     </td>
                     <td className="py-3 px-4 text-slate-900 dark:text-white font-medium">
                       <div>{sale.customer_name}</div>

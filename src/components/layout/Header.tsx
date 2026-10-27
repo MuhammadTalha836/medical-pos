@@ -5,7 +5,7 @@ import { useShiftStore } from '../../store/useShiftStore';
 import { ProfileModal } from '../auth/ProfileModal';
 import { AppLogo } from '../common/AppLogo';
 import { api } from '../../services/apiService';
-import { LicenseStatus, SystemSettings } from '../../types';
+import { LanInfo, LicenseStatus, SystemSettings } from '../../types';
 import { SupportModal } from './SupportModal';
 import { developerInfoFor } from '../../../shared/developerProfile';
 import {
@@ -17,6 +17,9 @@ import {
   Moon,
   LogOut,
   LifeBuoy,
+  Monitor,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { useShiftElapsed } from '../../hooks/useShiftElapsed';
 
@@ -61,6 +64,19 @@ export const Header: React.FC<HeaderProps> = ({ settings, onQuickBackup, onOpenC
     return () => clearInterval(interval);
   }, []);
 
+  // Multi-PC shop: which computer this is, and on a counter whether the main computer answers (every 10 s)
+  const [lan, setLan] = useState<LanInfo | null>(null);
+  const [connected, setConnected] = useState(true);
+  useEffect(() => {
+    window.electronAPI?.lanInfo().then(setLan).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (lan?.mode !== 'client') return;
+    const check = () => api.getLanHealth().then(() => setConnected(true)).catch(() => setConnected(false));
+    const interval = setInterval(check, 10000);
+    return () => clearInterval(interval);
+  }, [lan?.mode]);
+
   const elapsedFormatted = useShiftElapsed(activeShift?.start_time);
 
   return (
@@ -89,6 +105,23 @@ export const Header: React.FC<HeaderProps> = ({ settings, onQuickBackup, onOpenC
             <p className="text-xs text-slate-500 dark:text-slate-400">100% Offline POS</p>
           </div>
         </div>
+
+        {lan?.mode === 'server' && lan.savedMode === 'server' && (
+          <span className="hidden md:inline-flex items-center gap-1.5 badge-info" title="Counters connect to this computer">
+            <Monitor className="w-3.5 h-3.5" />
+            Main computer
+          </span>
+        )}
+        {lan?.mode === 'client' && (
+          <span
+            className={`hidden md:inline-flex items-center gap-1.5 ${connected ? 'badge-success' : 'badge-danger'}`}
+            title={connected ? `Connected to the main computer (${lan.serverHost})` : 'The main computer is not answering. Check it is on and connected.'}
+            role="status"
+          >
+            {connected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+            {lan.terminalName || 'Counter'}{connected ? '' : ': reconnecting…'}
+          </span>
+        )}
 
       </div>
 

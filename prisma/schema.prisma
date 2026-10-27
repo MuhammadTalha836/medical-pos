@@ -185,6 +185,9 @@ model Sale {
   pointsEarned          Int      @default(0) @map("points_earned")
   loyaltyPlanName       String?  @map("loyalty_plan_name")
   pointsBalance         Int?     @map("points_balance")
+  terminalId            Int?     @map("terminal_id")
+  terminalName          String?  @map("terminal_name")
+  clientRequestId       String?  @map("client_request_id")
   createdAt         DateTime     @default(now()) @map("created_at")
 
   customer          Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -238,6 +241,8 @@ model SaleReturn {
   userId            Int?             @map("user_id")
   userName          String?          @map("user_name")
   shiftId           Int?             @map("shift_id")
+  terminalId        Int?             @map("terminal_id")
+  terminalName      String?          @map("terminal_name")
   createdAt         DateTime         @default(now()) @map("created_at")
 
   sale              Sale?            @relation(fields: [saleId], references: [id], onDelete: SetNull)
@@ -560,6 +565,21 @@ model LoyaltyTransaction {
   @@map("loyalty_transactions")
 }
 
+model Terminal {
+  id         Int       @id @default(autoincrement())
+  name       String
+  keyHash    String?   @unique @map("key_hash")
+  isServer   Int       @default(0) @map("is_server")
+  pairedAt   DateTime? @map("paired_at")
+  lastSeenAt DateTime? @map("last_seen_at")
+  lastIp     String?   @map("last_ip")
+  appVersion String?   @map("app_version")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("terminals")
+}
+
 model SystemSetting {
   key   String @id
   value String
@@ -625,6 +645,8 @@ model CashierShift {
   totalExpensesCash     Float             @default(0.0) @map("total_expenses_cash")
   notes                 String?
   status                String            @default("open")
+  terminalId            Int?              @map("terminal_id")
+  terminalName          String?           @map("terminal_name")
   createdAt             DateTime          @default(now()) @map("created_at")
   updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at")
 

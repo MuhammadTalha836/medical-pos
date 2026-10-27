@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { COLUMN_MIGRATIONS, SCHEMA_SQL } from './schema';
+import { COLUMN_MIGRATIONS, POST_MIGRATION_SQL, SCHEMA_SQL } from './schema';
 import { seedInitialData } from './seed';
 import { DB_PATH } from './paths';
 
@@ -27,6 +27,7 @@ function initDatabase(): Database.Database {
   // Tables, indexes, then columns added since the first release
   db.exec(SCHEMA_SQL);
   applyColumnMigrations(db);
+  db.exec(POST_MIGRATION_SQL);
 
   // Default settings and roles (never overwrites existing rows)
   seedInitialData(db);

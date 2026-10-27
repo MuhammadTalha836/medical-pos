@@ -14,6 +14,17 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 - App icon (`build/icon.png`, source `build/icon.svg`): installer, `.exe`, window, taskbar and the in-app logo.
 - Developer profile & advertising: the Developer enters name, company, phone, WhatsApp, email, website and a message (Developer → Developer Profile) and picks which details show on the login screen, the sidebar, the sale receipt and the new Support window (Header → Support). Staff cannot change or hide them; each sale keeps the receipt line it was printed with.
 
+### Added (M11: several computers in one shop, LAN mode)
+- **Main computer and counters:** a shop with several computers keeps all data on one **main computer**; the others are **counters** that sell from it over the shop network, with no internet. A shop with one computer works as before.
+- **Developer → Network (LAN):** make this computer the main computer (port 4545 by default) or a counter. Changing it never deletes data.
+- **Settings → Counters (LAN)** (main computer, Admin): this computer's address, port and security code; **Make pairing code** (6 digits, 5 minutes, once); the counters list with online state, last seen, address and version; **Rename**, **Remove access**, **Allow through firewall**, **Start with Windows**.
+- **Counter screens:** pairing (address, port, code, name, then compare the security code), *Connecting to the main computer* with automatic retry, *Please update this computer* when the versions differ, and **Leave counter mode** with the Developer code. The setup wizard's first screen has **This computer is a counter**.
+- **Safe for several counters:** the connection is encrypted and only paired counters get in; a shift belongs to the counter it was opened on; a cashier signing in on another counter is signed out from the first (Admin may be on several); a bill sent again after a network drop is saved once; two counters cannot both sell the last unit. Setup, Developer sign-in, restore, backup folders and the network setting work only on the main computer.
+- The counter name shows on Shifts (with a filter), Sales History and the receipt. The header shows *Main computer*, or the counter's name with a connected / reconnecting light.
+- On the main computer the close button hides the app to the tray so counters keep working; Quit from the tray asks first.
+- New permission **Manage Counter Computers (LAN)** (Admin). Pairing, renaming, removing and network changes are written to the audit log.
+- Installer guide: `docs/LAN_SETUP_GUIDE.md` (Roman Urdu + English).
+
 ### Added (M10: loyalty points and member plans)
 - **Developer switch:** Developer → Admin permissions → **Allow Loyalty Points for This Store**. Until it is on, the Admin sees nothing about loyalty.
 - **Settings → Loyalty Points** (Admin):

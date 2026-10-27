@@ -9,6 +9,7 @@ import { DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
 import { priceReturn, priceSaleLine, settleCash, totalSale } from '../sales/saleMath';
 import { localDateKey, localDateString } from '../../shared/dates';
 import { applyLoyalty, expiryDate, pointsEarned, returnedShare, shareDue } from '../../shared/loyalty';
+import { requestTerminal, type RequestTerminal } from '../lan/lanGate';
 import { addPoints, expireDuePoints, LOYALTY_UNAVAILABLE, loyaltyActive, maybeUpgrade, planOf, planRules, recomputeBalance, removePoints } from '../loyalty/loyaltyStore';
 import { returnUnits, syncProductBatches, takeUnits } from '../stock/batchStock';
 import { missingPrescriptionFields, normalizeSchedule } from '../../shared/schedule';
@@ -29,6 +30,16 @@ async function openShiftIdFor(userId: number | null): Promise<number | null> {
   return shift?.id ?? null;
 }
 
+/**
+ * LAN mode (M11): a shift belongs to the computer it was opened on. Sales and returns from any other counter
+ * are refused, so each drawer's cash matches its own sales. Shifts from before LAN mode have no terminal.
+ */
+async function wrongCounterMessage(shiftId: number, terminal: RequestTerminal | null): Promise<string | null> {
+  const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId }, select: { terminalId: true, terminalName: true } });
+  if (!shift?.terminalId || !terminal || shift.terminalId === terminal.id) return null;
+  return `Your shift is open on ${shift.terminalName || 'another computer'}. Sell from there, or close that shift first.`;
+}
+
 const describeStock = (boxes: number, loose: number, unitType: string) =>
   loose > 0 ? `${boxes} box(es) + ${loose} ${unitType}` : `${boxes} box(es)`;
 
@@ -45,10 +56,22 @@ router.post('/api/sales', async (req: Request, res: Response) => {
     const paymentType = PAYMENT_TYPES.includes(payment_type) ? payment_type : 'Cash';
 
     // Strict shift lock: the sale always goes to the signed-in user's own open shift
+    // A retried request (e.g. after the network dropped) returns the sale already saved instead of selling twice
+    if (body.client_request_id) {
+      const already = await prisma.sale.findFirst({ where: { clientRequestId: body.client_request_id }, include: { items: true } });
+      if (already) {
+        if (already.userId !== (user_id ? Number(user_id) : null)) return res.status(409).json({ error: 'This bill was already saved by another user.' });
+        return res.json({ success: true, duplicate: true, saleId: already.id, invoiceNo: already.invoiceNo, netTotal: already.netTotal, changeDue: already.changeDue, sale: formatSale(already) });
+      }
+    }
+
     const activeShiftId = await openShiftIdFor(user_id);
     if (!activeShiftId) {
       return res.status(403).json({ error: 'No active open cashier shift found. You must start a shift before invoicing.' });
     }
+    const terminal = requestTerminal(res);
+    const wrongCounter = await wrongCounterMessage(activeShiftId, terminal);
+    if (wrongCounter) return res.status(403).json({ error: wrongCounter, code: 'SHIFT_ON_OTHER_COUNTER' });
 
     // A sale may be linked to a saved (khata) customer; a credit sale must be
     const hasCustomerId = customer_id !== undefined && customer_id !== null && customer_id !== '';
@@ -193,6 +216,9 @@ router.post('/api/sales', async (req: Request, res: Response) => {
             } : {}),
             paymentType,
             notes: notes || null,
+            terminalId: terminal?.id ?? null,
+            terminalName: terminal?.name ?? null,
+            clientRequestId: body.client_request_id ?? null,
             storeNameSnapshot: identity.store_name ?? null,
             storeAddressSnapshot: identity.store_address ?? null,
             invoiceFooterSnapshot: composeInvoiceFooter(identity)
@@ -402,6 +428,9 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
     if (!activeShiftId) {
       return res.status(403).json({ error: 'No active open cashier shift found. You must start a shift before processing returns.' });
     }
+    const terminal = requestTerminal(res);
+    const wrongCounter = await wrongCounterMessage(activeShiftId, terminal);
+    if (wrongCounter) return res.status(403).json({ error: wrongCounter, code: 'SHIFT_ON_OTHER_COUNTER' });
 
     const today = localDateKey();
     const requested = body.return_items.map(item => ({
@@ -451,7 +480,9 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
           reason: body.reason?.trim() || null,
           userId: user_id ? Number(user_id) : null,
           userName: user_name || 'Cashier',
-          shiftId: activeShiftId
+          shiftId: activeShiftId,
+          terminalId: terminal?.id ?? null,
+          terminalName: terminal?.name ?? null
         }
       });
 

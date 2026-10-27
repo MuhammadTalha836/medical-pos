@@ -326,6 +326,16 @@ export const SetupWizardModal: React.FC<SetupWizardModalProps> = ({ isOpen, onCo
                 <span>{loading ? 'Verifying...' : 'Unlock Setup'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+
+              {window.electronAPI && (
+                <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                  Shop with more than one computer?{' '}
+                  <button type="button" onClick={() => void window.electronAPI?.lanOpenCounterSetup()} className="font-semibold text-teal-700 dark:text-teal-400 hover:underline">
+                    This computer is a counter
+                  </button>
+                  {' '}(connects to the main computer)
+                </p>
+              )}
             </form>
           )}
 

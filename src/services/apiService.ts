@@ -11,6 +11,7 @@ import {
   LoyaltyPlan,
   LoyaltyPlanInput,
   LoyaltyTemplate,
+  LanStatus,
   StockAdjustInput,
   StockAdjustmentList,
   StockCount,
@@ -99,6 +100,11 @@ async function request<T>(method: string, path: string, options: { body?: unknow
     if ((res.status === 401 && errorData.code === 'SESSION_REQUIRED') || errorData.code === 'LICENSE_EXPIRED') {
       window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { code: errorData.code } }));
     }
+    // Counter PC: this counter was removed on the main computer, or the versions differ; the counter's own
+    // screen takes over (pair again / please update)
+    if (errorData.code === 'TERMINAL_NOT_PAIRED' || errorData.code === 'VERSION_MISMATCH') {
+      void window.electronAPI?.lanRetry();
+    }
     throw new ApiError(errorData.error || `HTTP ${res.status}: ${res.statusText}`, res.status, errorData.code, errorData);
   }
   return res.json();
@@ -150,6 +156,15 @@ export const api = {
     post<{ success: boolean; new_balance: number }>(`/customers/${customerId}/payment`, data),
   getCustomerLedger: (customerId: number) => get<CustomerLedger>(`/customers/${customerId}/ledger`),
   deleteCustomer: (id: number) => del<Success>(`/customers/${id}`),
+
+  // Counters on the shop network (LAN mode)
+  getLanHealth: () => get<{ app: string; version: string; server_time: string; server_name: string; mode: string; paired: boolean }>('/lan/health'),
+  getLanStatus: () => get<LanStatus>('/lan/status'),
+  makePairingCode: () => post<{ code: string; expires_at: string; fingerprint_short: string }>('/lan/pairing-code'),
+  renameTerminal: (id: number, name: string) => put<Success>(`/lan/terminals/${id}`, { name }),
+  revokeTerminal: (id: number) => post<Success>(`/lan/terminals/${id}/revoke`),
+  setLanMode: (mode: 'standalone' | 'server', port: number) =>
+    put<{ success: boolean; restart_needed: boolean; mode: string; port: number }>('/lan/mode', { mode, port }),
 
   // Loyalty points and plans
   getLoyaltyPlans: () => get<LoyaltyPlan[]>('/loyalty/plans'),

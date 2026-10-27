@@ -51,6 +51,7 @@ interface SaleEntity {
   pointsEarned?: number;
   loyaltyPlanName?: string | null;
   pointsBalance?: number | null;
+  terminalName?: string | null;
   createdAt: Date;
   items?: SaleItemEntity[];
 }
@@ -107,6 +108,7 @@ export function formatSale(sale: SaleEntity) {
     points_earned: sale.pointsEarned ?? 0,
     loyalty_plan_name: sale.loyaltyPlanName ?? null,
     points_balance: sale.pointsBalance ?? null,
+    terminal_name: sale.terminalName ?? null,
     created_at: sale.createdAt,
     items: sale.items ? sale.items.map(formatSaleItem) : undefined
   };

@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { clearTerminalCache } from '../lan/lanGate';
 import { prisma } from '../database/prisma';
 import { getBackupList, restoreDatabase, resetStockZero, optimizeDatabase, countRetainedBackups, getLocalRetentionLimit, PRE_RESTORE_KEEP } from '../database/backup';
 import { getCloudStatus, keepingCloudConnection, listCloudBackups, restoreFromCloud } from '../backup/cloud/cloudBackup';
@@ -24,6 +25,8 @@ async function exclusiveRestore<T>(restore: () => Promise<T>): Promise<T> {
   try {
     const result = await restore();
     revokeAllSessions();
+    // The restored database has its own terminals list
+    clearTerminalCache();
     return result;
   } finally {
     restoreRunning = false;

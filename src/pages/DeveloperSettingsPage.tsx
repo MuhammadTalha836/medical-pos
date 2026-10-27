@@ -9,6 +9,7 @@ import { WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { LicensePanel } from '../components/developer/LicensePanel';
 import { AdminPermissionsPanel } from '../components/developer/AdminPermissionsPanel';
 import { DeveloperProfilePanel } from '../components/developer/DeveloperProfilePanel';
+import { NetworkPanel } from '../components/developer/NetworkPanel';
 import { BackupModePicker } from '../components/backup/BackupModePicker';
 import { CloudBackupCard } from '../components/backup/CloudBackupCard';
 import { normalizeBackupMode, usesCloud } from '../../shared/backup';
@@ -34,7 +35,8 @@ import {
   ChevronRight,
   CalendarClock,
   ListChecks,
-  Megaphone
+  Megaphone,
+  Network
 } from 'lucide-react';
 
 // Minimal sale used to preview how the developer footer wraps on the narrowest (58mm) roll
@@ -78,7 +80,7 @@ interface DeveloperSettingsPageProps {
 
 export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ onRefreshSettings }) => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'license' | 'profile' | 'policies' | 'permissions' | 'store' | 'backups' | 'passwords' | 'audit'>('license');
+  const [activeTab, setActiveTab] = useState<'license' | 'profile' | 'policies' | 'permissions' | 'store' | 'backups' | 'network' | 'passwords' | 'audit'>('license');
 
   // Developer settings state
   const [settings, setSettings] = useState<DeveloperSettingsPayload>({
@@ -363,6 +365,18 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
         </button>
 
         <button
+          onClick={() => setActiveTab('network')}
+          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+            activeTab === 'network'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Network className="w-4 h-4" />
+          <span>Network (LAN)</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('passwords')}
           className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
             activeTab === 'passwords'
@@ -411,6 +425,8 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
       {activeTab === 'profile' && <DeveloperProfilePanel onSaved={onRefreshSettings} />}
 
       {activeTab === 'permissions' && <AdminPermissionsPanel />}
+
+      {activeTab === 'network' && <NetworkPanel />}
 
       {/* TAB 1: RBAC POLICIES */}
       {activeTab === 'policies' && (

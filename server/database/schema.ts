@@ -140,6 +140,9 @@ CREATE TABLE IF NOT EXISTS sales (
   points_earned INTEGER NOT NULL DEFAULT 0,
   loyalty_plan_name TEXT,
   points_balance INTEGER,
+  terminal_id INTEGER,
+  terminal_name TEXT,
+  client_request_id TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -176,6 +179,8 @@ CREATE TABLE IF NOT EXISTS sale_returns (
   user_id INTEGER REFERENCES users(id),
   user_name TEXT,
   shift_id INTEGER REFERENCES cashier_shifts(id),
+  terminal_id INTEGER,
+  terminal_name TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -424,6 +429,21 @@ CREATE TABLE IF NOT EXISTS loyalty_transactions (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 14e. LAN terminals (M11): the main computer (is_server = 1) and every paired counter PC.
+-- Only the SHA-256 of a counter's key is stored; a revoked counter is refused at once.
+CREATE TABLE IF NOT EXISTS terminals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  key_hash TEXT UNIQUE,
+  is_server INTEGER NOT NULL DEFAULT 0,
+  paired_at DATETIME,
+  last_seen_at DATETIME,
+  last_ip TEXT,
+  app_version TEXT,
+  revoked_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 15. System Settings
 CREATE TABLE IF NOT EXISTS system_settings (
   key TEXT PRIMARY KEY,
@@ -485,6 +505,8 @@ CREATE TABLE IF NOT EXISTS cashier_shifts (
   total_expenses_cash REAL DEFAULT 0.0,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'open',
+  terminal_id INTEGER,
+  terminal_name TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -518,6 +540,12 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_tx_sale ON loyalty_transactions(sale_id);
  * new databases already have it from SCHEMA_SQL. To add a column: put it in the CREATE TABLE above, add it
  * here, add it to prisma/schema.prisma, and run `npm run prisma:generate`.
  */
+/** Indexes on columns that COLUMN_MIGRATIONS may have just added (run after them) */
+export const POST_MIGRATION_SQL = `
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_client_request ON sales(client_request_id);
+CREATE INDEX IF NOT EXISTS idx_sales_terminal ON sales(terminal_id);
+`;
+
 export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definition: string }> = [
   { table: 'sales', column: 'shift_id', definition: 'INTEGER REFERENCES cashier_shifts(id)' },
   { table: 'sale_returns', column: 'shift_id', definition: 'INTEGER REFERENCES cashier_shifts(id)' },
@@ -563,5 +591,12 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definitio
   { table: 'sales', column: 'points_redeemed_value', definition: 'REAL NOT NULL DEFAULT 0.0' },
   { table: 'sales', column: 'points_earned', definition: 'INTEGER NOT NULL DEFAULT 0' },
   { table: 'sales', column: 'loyalty_plan_name', definition: 'TEXT' },
-  { table: 'sales', column: 'points_balance', definition: 'INTEGER' }
+  { table: 'sales', column: 'points_balance', definition: 'INTEGER' },
+  { table: 'sales', column: 'terminal_id', definition: 'INTEGER' },
+  { table: 'sales', column: 'terminal_name', definition: 'TEXT' },
+  { table: 'sales', column: 'client_request_id', definition: 'TEXT' },
+  { table: 'sale_returns', column: 'terminal_id', definition: 'INTEGER' },
+  { table: 'sale_returns', column: 'terminal_name', definition: 'TEXT' },
+  { table: 'cashier_shifts', column: 'terminal_id', definition: 'INTEGER' },
+  { table: 'cashier_shifts', column: 'terminal_name', definition: 'TEXT' }
 ];

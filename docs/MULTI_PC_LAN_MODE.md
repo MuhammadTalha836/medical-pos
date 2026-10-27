@@ -252,6 +252,24 @@ each terminal prints to its own printer.
 
 ---
 
+## Implemented as (M11, 2026-10-27)
+
+The app already had an HTTP API with server-side sessions, pricing and permissions, so LAN mode did not need the IPC/Operation-Registry rewrite planned above (L1). Mapping:
+
+| Phase | Built |
+|---|---|
+| L0 | Audit: the UI already talks only to `/api` over HTTP; sale/invoice numbering, stock checks and shift totals already run in transactions on the server; SQLite in WAL with `busy_timeout`. |
+| L1 | Not needed: the Express routes are the service layer. |
+| L2 | `server/lan/lanConfig.ts` (`lan-config.json`, per computer, never in the database). Developer → Network (LAN) switches standalone/server; "This computer is a counter" on the setup wizard or the Developer page starts pairing. |
+| L3 | `electron/lan/serverMode.ts`: the same Express app on HTTPS 0.0.0.0:4545, tray, close-to-tray, `powerSaveBlocker`, Start with Windows, firewall rule (UAC + `netsh`). |
+| L4 | `terminals` table, `server/lan/lanGate.ts` (key header, local-only routes, version check), `server/routes/lan.ts` (health, pair, status, pairing code, rename, revoke, mode). Self-signed certificate pinned by fingerprint (`selfsigned`), not a shared password. |
+| L5 | `electron/lan/clientMode.ts`: no API or database; `certificate-error` accepts only the pinned fingerprint; `onBeforeSendHeaders` adds the key (the page never sees it); `connectPage.ts` for pairing, connecting/retry, update and leaving (Developer code). |
+| L6 | Shifts bound to the terminal (`SHIFT_ON_OTHER_COUNTER`), one login per non-admin user, `client_request_id` for retries, terminal name on sales/returns/shifts/receipts; the server clock is used for everything. |
+| L7 | `docs/LAN_SETUP_GUIDE.md` (Roman Urdu + English). The file name differs from `LAN_SETUP.md` above. |
+| L8 | `lanMath.spec.ts`, `test:m11`, full regression. Two-PC checks are the guide's acceptance checklist (owner). |
+
+---
+
 ## Appendix — LAN acceptance checklist
 
 - [ ] Standalone, Server and Client modes install and work; Standalone unchanged.
