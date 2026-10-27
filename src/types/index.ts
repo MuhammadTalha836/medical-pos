@@ -671,7 +671,7 @@ export interface AuditLogEntry {
   module: string;
   details?: string | null;
   affected_user?: string | null;
-  status: 'SUCCESS' | 'FAILED';
+  status: 'SUCCESS' | 'FAILED' | 'DENIED';
   user_id?: number | null;
   user_name?: string | null;
   created_at: string;

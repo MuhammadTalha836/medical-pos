@@ -195,6 +195,11 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             placeholder="Search by Invoice # (e.g. INV-2026...)"
             className="field-input w-full pl-10 pr-4"
           />
+          {!hasPermission('can_view_all_sales') && (
+            <p className="field-hint mt-1">
+              Showing your own invoices.{hasPermission('can_return_sale') ? ' Type a full invoice number to find another cashier\'s bill for a return.' : ''}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center space-x-2">

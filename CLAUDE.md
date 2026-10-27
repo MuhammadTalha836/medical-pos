@@ -40,6 +40,7 @@ npm run test:m8          # expenses and day close: cash expense lowers shift cas
 npm run test:m9          # stock count and adjustment: count changes nothing until Apply, later sales kept, batches = stock, adjustments by batch/reason, permissions, history
 npm run test:m10         # loyalty: Developer gate + Admin switch, plans, earn/redeem/member discount, returns, expiry, auto upgrade, manual points
 npm run test:m11         # LAN: pairing, unpaired/remote refusals, local-only routes, version check, revoke, one login, shift per counter, idempotent sale, last unit
+npm run test:phaseA      # docs/NEXT_PHASES.md Phase A: scoped reads, one open shift race, DENIED audit, restore version/upgrade, local-day dates, P&L discount, product input
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
 npm run rebuild          # compile better-sqlite3 for Electron (dev and the test suites do this on their own when needed)
@@ -71,7 +72,7 @@ Testing notes:
 - `server/database/paths.ts` decides the file: `PHARMACARE_DATA_DIR` or `./data`. Both layers use it; `DATABASE_URL` is only for the Prisma CLI (`prisma.config.ts`).
 - `server/database/db.ts` (better-sqlite3) runs `schema.ts`'s raw SQL and the seed data. `backup.ts` uses it for backups and restores.
 - `server/database/prisma.ts` is the Prisma 7 client (import it from `../generated/prisma/client`, never `@prisma/client`) connected through the better-sqlite3 adapter.
-- Stored dates are in mixed formats (integer ms from Prisma 6, `YYYY-MM-DD HH:MM:SS` from raw SQL, ISO text from Prisma 7). Raw SQL using `DATE(col)` skips the integer rows; see `docs/PROGRESS.md` 1.22.
+- Stored dates are in mixed formats (integer ms from Prisma 6, `YYYY-MM-DD HH:MM:SS` from raw SQL, ISO text from Prisma 7). Never filter raw SQL with `DATE(col)` (NULL for the integers, UTC for the rest): use `localDateSql('col')` from `server/http/sqlDates.ts`, which gives the local calendar day for all three. Prisma `Date` filters use local midnight (`new Date('YYYY-MM-DDT00:00:00')`).
 
 There is no migration tool. A schema change needs all of:
 - the model in `prisma/schema.prisma`;
@@ -93,7 +94,20 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - Logout, password change/reset, disabling and deleting a user revoke sessions (`revokeUserSessions`); a restore revokes every session (`revokeAllSessions`).
 - Staff login locks after 5 wrong passwords for 15 minutes (`failedLoginAttempts`/`lockedUntil`; a password reset unlocks). Every staff password uses `PASSWORD_MIN` (`shared/passwords.ts`); the setup wizard asks for 8.
 - Roles: a non-Developer cannot grant a permission their own role lacks (`assertGrantable` in `roles.ts`), change their own role, or assign an unknown role.
-- Enforcement must be server-side; the UI only hides or locks controls. Users, roles, shifts, sales returns, khata payments, products/companies writes, purchases, reports, dashboard revenue, stock zero, optimize, settings, backups and developer routes check permissions; reading products and creating sales only require a login (`docs/PROGRESS.md` 2.1). New or changed routes must call `requirePermission` / `hasRolePermission`.
+- Enforcement must be server-side; the UI only hides or locks controls. Users, roles, shifts, sales returns, khata payments, products/companies writes, purchases, reports, dashboard revenue, stock zero, optimize, settings, backups and developer routes check permissions; reading products and creating sales only require a login. New or changed routes must call `requirePermission` / `hasRolePermission` / `hasAnyPermission`.
+- **Reads are scoped too (Phase A):**
+  - `GET /api/sales` lists only the user's own bills without `can_view_all_sales`; a user with `can_return_sale` also finds another bill by its complete invoice number.
+  - `GET /api/sales/:id` needs one of: own bill, `can_view_all_sales`, `can_return_sale`, `khata`, `dashboard`.
+  - Shift list, detail and summary are the user's own unless they have the `shifts` module or `can_manage_shifts`. `/api/shifts/active` is always the session user. Closing your own shift needs `can_shift_close`.
+  - `GET /api/customers` and `/:id/ledger` need `khata`; `/api/customers/search` stays login-only for the POS.
+- Every 403 from `requirePermission`, `requireDeveloper` and the scoped reads writes a `PERMISSION_DENIED` audit row with status `DENIED` (`logDenied`, `server/security/audit.ts`), throttled to one per user + permission + path per 10 minutes.
+- One open shift per user is also a database rule: the partial unique index `idx_shifts_one_open` (`ONE_OPEN_SHIFT_INDEX_SQL`; skipped with a warning when an old database already has two open shifts for one user).
+- Product and company writes are validated with `productSchema` / `companySchema`:
+  - a duplicate barcode gets 409;
+  - a loose-sale medicine without a unit price gets the box price ÷ packing, or 400 when that is 0 too;
+  - an edit that leaves out `allow_open_sale` keeps the stored value.
+
+  Product create, edit (with the changed price, loose-sale and schedule fields) and delete are audited.
 - Roles: `developer` (one account, signs in with the fixed developer email + a master-key TOTP code, never a password), `admin`, `cashier`, plus custom roles stored in the `roles` table with JSON `permissions`. Only the Developer bypasses the matrix (client and server). The `admin`/`developer` roles are changed only by the Developer (`/api/developer/admin-permissions`). Permission keys, labels and defaults live in `shared/permissions.ts`; the role checkbox matrix is `src/components/settings/RolePermissionEditor.tsx`.
 - Security-relevant actions call `logSecurityAudit` (`server/security/audit.ts`), which redacts secrets.
 
@@ -203,6 +217,11 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - Shared types live in `src/types/index.ts`.
 
 **Backups** (`server/database/backup.ts`, `server/backup/scheduler.ts`):
+- **Restore** (`restoreDatabase`):
+  - It refuses a backup stamped with a newer `app_version`. Every start-up stamps the version through `upgradeSchema` in `db.ts`; the comparison is `restoreMath.ts`.
+  - It copies the backup in with SQLite's online backup (`source.backup(DB_PATH)`), never a file copy, so the open better-sqlite3 and Prisma connections read the restored data.
+  - It then runs `upgradeSchema(db)` (tables, `COLUMN_MIGRATIONS`, indexes, seed, version) and `reconcileAllProductBatches`, so an older backup gets today's columns at once.
+  - `app_version` is an internal setting, hidden from `/api/settings`.
 - `createBackup` writes `*.partial`, verifies it (`integrity_check` + core tables), renames it into place, records `backup_history` (`verified`, `checksum_sha256`), and only then prunes.
 - Retention is per folder, based on `backup_history` rows; `pre_restore` snapshots are kept separately (newest 3).
 - `computeSchedule` is pure (catch-up, backoff, clock rollback). `runRecordedBackup` / `recordBackupOutcome` update the `last_backup_*` settings that the Dashboard status endpoint reads.

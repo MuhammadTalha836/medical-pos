@@ -4,6 +4,26 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 
 ## [Unreleased] — 2026-10-24
 
+### Security and fixes (Phase A, `docs/NEXT_PHASES.md`)
+- **Staff see only their own invoices and shifts** unless their role has "View All Staff Invoices" or shift management.
+  - A cashier who handles returns can still open another cashier's bill by typing its full invoice number; Sales History says so under the search box.
+  - The customer list and khata ledger need Customer Khata access. Closing your own shift needs "Execute Shift Closing", as the menu already showed.
+- **One open shift per cashier is now guaranteed,** even when two counters press Start Shift at the same moment.
+- **Refused actions are logged:** every "no permission" answer writes a DENIED row to the security audit trail (at most one per person and action every 10 minutes). The Developer's audit page can filter by it.
+- **Safer restore:**
+  - A backup made by a newer version of the app is refused.
+  - The backup is written in through the database itself instead of copying the file over the open one.
+  - An older backup gets today's new fields straight away.
+- **Date filters** in Sales History and reports now include every sale on the chosen days, including older sales and sales made after midnight.
+- **P&L Summary:** a bill discount is subtracted once per bill; before, it was subtracted once for every line on the bill.
+- **Medicine and company forms are checked on the server:**
+  - numbers must be numbers;
+  - a barcode can belong to only one medicine;
+  - a medicine sold loose gets its unit price from the box price when left empty;
+  - editing a medicine no longer switches loose sale back on by itself.
+
+  Adding, changing (prices, loose sale, schedule) and deleting a medicine are written to the audit trail.
+
 ### Added
 - Online backup to Google Drive: the Developer picks the backup type at install (setup wizard → Backups) or later (Developer → Backup Retention): **Offline** (this computer, as before), **Online** (the store owner's Google Drive; only the newest 2 copies stay on the PC) or **Both**. The owner signs in once with their Gmail; the app can only see its own "100% Offline POS Backups" folder. Copies are encrypted, uploads wait for the internet and retry on their own, Drive keeps the retention limit, and Backup & Recovery → Online Backups restores any of them. The Dashboard backup card shows the online status. Needs a Google sign-in client in the build (`docs/ONLINE_BACKUP_SETUP.md`).
 - Customers page (sidebar "Customers", replaces "Customer Khata"): a **Customers** tab listing every customer with Edit and Delete; the arrow on a row shows that customer's invoices, and clicking one opens the full invoice with Print (reprint). A **Khata (Udhaar)** tab shows who owes how much, Receive Payment, and each customer's credit invoices and payments. Customers with invoices, payments or udhaar cannot be deleted.

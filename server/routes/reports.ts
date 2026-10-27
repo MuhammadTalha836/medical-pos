@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { requirePermission, sendError } from '../http/context';
+import { localDateSql } from '../http/sqlDates';
 import { localDateString } from '../../shared/dates';
 
 // Stock, profit/loss and sales reports
@@ -88,10 +89,10 @@ router.get('/api/reports/financial/pnl-summary', async (req: Request, res: Respo
     const conditions: Prisma.Sql[] = [Prisma.sql`s.status IN ('completed', 'partially_returned')`];
 
     if (date_from) {
-      conditions.push(Prisma.sql`DATE(s.sale_date) >= ${String(date_from)}`);
+      conditions.push(Prisma.sql`${localDateSql('s.sale_date')} >= ${String(date_from)}`);
     }
     if (date_to) {
-      conditions.push(Prisma.sql`DATE(s.sale_date) <= ${String(date_to)}`);
+      conditions.push(Prisma.sql`${localDateSql('s.sale_date')} <= ${String(date_to)}`);
     }
 
     const whereClause = Prisma.join(conditions, ' AND ');
@@ -101,7 +102,9 @@ router.get('/api/reports/financial/pnl-summary', async (req: Request, res: Respo
         COUNT(DISTINCT s.id) as total_invoices,
         COALESCE(SUM(si.net_amount), 0) as total_revenue,
         COALESCE(SUM(si.quantity * si.unit_cost), 0) as total_cost_of_goods,
-        COALESCE(SUM(si.net_amount) - SUM(si.quantity * si.unit_cost) - SUM(s.bill_discount_amt), 0) as gross_profit
+        -- The bill discount once per invoice (the join above repeats it on every line)
+        COALESCE(SUM(si.net_amount) - SUM(si.quantity * si.unit_cost), 0)
+          - (SELECT COALESCE(SUM(s.bill_discount_amt), 0) FROM sales s WHERE ${whereClause}) as gross_profit
       FROM sales s
       JOIN sale_items si ON s.id = si.sale_id
       WHERE ${whereClause}
@@ -122,10 +125,10 @@ router.get('/api/reports/financial/invoice-pnl', async (req: Request, res: Respo
     const conditions: Prisma.Sql[] = [Prisma.sql`s.status IN ('completed', 'partially_returned')`];
 
     if (date_from) {
-      conditions.push(Prisma.sql`DATE(s.sale_date) >= ${String(date_from)}`);
+      conditions.push(Prisma.sql`${localDateSql('s.sale_date')} >= ${String(date_from)}`);
     }
     if (date_to) {
-      conditions.push(Prisma.sql`DATE(s.sale_date) <= ${String(date_to)}`);
+      conditions.push(Prisma.sql`${localDateSql('s.sale_date')} <= ${String(date_to)}`);
     }
 
     const whereClause = Prisma.join(conditions, ' AND ');

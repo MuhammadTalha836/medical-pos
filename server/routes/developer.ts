@@ -12,7 +12,7 @@ import {
 import { isBackupMode } from '../../shared/backup';
 import { hashPassword } from '../security/passwords';
 import { PASSWORD_MIN_MESSAGE, isValidPassword } from '../../shared/passwords';
-import { logSecurityAudit } from '../security/audit';
+import { logDenied, logSecurityAudit } from '../security/audit';
 import { getDeveloperEmail } from '../security/developerKey';
 import { revokeUserSessions } from '../security/sessions';
 import { parseBody, developerSettingsSchema } from '../validation/schemas';
@@ -206,6 +206,7 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
 async function requireDeveloper(req: Request, res: Response) {
   const actingUser = await getActingUser(req);
   if (!actingUser || actingUser.role !== 'developer') {
+    await logDenied(actingUser, 'developer', req);
     res.status(403).json({ error: 'Access denied: Developer role required' });
     return null;
   }

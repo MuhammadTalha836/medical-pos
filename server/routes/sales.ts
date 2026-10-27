@@ -2,7 +2,9 @@ import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { parseBody, createSaleSchema, saleReturnSchema } from '../validation/schemas';
-import { getActingUser, hasRolePermission, requirePermission, sessionIdentity, sendError } from '../http/context';
+import { getActingUser, hasAnyPermission, hasRolePermission, requirePermission, sessionIdentity, sendError, SESSION_REQUIRED_ERROR } from '../http/context';
+import { localDateSql } from '../http/sqlDates';
+import { logDenied } from '../security/audit';
 import { formatSale } from '../http/formatters';
 import { DEVELOPER_PROFILE_SETTING_KEYS, composeInvoiceFooter } from '../../shared/developerProfile';
 import { DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
@@ -351,18 +353,28 @@ router.post('/api/sales', async (req: Request, res: Response) => {
 
 router.get('/api/sales', async (req: Request, res: Response) => {
   try {
+    const actor = await getActingUser(req);
+    if (!actor) return res.status(401).json(SESSION_REQUIRED_ERROR);
     const { date_from, date_to, invoice_no, customer_id } = req.query;
     const conditions: Prisma.Sql[] = [Prisma.sql`1=1`];
+    const invoiceText = invoice_no ? String(invoice_no).trim() : '';
 
-    if (invoice_no) {
-      const search = `%${String(invoice_no).trim()}%`;
-      conditions.push(Prisma.sql`invoice_no LIKE ${search}`);
+    // Without "View All Staff Invoices" a user lists only their own bills. A user who processes returns may still
+    // open another cashier's bill by its complete invoice number (the customer brings the receipt back).
+    if (!(await hasRolePermission(actor.role, 'can_view_all_sales'))) {
+      const exactForReturn = invoiceText && await hasRolePermission(actor.role, 'can_return_sale');
+      conditions.push(exactForReturn
+        ? Prisma.sql`(user_id = ${actor.id} OR UPPER(invoice_no) = ${invoiceText.toUpperCase()})`
+        : Prisma.sql`user_id = ${actor.id}`);
+    }
+    if (invoiceText) {
+      conditions.push(Prisma.sql`invoice_no LIKE ${`%${invoiceText}%`}`);
     }
     if (date_from) {
-      conditions.push(Prisma.sql`DATE(sale_date) >= ${String(date_from)}`);
+      conditions.push(Prisma.sql`${localDateSql('sale_date')} >= ${String(date_from)}`);
     }
     if (date_to) {
-      conditions.push(Prisma.sql`DATE(sale_date) <= ${String(date_to)}`);
+      conditions.push(Prisma.sql`${localDateSql('sale_date')} <= ${String(date_to)}`);
     }
     if (customer_id) {
       conditions.push(Prisma.sql`customer_id = ${Number(customer_id)}`);
@@ -393,6 +405,13 @@ router.get('/api/sales/:id', async (req: Request, res: Response) => {
     });
 
     if (!sale) return res.status(404).json({ error: 'Sale invoice not found' });
+    // Own bills, or a permission that needs other people's bills: all invoices, returns, khata history, dashboard
+    const actor = await getActingUser(req);
+    if (!actor) return res.status(401).json(SESSION_REQUIRED_ERROR);
+    if (sale.userId !== actor.id && !(await hasAnyPermission(actor.role, ['can_view_all_sales', 'can_return_sale', 'khata', 'dashboard']))) {
+      await logDenied(actor, 'can_view_all_sales', req);
+      return res.status(403).json({ error: 'You can only open your own invoices.' });
+    }
 
     // How much of each line has already come back, so the return form only offers what is left
     const returned = await prisma.saleReturnItem.findMany({ where: { saleReturn: { saleId: sale.id } } });

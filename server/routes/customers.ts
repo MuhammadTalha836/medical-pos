@@ -11,8 +11,11 @@ const router = Router();
 
 const CUSTOMER_NOT_FOUND = 'Customer not found';
 
-router.get('/api/customers', async (_req: Request, res: Response) => {
+const KHATA_DENIED = 'You do not have access to customer accounts.';
+
+router.get('/api/customers', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'khata', KHATA_DENIED))) return;
     const customers = await prisma.$queryRaw<any[]>`
       SELECT c.id, c.name, c.phone, c.address, c.credit_limit, c.current_balance, c.created_at,
         c.loyalty_points, c.loyalty_plan_id, (SELECT lp.name FROM loyalty_plans lp WHERE lp.id = c.loyalty_plan_id) as loyalty_plan_name,
@@ -219,6 +222,7 @@ router.post('/api/customers/:id/payment', async (req: Request, res: Response) =>
 
 router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
   try {
+    if (!(await requirePermission(req, res, 'khata', KHATA_DENIED))) return;
     const idNum = Number(req.params.id);
     const customer = await prisma.customer.findUnique({ where: { id: idNum } });
     if (!customer) return res.status(404).json({ error: 'Customer not found' });

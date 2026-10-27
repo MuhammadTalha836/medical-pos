@@ -17,8 +17,9 @@ const router = Router();
 
 // Shown on the login screen before anyone signs in; everything else needs a session
 const PUBLIC_SETTING_KEYS = ['store_name', 'store_address', 'store_phone', 'currency_symbol'];
-// Signed license, TOTP replay state and the Google Drive sign-in are never readable or writable through /api/settings
-const INTERNAL_SETTING_KEYS = [...LICENSE_SETTING_KEYS, ...DEVELOPER_TOTP_STATE_KEYS, ...CLOUD_SETTING_KEYS];
+// Signed license, TOTP replay state, the Google Drive sign-in and the database's version stamp are never readable
+// or writable through /api/settings
+const INTERNAL_SETTING_KEYS = [...LICENSE_SETTING_KEYS, ...DEVELOPER_TOTP_STATE_KEYS, ...CLOUD_SETTING_KEYS, 'app_version'];
 
 router.get('/api/settings', async (req: Request, res: Response) => {
   try {

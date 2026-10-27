@@ -3,7 +3,8 @@ import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { runShiftCloseBackup } from '../backup/scheduler';
 import { parseBody, shiftReopenSchema } from '../validation/schemas';
-import { getActingUser, sessionIdentity, hasRolePermission, sendError } from '../http/context';
+import { getActingUser, sessionIdentity, hasRolePermission, hasAnyPermission, sendError, SESSION_REQUIRED_ERROR, type Actor } from '../http/context';
+import { logDenied } from '../security/audit';
 import { loadShiftTotals } from '../shifts/loadShiftTotals';
 import type { ShiftTotals } from '../shifts/shiftTotals';
 import { localDateKey } from '../../shared/dates';
@@ -13,6 +14,24 @@ import { requestTerminal } from '../lan/lanGate';
 const router = Router();
 
 type ShiftRecord = Prisma.CashierShiftGetPayload<object>;
+
+const OTHER_SHIFT_DENIED = 'You can only see your own shifts.';
+
+/** Shift managers see every cashier's shifts; everyone else only their own */
+const canSeeAllShifts = (actor: Actor) => hasAnyPermission(actor.role, ['shifts', 'can_manage_shifts']);
+
+/** The signed-in user when they may read this shift; otherwise answers (401/403) and returns null */
+async function shiftReader(req: Request, res: Response, shift: { userId: number }): Promise<Actor | null> {
+  const actor = await getActingUser(req);
+  if (!actor) {
+    res.status(401).json(SESSION_REQUIRED_ERROR);
+    return null;
+  }
+  if (shift.userId === actor.id || await canSeeAllShifts(actor)) return actor;
+  await logDenied(actor, 'can_manage_shifts', req);
+  res.status(403).json({ error: OTHER_SHIFT_DENIED });
+  return null;
+}
 
 /** A shift in the client's snake_case shape; open shifts show live totals, closed ones their saved figures */
 function shiftPayload(shift: ShiftRecord, live: ShiftTotals | null, durationMinutes: number | null) {
@@ -111,17 +130,15 @@ function formatShiftDuration(minutes: number): string {
   return `${h}h ${m}m`;
 }
 
-// 1. Get active shift for a cashier user
+// 1. The signed-in user's own open shift (a user_id in the query is ignored)
 router.get('/api/shifts/active', async (req: Request, res: Response) => {
   try {
-    const { user_id } = req.query;
-    if (!user_id) {
-      return res.status(400).json({ error: 'user_id is required' });
-    }
+    const actor = await getActingUser(req);
+    if (!actor) return res.status(401).json(SESSION_REQUIRED_ERROR);
 
     const shift = await prisma.cashierShift.findFirst({
       where: {
-        userId: Number(user_id),
+        userId: actor.id,
         status: 'open'
       },
       orderBy: { id: 'desc' }
@@ -195,7 +212,17 @@ router.post('/api/shifts/start', async (req: Request, res: Response) => {
           }
         });
       } catch (err: any) {
-        if (attempt < 4 && (err?.code === 'P2002' || String(err?.message).includes('Unique constraint'))) continue;
+        if (err?.code === 'P2002' || String(err?.message).includes('Unique constraint')) {
+          // Another counter opened a shift for this user at the same moment (one open shift per user index)
+          const raced = await prisma.cashierShift.findFirst({ where: { userId: Number(user_id), status: 'open' } });
+          if (raced) {
+            return res.status(400).json({
+              error: `User already has an active open shift (${raced.shiftNo}). You must close it before starting a new one.`,
+              activeShift: raced
+            });
+          }
+          if (attempt < 4) continue;
+        }
         throw err;
       }
     }
@@ -237,6 +264,7 @@ router.get('/api/shifts/:id/summary', async (req: Request, res: Response) => {
     if (!shift) {
       return res.status(404).json({ error: 'Shift not found' });
     }
+    if (!(await shiftReader(req, res, shift))) return;
 
     const totals = await loadShiftTotals(shift);
     const durationMinutes = Math.max(1, minutesSince(shift.startTime, shift.endTime || new Date()));
@@ -277,10 +305,16 @@ router.post('/api/shifts/:id/close', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Shift is already closed and locked.' });
     }
 
-    // A cashier closes their own shift; someone else's needs shift management (the admin force-close)
+    // A cashier closes their own shift with the closing permission; someone else's needs shift management
     const actor = await getActingUser(req);
-    if (!actor || (shift.userId !== actor.id && !(await hasRolePermission(actor.role, 'can_manage_shifts')))) {
+    if (!actor) return res.status(401).json(SESSION_REQUIRED_ERROR);
+    if (shift.userId !== actor.id && !(await hasRolePermission(actor.role, 'can_manage_shifts'))) {
+      await logDenied(actor, 'can_manage_shifts', req);
       return res.status(403).json({ error: 'You can only close your own shift.' });
+    }
+    if (shift.userId === actor.id && !(await hasRolePermission(actor.role, 'can_shift_close'))) {
+      await logDenied(actor, 'can_shift_close', req);
+      return res.status(403).json({ error: 'You do not have permission to close shifts. Ask a manager to close it.' });
     }
 
     const actualCashNum = cashAmount(actual_cash);
@@ -318,15 +352,20 @@ router.post('/api/shifts/:id/close', async (req: Request, res: Response) => {
 // 5. List all shifts with filters
 router.get('/api/shifts', async (req: Request, res: Response) => {
   try {
+    const actor = await getActingUser(req);
+    if (!actor) return res.status(401).json(SESSION_REQUIRED_ERROR);
     const { user_id, status, date_from, date_to } = req.query;
     const where: Prisma.CashierShiftWhereInput = {};
 
-    if (user_id) where.userId = Number(user_id);
+    // Without shift management only the user's own shifts are listed, whatever the query asks
+    if (!(await canSeeAllShifts(actor))) where.userId = actor.id;
+    else if (user_id) where.userId = Number(user_id);
     if (status) where.status = String(status);
+    // Dates are the shop's local calendar days
     if (date_from || date_to) {
       where.startTime = {};
-      if (date_from) where.startTime.gte = new Date(`${date_from}T00:00:00.000Z`);
-      if (date_to) where.startTime.lte = new Date(`${date_to}T23:59:59.999Z`);
+      if (date_from) where.startTime.gte = new Date(`${date_from}T00:00:00`);
+      if (date_to) where.startTime.lte = new Date(`${date_to}T23:59:59.999`);
     }
 
     const shifts = await prisma.cashierShift.findMany({
@@ -398,6 +437,7 @@ router.get('/api/shifts/:id', async (req: Request, res: Response) => {
     if (!shift) {
       return res.status(404).json({ error: 'Shift not found' });
     }
+    if (!(await shiftReader(req, res, shift))) return;
 
     const live = shift.status === 'open' ? await loadShiftTotals(shift) : null;
     res.json({

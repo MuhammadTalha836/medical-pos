@@ -950,6 +950,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
                 <option value="">All Statuses</option>
                 <option value="SUCCESS">SUCCESS</option>
                 <option value="FAILED">FAILED</option>
+                <option value="DENIED">DENIED</option>
               </select>
 
               <div className="relative">
@@ -1015,7 +1016,9 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
                           <span className={`px-2 py-0.5 rounded text-2xs font-bold ${
                             log.status === 'SUCCESS'
                               ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                              : log.status === 'DENIED'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
                           }`}>
                             {log.status}
                           </span>

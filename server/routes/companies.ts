@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { prisma } from '../database/prisma';
 import { requirePermission, sendError } from '../http/context';
+import { companySchema, parseBody } from '../validation/schemas';
 
 // Companies / manufacturers
 const router = Router();
@@ -36,15 +37,16 @@ router.get('/api/companies', async (_req: Request, res: Response) => {
 router.post('/api/companies', async (req: Request, res: Response) => {
   try {
     if (!(await requirePermission(req, res, 'can_add_company', 'You do not have permission to add companies.'))) return;
-    const { code, name, contact_person, phone, email, address } = req.body;
+    const body = parseBody(companySchema, req.body, res);
+    if (!body) return;
     const newCompany = await prisma.company.create({
       data: {
-        code: code.toUpperCase().trim(),
-        name: name.trim(),
-        contactPerson: contact_person || null,
-        phone: phone || null,
-        email: email || null,
-        address: address || null,
+        code: body.code.toUpperCase(),
+        name: body.name,
+        contactPerson: body.contact_person || null,
+        phone: body.phone || null,
+        email: body.email || null,
+        address: body.address || null,
         status: 'active'
       }
     });
@@ -58,17 +60,18 @@ router.put('/api/companies/:id', async (req: Request, res: Response) => {
   try {
     if (!(await requirePermission(req, res, 'can_edit_company', 'You do not have permission to edit companies.'))) return;
     const idNum = Number(req.params.id);
-    const { code, name, contact_person, phone, email, address, status } = req.body;
+    const body = parseBody(companySchema, req.body, res);
+    if (!body) return;
     await prisma.company.update({
       where: { id: idNum },
       data: {
-        code: code.toUpperCase().trim(),
-        name: name.trim(),
-        contactPerson: contact_person,
-        phone: phone,
-        email: email,
-        address: address,
-        status: status || 'active'
+        code: body.code.toUpperCase(),
+        name: body.name,
+        contactPerson: body.contact_person || null,
+        phone: body.phone || null,
+        email: body.email || null,
+        address: body.address || null,
+        status: body.status || 'active'
       }
     });
     res.json({ success: true });

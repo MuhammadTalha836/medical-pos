@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import Database from 'better-sqlite3';
-import { db, DB_PATH } from './db';
+import { currentAppVersion, db, DB_PATH, upgradeSchema } from './db';
+import { restoreVersionError } from './restoreMath';
 import { localRetentionFor, normalizeBackupMode } from '../../shared/backup';
 
 // The Electron app points PHARMACARE_BACKUP_DIR at its per-user folder; dev and tests use ./backups
@@ -367,9 +368,20 @@ export function getBackupList() {
   return { records, diskFiles };
 }
 
+/** The app version stamped in a backup file (null for backups made before the stamp existed) */
+function backupAppVersion(filePath: string): string | null {
+  const source = new Database(filePath, { readonly: true, fileMustExist: true });
+  try {
+    const row = source.prepare("SELECT value FROM system_settings WHERE key = 'app_version'").get() as { value?: string } | undefined;
+    return row?.value || null;
+  } finally {
+    source.close();
+  }
+}
+
 /**
  * Restores a SQLite database from a chosen backup file with automatic safety snapshot.
- * The chosen file is fully verified before anything is touched.
+ * The chosen file is fully verified before anything is touched, and a backup made by a newer app is refused.
  */
 export async function restoreDatabase(backupFilePath: string): Promise<{ success: boolean; message: string }> {
   if (!fs.existsSync(backupFilePath)) {
@@ -380,21 +392,37 @@ export async function restoreDatabase(backupFilePath: string): Promise<{ success
   if (!verification.ok) {
     throw new Error(`Restore aborted, the selected backup failed verification: ${verification.error}`);
   }
+  const versionError = restoreVersionError(backupAppVersion(backupFilePath), currentAppVersion());
+  if (versionError) throw new Error(versionError);
 
   // 1. Create a safety snapshot of current DB before replacing
   await createBackup('pre_restore', getConfiguredBackupDir());
 
-  // 2. Perform restore by copying backup file over active DB
-  // Checkpoint WAL first
-  db.pragma('wal_checkpoint(TRUNCATE)');
-  
-  // Copy backup file
-  fs.copyFileSync(backupFilePath, DB_PATH);
+  // 2. Copy the backup into the live file with SQLite's online backup. It writes through SQLite itself, so the
+  // connections that stay open (this one and Prisma's) read the restored data correctly; a plain file copy under
+  // WAL could leave them with stale pages.
+  const source = new Database(backupFilePath, { readonly: true, fileMustExist: true });
+  try {
+    await source.backup(DB_PATH);
+  } finally {
+    source.close();
+  }
+
+  // 3. An older backup gets today's tables and columns, defaults and the version stamp
+  upgradeSchema(db);
 
   // Re-verify integrity
   const integrity = db.pragma('quick_check') as Array<{ quick_check: string }>;
   if (integrity.length > 0 && integrity[0].quick_check !== 'ok') {
     throw new Error(`The restored data failed its health check (${integrity[0].quick_check})`);
+  }
+
+  // Every unit of stock belongs to a batch (as at start-up)
+  try {
+    const { reconcileAllProductBatches } = await import('../stock/batchStock');
+    await reconcileAllProductBatches();
+  } catch (err) {
+    console.error('[Restore] Batches could not be brought in line with stock:', err);
   }
 
   return {

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
-import { logSecurityAudit } from '../security/audit';
+import { logDenied, logSecurityAudit } from '../security/audit';
 import { parseBody, stockAdjustSchema, stockCountItemSchema, stockCountSchema } from '../validation/schemas';
 import { hasRolePermission, requirePermission, sendError, type Actor } from '../http/context';
 import { toUnits } from '../stock/batchMath';
@@ -26,6 +26,7 @@ async function requireStockView(req: Request, res: Response): Promise<Actor | nu
   const actor = await requirePermission(req, res, 'masters', 'You do not have access to medicines.');
   if (!actor) return null;
   if (await hasRolePermission(actor.role, 'can_count_stock') || await hasRolePermission(actor.role, 'can_adjust_stock')) return actor;
+  await logDenied(actor, 'can_count_stock', req);
   res.status(403).json({ error: COUNT_DENIED });
   return null;
 }

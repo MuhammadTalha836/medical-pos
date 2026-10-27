@@ -546,6 +546,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_client_request ON sales(client_reque
 CREATE INDEX IF NOT EXISTS idx_sales_terminal ON sales(terminal_id);
 `;
 
+/**
+ * One open shift per user, enforced by the database (two counters may press Start Shift together). Kept apart from
+ * POST_MIGRATION_SQL: an older database that already holds two open shifts for one user cannot take it until one
+ * of them is closed, and that must not stop the app from starting.
+ */
+export const ONE_OPEN_SHIFT_INDEX_SQL =
+  "CREATE UNIQUE INDEX IF NOT EXISTS idx_shifts_one_open ON cashier_shifts(user_id) WHERE status = 'open';";
+
 export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definition: string }> = [
   { table: 'sales', column: 'shift_id', definition: 'INTEGER REFERENCES cashier_shifts(id)' },
   { table: 'sale_returns', column: 'shift_id', definition: 'INTEGER REFERENCES cashier_shifts(id)' },

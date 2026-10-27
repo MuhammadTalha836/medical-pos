@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { parsePermissions } from '../../shared/permissions';
+import { logDenied } from '../security/audit';
 
 export const SESSION_REQUIRED_ERROR = { error: 'Your session has ended. Please log in again.', code: 'SESSION_REQUIRED' };
 export const LICENSE_EXPIRED_ERROR = {
@@ -35,10 +36,17 @@ export async function hasRolePermission(roleName: string, permissionKey: string)
 export async function requirePermission(req: Request, res: Response, permissionKey: string, deniedMessage: string): Promise<Actor | null> {
   const actingUser = await getActingUser(req);
   if (!actingUser || !(await hasRolePermission(actingUser.role, permissionKey))) {
+    await logDenied(actingUser, permissionKey, req);
     res.status(403).json({ error: deniedMessage });
     return null;
   }
   return actingUser;
+}
+
+/** True when the role has at least one of the permissions (the Developer always has all) */
+export async function hasAnyPermission(roleName: string, keys: string[]): Promise<boolean> {
+  for (const key of keys) if (await hasRolePermission(roleName, key)) return true;
+  return false;
 }
 
 // The setup wizard is locked once it completed and the developer account exists

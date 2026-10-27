@@ -2,7 +2,9 @@ import { Router, type Request, type Response } from 'express';
 import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { requirePermission, sendError } from '../http/context';
-import { parseBody, batchEditSchema } from '../validation/schemas';
+import { parseBody, batchEditSchema, productSchema } from '../validation/schemas';
+import { round2 } from '../sales/saleMath';
+import { z } from 'zod';
 import { logSecurityAudit } from '../security/audit';
 import { syncProductBatches } from '../stock/batchStock';
 import { adjustProductStock } from '../stock/adjustStock';
@@ -15,6 +17,27 @@ const NEAR_EXPIRY_DAYS = 90;
 const SCHEDULE_ERROR = `Schedule must be one of: ${MEDICINE_SCHEDULES.join(', ')}.`;
 
 /** The schedule from a request body: undefined when not sent, null when invalid */
+type ProductBody = z.infer<typeof productSchema>;
+
+const isOn = (value: unknown) => value === true || value === 1 || value === '1' || value === 'true';
+
+/** Another medicine that already has this barcode (blank barcodes are never compared) */
+async function barcodeOwner(barcode: string | undefined, exceptId?: number) {
+  if (!barcode) return null;
+  return prisma.product.findFirst({ where: { barcode, ...(exceptId ? { id: { not: exceptId } } : {}) }, select: { id: true, name: true } });
+}
+
+/**
+ * Loose-sale price: when a medicine may be sold loose without a unit price, it is the box price shared over the
+ * packing (what the form shows). Returns the price to store, or an error message.
+ */
+function looseUnitPrice(body: ProductBody, allowOpenSale: boolean, packing: number): { price: number } | { error: string } {
+  const unit = body.unit_retail_price ?? 0;
+  if (!allowOpenSale || unit > 0) return { price: unit };
+  const derived = round2((body.box_retail_price ?? 0) / Math.max(1, packing));
+  return derived > 0 ? { price: derived } : { error: 'Enter a unit price for loose sales, or turn off loose sale for this medicine.' };
+}
+
 function readSchedule(value: unknown) {
   if (value === undefined || value === null || value === '') return undefined;
   const v = String(value).trim().toLowerCase();
@@ -175,45 +198,57 @@ router.post('/api/products', async (req: Request, res: Response) => {
   try {
     const actor = await requirePermission(req, res, 'can_add_product', 'You do not have permission to add medicines.');
     if (!actor) return;
-    const {
-      company_id, c_code, p_code, barcode, name, generic_name, unit_type,
-      packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-      default_discount_pct, location_rack, stock_boxes, stock_loose, min_stock_alert,
-      allow_open_sale, min_sale_qty
-    } = req.body;
+    const body = parseBody(productSchema, req.body, res);
+    if (!body) return;
     const schedule = readSchedule(req.body.schedule);
     if (schedule === null) return res.status(400).json({ error: SCHEDULE_ERROR });
+    if (!body.p_code) return res.status(400).json({ error: 'P-Code is required' });
+    const pCode = body.p_code;
+    const barcode = body.barcode || undefined;
+    const owner = await barcodeOwner(barcode);
+    if (owner) return res.status(409).json({ error: `This barcode already belongs to "${owner.name}".` });
+    const packing = body.packing ?? 1;
+    const allowOpenSale = body.allow_open_sale === undefined || body.allow_open_sale === null ? true : isOn(body.allow_open_sale);
+    const unitPrice = looseUnitPrice(body, allowOpenSale, packing);
+    if ('error' in unitPrice) return res.status(400).json({ error: unitPrice.error });
 
     const newProd = await prisma.$transaction(async (tx) => {
       const created = await tx.product.create({
       data: {
-        companyId: company_id ? Number(company_id) : null,
-        cCode: c_code,
-        pCode: p_code,
-        barcode: barcode || null,
-        name,
-        genericName: generic_name || null,
-        unitType: unit_type || 'Tablets',
-        packing: Number(packing) || 1,
-        boxTradePrice: parseFloat(box_trade_price) || 0,
-        boxRetailPrice: parseFloat(box_retail_price) || 0,
-        unitTradePrice: parseFloat(unit_trade_price) || 0,
-        unitRetailPrice: parseFloat(unit_retail_price) || 0,
-        defaultDiscountPct: parseFloat(default_discount_pct) || 0,
-        locationRack: location_rack || null,
-        minStockAlert: parseInt(min_stock_alert) || 10,
-        allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
-        minSaleQty: parseInt(min_sale_qty) || 1,
+        companyId: body.company_id ?? null,
+        cCode: body.c_code || 'GEN',
+        pCode,
+        barcode: barcode ?? null,
+        name: body.name,
+        genericName: body.generic_name || null,
+        unitType: body.unit_type || 'Tablets',
+        packing,
+        boxTradePrice: body.box_trade_price ?? 0,
+        boxRetailPrice: body.box_retail_price ?? 0,
+        unitTradePrice: body.unit_trade_price ?? 0,
+        unitRetailPrice: unitPrice.price,
+        defaultDiscountPct: body.default_discount_pct ?? 0,
+        locationRack: body.location_rack || null,
+        minStockAlert: body.min_stock_alert ?? 10,
+        allowOpenSale: allowOpenSale ? 1 : 0,
+        minSaleQty: body.min_sale_qty ?? 1,
         schedule: schedule ?? 'none',
         status: 'active'
       }
       });
       // Opening stock becomes the medicine's opening batch, recorded as an adjustment
-      const openingUnits = toUnits(Math.max(0, parseInt(stock_boxes) || 0), Math.max(0, parseInt(stock_loose) || 0), created.packing);
+      const openingUnits = toUnits(body.stock_boxes ?? 0, body.stock_loose ?? 0, created.packing);
       if (openingUnits > 0) await adjustProductStock(tx, created.id, openingUnits, { reason: 'opening', actor });
       return created;
     });
 
+    await logSecurityAudit({
+      action: 'PRODUCT_CREATED',
+      module: 'Medicines',
+      details: `"${newProd.name}" added (box retail ${newProd.boxRetailPrice}, unit retail ${newProd.unitRetailPrice}, loose sale ${allowOpenSale ? 'on' : 'off'})`,
+      userId: actor.id,
+      userName: actor.fullName || actor.username
+    });
     res.json({ success: true, id: newProd.id });
   } catch (error: unknown) {
     sendError(res, error, 400);
@@ -222,46 +257,69 @@ router.post('/api/products', async (req: Request, res: Response) => {
 
 router.put('/api/products/:id', async (req: Request, res: Response) => {
   try {
-    if (!(await requirePermission(req, res, 'can_edit_product', 'You do not have permission to edit medicines.'))) return;
+    const actor = await requirePermission(req, res, 'can_edit_product', 'You do not have permission to edit medicines.');
+    if (!actor) return;
     const idNum = Number(req.params.id);
-    const {
-      company_id, c_code, p_code, barcode, name, generic_name, unit_type,
-      packing, box_trade_price, box_retail_price, unit_trade_price, unit_retail_price,
-      default_discount_pct, location_rack, min_stock_alert, status,
-      allow_open_sale, min_sale_qty
-    } = req.body;
+    const body = parseBody(productSchema, req.body, res);
+    if (!body) return;
     const schedule = readSchedule(req.body.schedule);
     if (schedule === null) return res.status(400).json({ error: SCHEDULE_ERROR });
+    const before = await prisma.product.findUnique({ where: { id: idNum } });
+    if (!before) return res.status(404).json({ error: 'Product not found' });
+    const barcode = body.barcode || undefined;
+    const owner = await barcodeOwner(barcode, idNum);
+    if (owner) return res.status(409).json({ error: `This barcode already belongs to "${owner.name}".` });
+    const packing = body.packing ?? 1;
+    // Left out = unchanged (it used to switch loose sale back on)
+    const allowOpenSale = body.allow_open_sale === undefined || body.allow_open_sale === null ? before.allowOpenSale === 1 : isOn(body.allow_open_sale);
+    const unitPrice = looseUnitPrice(body, allowOpenSale, packing);
+    if ('error' in unitPrice) return res.status(400).json({ error: unitPrice.error });
 
     await prisma.$transaction(async (tx) => {
       await tx.product.update({
       where: { id: idNum },
       data: {
-        companyId: company_id ? Number(company_id) : null,
-        cCode: c_code,
-        pCode: p_code,
-        barcode: barcode || null,
-        name,
-        genericName: generic_name || null,
-        unitType: unit_type,
-        packing: Number(packing) || 1,
-        boxTradePrice: parseFloat(box_trade_price) || 0,
-        boxRetailPrice: parseFloat(box_retail_price) || 0,
-        unitTradePrice: parseFloat(unit_trade_price) || 0,
-        unitRetailPrice: parseFloat(unit_retail_price) || 0,
-        defaultDiscountPct: parseFloat(default_discount_pct) || 0,
-        locationRack: location_rack || null,
-        minStockAlert: parseInt(min_stock_alert) || 10,
-        allowOpenSale: allow_open_sale !== undefined ? (allow_open_sale ? 1 : 0) : 1,
-        minSaleQty: parseInt(min_sale_qty) || 1,
+        companyId: body.company_id ?? null,
+        cCode: body.c_code,
+        pCode: body.p_code,
+        barcode: barcode ?? null,
+        name: body.name,
+        genericName: body.generic_name || null,
+        unitType: body.unit_type,
+        packing,
+        boxTradePrice: body.box_trade_price ?? 0,
+        boxRetailPrice: body.box_retail_price ?? 0,
+        unitTradePrice: body.unit_trade_price ?? 0,
+        unitRetailPrice: unitPrice.price,
+        defaultDiscountPct: body.default_discount_pct ?? 0,
+        locationRack: body.location_rack || null,
+        minStockAlert: body.min_stock_alert ?? 10,
+        allowOpenSale: allowOpenSale ? 1 : 0,
+        minSaleQty: body.min_sale_qty ?? 1,
         ...(schedule ? { schedule } : {}),
-        status: status || 'active'
+        status: body.status || 'active'
       }
       });
       // Stock is not edited here (Adjust stock / Stock count, M9); a changed packing still keeps the batches in step
       await syncProductBatches(tx, idNum);
     });
 
+    // Prices, loose sale and the schedule are what matter at the counter
+    const changes = [
+      ['box retail', before.boxRetailPrice, body.box_retail_price ?? 0],
+      ['box trade', before.boxTradePrice, body.box_trade_price ?? 0],
+      ['unit retail', before.unitRetailPrice, unitPrice.price],
+      ['discount %', before.defaultDiscountPct, body.default_discount_pct ?? 0],
+      ['loose sale', before.allowOpenSale === 1 ? 'on' : 'off', allowOpenSale ? 'on' : 'off'],
+      ['schedule', before.schedule, schedule ?? before.schedule]
+    ].filter(([, a, b]) => a !== b).map(([label, a, b]) => `${label} ${a} → ${b}`);
+    await logSecurityAudit({
+      action: 'PRODUCT_UPDATED',
+      module: 'Medicines',
+      details: `"${body.name}" edited${changes.length ? `: ${changes.join(', ')}` : ''}`,
+      userId: actor.id,
+      userName: actor.fullName || actor.username
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     sendError(res, error, 400);
@@ -323,9 +381,17 @@ router.put('/api/products/:id/batches/:batchId', async (req: Request, res: Respo
 
 router.delete('/api/products/:id', async (req: Request, res: Response) => {
   try {
-    if (!(await requirePermission(req, res, 'can_delete_product', 'You do not have permission to delete medicines.'))) return;
+    const actor = await requirePermission(req, res, 'can_delete_product', 'You do not have permission to delete medicines.');
+    if (!actor) return;
     const idNum = Number(req.params.id);
-    await prisma.product.delete({ where: { id: idNum } });
+    const deleted = await prisma.product.delete({ where: { id: idNum } });
+    await logSecurityAudit({
+      action: 'PRODUCT_DELETED',
+      module: 'Medicines',
+      details: `"${deleted.name}" deleted`,
+      userId: actor.id,
+      userName: actor.fullName || actor.username
+    });
     res.json({ success: true });
   } catch (error: unknown) {
     sendError(res, error, 400);

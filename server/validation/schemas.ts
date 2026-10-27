@@ -202,6 +202,49 @@ const customerPhone = z.string({ error: 'Customer phone number is required' }).t
   .refine(isValidPhone, { error: `Enter a valid phone number (${PHONE_MIN_DIGITS}-${PHONE_MAX_DIGITS} digits)` });
 
 // Khata customers: a name and a unique phone (the phone tells two customers with the same name apart)
+// Medicine and company forms send numbers as text; blank means "not given"
+const blankToUndefined = (v: unknown) => (v === '' || v === null ? undefined : v);
+const optionalAmount = (message: string) => z.preprocess(blankToUndefined, z.coerce.number({ error: message }).min(0, { error: message }).optional());
+const optionalWhole = (message: string, min: number) =>
+  z.preprocess(blankToUndefined, z.coerce.number({ error: message }).int({ error: message }).min(min, { error: message }).optional());
+const optionalText = (max: number, label: string) => z.preprocess(
+  v => (v === null ? undefined : v),
+  z.coerce.string().trim().max(max, { error: `${label} cannot exceed ${max} characters` }).optional()
+);
+
+export const productSchema = z.looseObject({
+  name: requiredText('Medicine name is required').pipe(z.string().max(150, { error: 'Medicine name cannot exceed 150 characters' })),
+  company_id: z.preprocess(blankToUndefined, z.coerce.number({ error: 'Choose a valid company' }).int().positive({ error: 'Choose a valid company' }).optional()),
+  barcode: optionalText(64, 'Barcode'),
+  c_code: optionalText(40, 'C-Code'),
+  p_code: optionalText(40, 'P-Code'),
+  generic_name: optionalText(200, 'Generic formula'),
+  unit_type: optionalText(40, 'Unit type'),
+  location_rack: optionalText(40, 'Location'),
+  packing: optionalWhole('Packing must be a whole number of 1 or more', 1),
+  box_trade_price: optionalAmount('Box trade price must be 0 or more'),
+  box_retail_price: optionalAmount('Box retail price must be 0 or more'),
+  unit_trade_price: optionalAmount('Unit trade price must be 0 or more'),
+  unit_retail_price: optionalAmount('Unit retail price must be 0 or more'),
+  default_discount_pct: z.preprocess(blankToUndefined, z.coerce.number({ error: 'Discount must be 0 to 100%' }).min(0, { error: 'Discount must be 0 to 100%' }).max(100, { error: 'Discount must be 0 to 100%' }).optional()),
+  min_stock_alert: optionalWhole('Minimum stock alert must be a whole number of 0 or more', 0),
+  min_sale_qty: optionalWhole('Minimum sale quantity must be a whole number of 1 or more', 1),
+  stock_boxes: optionalWhole('Opening boxes must be a whole number of 0 or more', 0),
+  stock_loose: optionalWhole('Opening loose units must be a whole number of 0 or more', 0),
+  allow_open_sale: z.union([z.boolean(), z.number(), z.string()]).nullish(),
+  status: optionalText(20, 'Status')
+});
+
+export const companySchema = z.looseObject({
+  code: requiredText('Company code is required').pipe(z.string().max(20, { error: 'Company code cannot exceed 20 characters' })),
+  name: requiredText('Company name is required').pipe(z.string().max(120, { error: 'Company name cannot exceed 120 characters' })),
+  contact_person: optionalText(100, 'Contact person'),
+  phone: optionalText(30, 'Phone'),
+  email: optionalText(120, 'Email'),
+  address: optionalText(200, 'Address'),
+  status: optionalText(20, 'Status')
+});
+
 export const customerSchema = z.looseObject({
   name: requiredText('Customer name is required')
     .pipe(z.string().min(2, { error: 'Customer name must be at least 2 characters' }).max(CUSTOMER_NAME_MAX, { error: `Customer name cannot exceed ${CUSTOMER_NAME_MAX} characters` })),

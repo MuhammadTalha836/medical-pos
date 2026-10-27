@@ -5,7 +5,7 @@ interface SecurityAuditOptions {
   module: string;
   details?: string;
   affectedUser?: string | null;
-  status?: 'SUCCESS' | 'FAILED';
+  status?: 'SUCCESS' | 'FAILED' | 'DENIED';
   userId?: number | null;
   userName?: string | null;
 }
@@ -42,4 +42,32 @@ export async function logSecurityAudit(options: SecurityAuditOptions): Promise<v
   } catch (err) {
     console.error('[SecurityAudit] Failed to record audit log:', err);
   }
+}
+
+// One PERMISSION_DENIED row per user + permission + path per 10 minutes, so polling screens cannot flood the log
+const DENIAL_THROTTLE_MS = 10 * 60 * 1000;
+const lastDenials = new Map<string, number>();
+
+/** Records that a signed-in user was refused (403) because their role lacks a permission */
+export async function logDenied(
+  actor: { id: number; username: string; fullName?: string } | null,
+  permissionKey: string,
+  request: { method: string; path: string },
+  now = Date.now()
+): Promise<void> {
+  if (!actor) return;
+  const key = `${actor.id}|${permissionKey}|${request.method} ${request.path}`;
+  const last = lastDenials.get(key);
+  if (last !== undefined && now - last < DENIAL_THROTTLE_MS) return;
+  lastDenials.set(key, now);
+  if (lastDenials.size > 5000) lastDenials.clear();
+  const area = request.path.split('/')[2] || 'API';
+  await logSecurityAudit({
+    action: 'PERMISSION_DENIED',
+    module: area.charAt(0).toUpperCase() + area.slice(1),
+    details: `${request.method} ${request.path} needs ${permissionKey}`,
+    status: 'DENIED',
+    userId: actor.id,
+    userName: actor.fullName || actor.username
+  });
 }
