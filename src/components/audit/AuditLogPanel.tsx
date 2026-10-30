@@ -141,7 +141,7 @@ export const AuditLogPanel: React.FC<AuditLogPanelProps> = ({ load, onTotal }) =
                   </tr>
                 ) : (
                   auditLogs.map(log => (
-                    <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                    <tr key={log.id} className="align-top hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                       <td className="py-2.5 px-3 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
                         {new Date(log.created_at).toLocaleString()}
                       </td>
@@ -168,7 +168,8 @@ export const AuditLogPanel: React.FC<AuditLogPanelProps> = ({ load, onTotal }) =
                       <td className="py-2.5 px-3 whitespace-nowrap text-slate-500 dark:text-slate-400">
                         {log.affected_user || '-'}
                       </td>
-                      <td className="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate" title={log.details || ''}>
+                      {/* The full message, wrapped over as many lines as it needs (it used to be cut off with "...") */}
+                      <td className="py-2.5 px-3 text-xs text-slate-600 dark:text-slate-300 min-w-72 whitespace-pre-wrap wrap-anywhere leading-relaxed">
                         {log.details || '-'}
                       </td>
                     </tr>
