@@ -11,6 +11,8 @@ import { DEFAULT_INVOICE_SETTINGS, DEFAULT_SETTINGS } from '../../shared/setting
 import { DEVELOPER_INFO_PLACEMENTS, DEVELOPER_PROFILE_FIELDS, DEVELOPER_PROFILE_SETTING_KEYS, developerInfoFor } from '../../shared/developerProfile';
 import { WHATSAPP_TEMPLATE_KEYS, WHATSAPP_TEMPLATE_MAX } from '../../shared/whatsapp';
 import { getActingUser, hasRolePermission, sendError } from '../http/context';
+import { ROUND_OFF_STEPS } from '../sales/saleMath';
+import { parseUnitTypes, unitTypesError } from '../../shared/unitTypes';
 
 // System settings
 const router = Router();
@@ -26,6 +28,10 @@ router.get('/api/settings', async (req: Request, res: Response) => {
     const rows = await prisma.systemSetting.findMany();
     const settings: Record<string, string> = {
       max_bill_discount_pct: DEFAULT_SETTINGS.max_bill_discount_pct,
+      round_off_to: DEFAULT_SETTINGS.round_off_to,
+      quotation_valid_days: DEFAULT_SETTINGS.quotation_valid_days,
+      medicine_unit_types: DEFAULT_SETTINGS.medicine_unit_types,
+      allow_second_shift_same_day: DEFAULT_SETTINGS.allow_second_shift_same_day,
       ...DEFAULT_INVOICE_SETTINGS
     };
     for (const r of rows) {
@@ -142,6 +148,26 @@ router.post('/api/settings', async (req: Request, res: Response) => {
         return res.status(400).json({ error: `WhatsApp messages can be at most ${WHATSAPP_TEMPLATE_MAX} characters.` });
       }
     }
+    // Phase C store rules
+    if (settings.round_off_to !== undefined && !ROUND_OFF_STEPS.includes(Number(settings.round_off_to) as typeof ROUND_OFF_STEPS[number])) {
+      return res.status(400).json({ error: 'Round off must be off, 1, 5 or 10.' });
+    }
+    if (settings.quotation_valid_days !== undefined) {
+      const days = Number(settings.quotation_valid_days);
+      if (!Number.isInteger(days) || days < 1 || days > 30) return res.status(400).json({ error: 'Quotation validity must be 1 to 30 days.' });
+    }
+    if (settings.medicine_unit_types !== undefined) {
+      const unitError = unitTypesError(settings.medicine_unit_types);
+      if (unitError) return res.status(400).json({ error: unitError });
+      settings.medicine_unit_types = JSON.stringify(parseUnitTypes(String(settings.medicine_unit_types)));
+    }
+    if (settings.allow_second_shift_same_day !== undefined) {
+      const value = String(settings.allow_second_shift_same_day);
+      if (value !== 'true' && value !== 'false') return res.status(400).json({ error: "allow_second_shift_same_day must be 'true' or 'false'" });
+      // A shift rule: only shift managers change it
+      if (!(await hasRolePermission(actingUser.role, 'can_manage_shifts'))) delete settings.allow_second_shift_same_day;
+    }
+
     // invoice_paper_size is canonical; keep the legacy paper_width key in step with it
     if (settings.invoice_paper_size !== undefined) {
       settings.paper_width = settings.invoice_paper_size;

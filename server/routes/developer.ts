@@ -107,7 +107,7 @@ router.put('/api/developer/settings', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid backup type. Allowed: offline, online, both' });
     }
     if (updates.backup_frequency !== undefined && !isValidFrequency(updates.backup_frequency)) {
-      return res.status(400).json({ error: 'Invalid backup frequency. Allowed: off, twice_daily, daily, weekly' });
+      return res.status(400).json({ error: 'Invalid backup frequency. Allowed: off, twice_daily, daily, every_2_days, every_3_days, weekly' });
     }
     if (updates.backup_scheduled_time !== undefined && !isValidBackupTime(updates.backup_scheduled_time)) {
       return res.status(400).json({ error: 'Backup time must use 24-hour HH:MM format' });

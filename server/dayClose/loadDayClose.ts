@@ -30,7 +30,7 @@ export async function loadPeriod(from: string, to: string): Promise<PeriodFigure
     // Cancelled invoices (older data) never count; returned ones do, their refund counts on its own day
     prisma.sale.findMany({
       where: { saleDate: range, status: { not: 'cancelled' } },
-      select: { saleDate: true, netTotal: true, paymentType: true, items: { select: { quantity: true, unitCost: true } } }
+      select: { saleDate: true, netTotal: true, paymentType: true, paidCash: true, paidCard: true, paidCredit: true, items: { select: { quantity: true, unitCost: true } } }
     }),
     prisma.saleReturn.findMany({
       where: { createdAt: range },
@@ -55,7 +55,7 @@ export async function loadPeriod(from: string, to: string): Promise<PeriodFigure
   const dayOf = (value: Date) => localDateString(new Date(value));
 
   const rows: DatedDayInput = {
-    sales: sales.map(s => ({ day: dayOf(s.saleDate), netTotal: s.netTotal, paymentType: s.paymentType, items: s.items })),
+    sales: sales.map(s => ({ day: dayOf(s.saleDate), netTotal: s.netTotal, paymentType: s.paymentType, paidCash: s.paidCash, paidCard: s.paidCard, paidCredit: s.paidCredit, items: s.items })),
     // A returned line costs what its sale line cost (averaged when the invoice had the medicine twice)
     returns: returns.map(r => ({
       day: dayOf(r.createdAt),

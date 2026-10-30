@@ -1,7 +1,8 @@
 // Pure backup-schedule math (no database or file access), shared by the scheduler, the API and unit tests.
 
 // Phase 4: Developer-controlled frequency; Admin controls only the time of day.
-const BACKUP_FREQUENCIES = ['off', 'twice_daily', 'daily', 'weekly'] as const;
+// every_2_days / every_3_days (Phase C5) run on fixed calendar days, so the rhythm survives restarts and missed days.
+const BACKUP_FREQUENCIES = ['off', 'twice_daily', 'daily', 'every_2_days', 'every_3_days', 'weekly'] as const;
 export type BackupFrequency = (typeof BACKUP_FREQUENCIES)[number];
 
 export const DEFAULT_BACKUP_TIME = '23:00';
@@ -36,6 +37,8 @@ interface ScheduleResult {
   latestDueSlot: Date | null; // most recent scheduled slot at or before now
   nextRunAt: Date | null; // when the next backup will run
   isDue: boolean;
+  /** Two scheduled backups in a row were missed: the warning the Admin sees (one missed slot is only "due") */
+  isOverdue: boolean;
 }
 
 function parseTime(time: string): { hours: number; minutes: number } {
@@ -50,6 +53,11 @@ function slotsForDay(day: Date, frequency: BackupFrequency, time: string, weekda
   const { hours, minutes } = parseTime(time);
   const base = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes, 0, 0);
   if (frequency === 'daily') return [base];
+  if (frequency === 'every_2_days' || frequency === 'every_3_days') {
+    // Day number counted from 1970-01-01 in the local calendar
+    const dayNumber = Math.round(Date.UTC(day.getFullYear(), day.getMonth(), day.getDate()) / 86_400_000);
+    return dayNumber % (frequency === 'every_2_days' ? 2 : 3) === 0 ? [base] : [];
+  }
   if (frequency === 'weekly') return day.getDay() === weekday ? [base] : [];
   if (frequency === 'twice_daily') {
     const second = new Date(day.getFullYear(), day.getMonth(), day.getDate(), (hours + 12) % 24, minutes, 0, 0);
@@ -74,15 +82,17 @@ export function computeSchedule(input: ScheduleInput): ScheduleResult {
   const weekday = Number.isInteger(input.weekday) && input.weekday! >= 0 && input.weekday! <= 6 ? input.weekday! : 0;
 
   if (frequency === 'off') {
-    return { enabled: false, latestDueSlot: null, nextRunAt: null, isDue: false };
+    return { enabled: false, latestDueSlot: null, nextRunAt: null, isDue: false, isOverdue: false };
   }
 
-  // Newest slot at or before now (search back up to 8 days covers the weekly rule)
-  let latestDueSlot: Date | null = null;
-  for (let offset = 0; offset <= 8 && !latestDueSlot; offset++) {
+  // The two newest slots at or before now (16 days back covers two weekly slots)
+  const pastSlots: Date[] = [];
+  for (let offset = 0; offset <= 16 && pastSlots.length < 2; offset++) {
     const candidates = slotsForDay(addDays(now, -offset), frequency, time, weekday).filter(s => s.getTime() <= now.getTime());
-    if (candidates.length > 0) latestDueSlot = candidates[candidates.length - 1];
+    pastSlots.push(...candidates.reverse());
   }
+  const latestDueSlot: Date | null = pastSlots[0] ?? null;
+  const previousSlot: Date | null = pastSlots[1] ?? null;
 
   // Next slot strictly after now
   let upcomingSlot: Date | null = null;
@@ -104,6 +114,7 @@ export function computeSchedule(input: ScheduleInput): ScheduleResult {
   }
 
   const isDue = slotMissed && !retryAt;
+  const isOverdue = !!previousSlot && (!lastSuccess || lastSuccess.getTime() < previousSlot.getTime());
   const nextRunAt = isDue ? now : retryAt ?? upcomingSlot;
-  return { enabled: true, latestDueSlot, nextRunAt, isDue };
+  return { enabled: true, latestDueSlot, nextRunAt, isDue, isOverdue };
 }

@@ -212,9 +212,15 @@ export const ReorderTab: React.FC<ReorderTabProps> = ({ settings, money, canCrea
                     <td className="py-2 px-3 text-center font-mono">{r.min_stock_alert || '-'}</td>
                     <td className="py-2 px-3 text-center font-mono">{r.sold_30d_units ? `${r.sold_30d_units} ${r.unit_type}` : '-'}</td>
                     <td className="py-2 px-3">
-                      {r.reason === 'below_minimum'
-                        ? <span className="badge-danger">Below minimum</span>
-                        : <span className="badge-warning">Runs out in {r.days_left} days</span>}
+                      <div className="flex flex-col items-start gap-1">
+                        {r.reason === 'below_minimum'
+                          ? <span className="badge-danger">Below minimum</span>
+                          : r.reason === 'running_out'
+                            ? <span className="badge-warning">Runs out in {r.days_left} days</span>
+                            : null}
+                        {r.shortage && <span className="badge-warning" title={r.shortage_note || undefined}>Marked short</span>}
+                        {r.shortage && r.shortage_note && <span className="text-2xs text-slate-500 dark:text-slate-400">{r.shortage_note}</span>}
+                      </div>
                     </td>
                     <td className="py-2 px-3 text-center">
                       <input
@@ -243,7 +249,7 @@ export const ReorderTab: React.FC<ReorderTabProps> = ({ settings, money, canCrea
               <tbody>
                 {orderedRows(group.rows).map(r => (
                   <tr key={r.product_id}>
-                    <td>{r.name}</td>
+                    <td>{r.name}{r.shortage ? ' (short)' : ''}</td>
                     <td className="num">{boxesFor(r)}</td>
                     <td className="num">{money(r.box_trade_price)}</td>
                     <td className="num">{money(boxesFor(r) * r.box_trade_price)}</td>

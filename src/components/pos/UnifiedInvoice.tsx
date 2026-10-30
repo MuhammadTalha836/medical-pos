@@ -20,6 +20,8 @@ interface UnifiedInvoiceProps {
   showControls?: boolean;
   /** More buttons in the on-screen control bar (never printed), e.g. WhatsApp */
   extraActions?: React.ReactNode;
+  /** Print as a quotation (C8): not a sale, so no payment, cash, points or barcode */
+  quotation?: { validDays: number; validUntil: string };
 }
 
 export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
@@ -30,8 +32,11 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
   onPrint,
   onClose,
   showControls = true,
-  extraActions
+  extraActions,
+  quotation
 }) => {
+  const isQuote = !!quotation;
+  const isVoided = !isQuote && invoice.status === 'cancelled';
   // Thermal-only: the admin-selected design and roll width are authoritative (legacy values normalize safely)
   const template = normalizeTemplate(templateOverride ?? settings?.default_invoice_template);
   const paperSize = normalizePaperSize(paperSizeOverride ?? settings?.invoice_paper_size ?? settings?.paper_width);
@@ -103,8 +108,8 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
   const invoiceMeta = (
     <div className={`py-2 ${fs.sm} border-b border-dashed border-black space-y-0.5`}>
       <div className="flex justify-between gap-2 font-bold">
-        {isVisible('show_invoice_no') && <span>INV: {invoice.invoice_no}</span>}
-        <span>{invoice.payment_type.toUpperCase()}</span>
+        {(isQuote || isVisible('show_invoice_no')) && <span>{isQuote ? 'QT' : 'INV'}: {invoice.invoice_no}</span>}
+        {!isQuote && <span>{invoice.payment_type.toUpperCase()}</span>}
       </div>
       <div className={`flex flex-wrap justify-between gap-x-2 ${fs.xs} text-gray-700`}>
         {isVisible('show_invoice_date') && <span>{dateText}</span>}
@@ -142,6 +147,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
                 <td className="py-1 pr-1 font-semibold align-top">
                   {item.product_name}
                   {item.is_loose ? <span className="text-[8px] font-normal block text-gray-600">(Loose)</span> : null}
+                  {item.low_stock ? <span className="text-[8px] font-bold block">(Low stock)</span> : null}
                 </td>
               )}
               {isVisible('show_col_p_code') && (
@@ -185,6 +191,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
             {detailed && <span className="text-gray-600 mr-1">{idx + 1}.</span>}
             {item.product_name}
             {item.is_loose ? <span className="font-normal text-gray-600"> (Loose)</span> : null}
+            {item.low_stock ? <span className="font-bold"> (Low stock)</span> : null}
           </div>
         )}
         {showCodeLine && (
@@ -236,14 +243,46 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
         row(`Member Discount (${invoice.loyalty_plan_name ? `${invoice.loyalty_plan_name} ` : ''}${invoice.member_discount_pct}%):`, `-${money(invoice.member_discount_amt ?? 0)}`, 'text-gray-700')}
       {(invoice.points_redeemed ?? 0) > 0 &&
         row(`Points Used (${invoice.points_redeemed}):`, `-${money(invoice.points_redeemed_value ?? 0)}`, 'text-gray-700')}
-      {isVisible('show_summary_net') &&
-        row('NET PAYABLE:', `${money(invoice.net_total)}`, `${fs.net} font-extrabold pt-1 border-t border-dotted border-black`)}
-      {isVisible('show_summary_received') &&
+      {(invoice.round_off ?? 0) !== 0 &&
+        row('Round Off:', `${(invoice.round_off ?? 0) > 0 ? '+' : '-'}${money(Math.abs(invoice.round_off ?? 0))}`, 'text-gray-700')}
+      {(isQuote || isVisible('show_summary_net')) &&
+        row(isQuote ? 'ESTIMATED TOTAL:' : 'NET PAYABLE:', `${money(invoice.net_total)}`, `${fs.net} font-extrabold pt-1 border-t border-dotted border-black`)}
+      {!isQuote && invoice.payment_type === 'Split' && (
+        <>
+          {(invoice.paid_cash ?? 0) > 0 && row('Paid Cash:', money(invoice.paid_cash ?? 0), 'pt-0.5')}
+          {(invoice.paid_card ?? 0) > 0 && row('Paid Card/Online:', money(invoice.paid_card ?? 0))}
+          {(invoice.paid_credit ?? 0) > 0 && row('On Khata (Credit):', money(invoice.paid_credit ?? 0))}
+        </>
+      )}
+      {!isQuote && isVisible('show_summary_received') &&
         row('Cash Tendered:', `${money(invoice.cash_tendered)}`, 'pt-0.5')}
-      {isVisible('show_summary_change') &&
+      {!isQuote && isVisible('show_summary_change') &&
         row('Change Due:', `${money(invoice.change_due)}`, 'font-bold text-gray-900')}
-      {invoice.loyalty_plan_name && invoice.points_balance !== null && invoice.points_balance !== undefined &&
+      {!isQuote && invoice.loyalty_plan_name && invoice.points_balance !== null && invoice.points_balance !== undefined &&
         row(`Points Earned: ${invoice.points_earned ?? 0}`, `Balance: ${invoice.points_balance}`, 'pt-0.5 font-semibold')}
+    </div>
+  );
+
+  // Quotation (C8) and voided bills (C7) say clearly that they are not a sale
+  const quotationTitle = isQuote && (
+    <div className="text-center py-1.5 border-b border-dashed border-black">
+      <div className={`font-extrabold ${is58 ? 'text-[16px]' : 'text-[19px]'} tracking-widest`}>QUOTATION</div>
+      <div className={fs.xs}>
+        {quotation!.validDays <= 1
+          ? 'Prices valid today only'
+          : `Prices valid until ${new Date(`${quotation!.validUntil}T00:00:00`).toLocaleDateString()}`}
+      </div>
+    </div>
+  );
+  const notASale = isQuote && (
+    <div className={`text-center py-2 border-b border-dashed border-black ${fs.sm} font-bold`}>
+      This is not a receipt. Not a sale.
+    </div>
+  );
+  const voidedBanner = isVoided && (
+    <div className="text-center py-1.5 border-b border-dashed border-black">
+      <div className={`font-extrabold ${is58 ? 'text-[15px]' : 'text-[17px]'} tracking-widest`}>VOID</div>
+      <div className={fs.xs}>This invoice was cancelled and is not a sale.{invoice.void_reason ? ` Reason: ${invoice.void_reason}` : ''}</div>
     </div>
   );
 
@@ -309,7 +348,7 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
               className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold text-[12px] rounded-lg shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Invoice</span>
+              <span>{isQuote ? 'Print Quotation' : 'Print Invoice'}</span>
             </button>
             {onClose && (
               <button
@@ -336,11 +375,14 @@ export const UnifiedInvoice: React.FC<UnifiedInvoiceProps> = ({
       >
         <div className={`${fs.base} font-mono leading-tight`}>
           {header}
+          {quotationTitle}
+          {voidedBanner}
           {invoiceMeta}
           {itemsSection}
           {totals}
-          {template !== 'compact' && barcode}
-          {policies}
+          {notASale}
+          {!isQuote && template !== 'compact' && barcode}
+          {!isQuote && policies}
           {developerFooterBlock}
         </div>
       </div>

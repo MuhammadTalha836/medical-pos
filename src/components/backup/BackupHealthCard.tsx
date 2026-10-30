@@ -112,6 +112,13 @@ export const BackupHealthCard: React.FC = () => {
         </div>
       )}
 
+      {status.last_status !== 'failed' && status.last_warning && (
+        <div className="flex items-start space-x-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span className="wrap-anywhere">{status.last_warning}</span>
+        </div>
+      )}
+
       {status.last_status === 'failed' && status.last_error && (
         <div className="flex items-start space-x-2 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />

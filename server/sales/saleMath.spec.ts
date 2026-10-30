@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { priceReturn, priceSaleLine, settleCash, totalSale } from './saleMath';
+import { checkSplit, priceReturn, priceSaleLine, refundTenders, roundOff, settleCash, tenderSplit, totalSale } from './saleMath';
 
 const panadol = { name: 'Panadol', boxRetailPrice: 120, unitRetailPrice: 12, defaultDiscountPct: 0 };
 const cashier = { canDiscount: false, maxBillDiscountPct: 14 };
@@ -92,3 +92,52 @@ describe('priceReturn', () => {
 });
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+describe('round-off (C1)', () => {
+  it('rounds to the nearest step and reports what was added', () => {
+    expect(roundOff(198, 10)).toEqual({ netTotal: 200, roundOff: 2 });
+    expect(roundOff(196, 5)).toEqual({ netTotal: 195, roundOff: -1 });
+    expect(roundOff(197.6, 1)).toEqual({ netTotal: 198, roundOff: 0.4 });
+    expect(roundOff(203, 10)).toEqual({ netTotal: 200, roundOff: -3 });
+  });
+
+  it('is off for 0, unknown steps and empty bills', () => {
+    expect(roundOff(198.4, 0)).toEqual({ netTotal: 198.4, roundOff: 0 });
+    expect(roundOff(198.4, 3)).toEqual({ netTotal: 198.4, roundOff: 0 });
+    expect(roundOff(0, 10)).toEqual({ netTotal: 0, roundOff: 0 });
+  });
+
+  it('a bill rounded up refunds the rounded amount on a full return', () => {
+    const sold = [{ productId: 1, productName: 'A', isLoose: false, quantity: 2, netAmount: 198 }];
+    expect(priceReturn(sold, 200, [], [{ productId: 1, isLoose: false, quantity: 2 }]).totalRefund).toBe(200);
+  });
+});
+
+describe('tenders and split payment (C4)', () => {
+  it('older bills count wholly in their one payment type', () => {
+    expect(tenderSplit({ paymentType: 'Cash', netTotal: 100 })).toEqual({ cash: 100, card: 0, credit: 0 });
+    expect(tenderSplit({ paymentType: 'Online', netTotal: 100 })).toEqual({ cash: 0, card: 100, credit: 0 });
+    expect(tenderSplit({ paymentType: 'Credit', netTotal: 100, paidCash: 0, paidCard: 0, paidCredit: 0 })).toEqual({ cash: 0, card: 0, credit: 100 });
+    expect(tenderSplit({ paymentType: 'Split', netTotal: 100, paidCash: 60, paidCard: 0, paidCredit: 40 })).toEqual({ cash: 60, card: 0, credit: 40 });
+  });
+
+  it('a split must use two parts and add up to the bill', () => {
+    expect(checkSplit(500, { cash: 200, card: '100', credit: 200 })).toEqual({ cash: 200, card: 100, credit: 200 });
+    expect(() => checkSplit(500, { cash: 500 })).toThrow(/at least two parts/);
+    expect(() => checkSplit(500, { cash: 200, credit: 200 })).toThrow(/add up to 400.00/);
+    expect(() => checkSplit(500, { cash: -1, credit: 501 })).toThrow(/negative/);
+  });
+
+  it('a split refund lowers the khata part first, then pays cash', () => {
+    const sale = { paymentType: 'Split', netTotal: 500, paidCash: 300, paidCard: 0, paidCredit: 200 };
+    expect(refundTenders(sale, 0, 150)).toEqual({ cash: 0, credit: 150 });
+    expect(refundTenders(sale, 150, 100)).toEqual({ cash: 50, credit: 50 });
+    expect(refundTenders(sale, 250, 250)).toEqual({ cash: 250, credit: 0 });
+  });
+
+  it('single-type refunds keep their old rule', () => {
+    expect(refundTenders({ paymentType: 'Cash', netTotal: 100 }, 0, 40)).toEqual({ cash: 40, credit: 0 });
+    expect(refundTenders({ paymentType: 'Card', netTotal: 100 }, 0, 40)).toEqual({ cash: 0, credit: 0 });
+    expect(refundTenders({ paymentType: 'Credit', netTotal: 100 }, 0, 40)).toEqual({ cash: 0, credit: 40 });
+  });
+});

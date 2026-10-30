@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS products (
   allow_open_sale INTEGER NOT NULL DEFAULT 1, -- 1 = Yes (Allow loose unit sales), 0 = No (Full pack only)
   min_sale_qty INTEGER NOT NULL DEFAULT 1, -- Smallest quantity permitted per sale
   schedule TEXT NOT NULL DEFAULT 'none', -- 'none' | 'rx' (prescription reminder) | 'controlled' (register required)
+  shortage_flag INTEGER NOT NULL DEFAULT 0, -- 1 = marked short by staff (POS warning, always on the reorder list)
+  shortage_note TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'active',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -143,6 +145,13 @@ CREATE TABLE IF NOT EXISTS sales (
   terminal_id INTEGER,
   terminal_name TEXT,
   client_request_id TEXT,
+  round_off REAL NOT NULL DEFAULT 0.0, -- signed amount added to reach round_off_to (C1)
+  paid_cash REAL NOT NULL DEFAULT 0.0, -- tender split of net_total (C4); 0/0/0 on bills from before C4
+  paid_card REAL NOT NULL DEFAULT 0.0,
+  paid_credit REAL NOT NULL DEFAULT 0.0,
+  void_reason TEXT,
+  voided_by TEXT,
+  voided_at DATETIME,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -181,6 +190,7 @@ CREATE TABLE IF NOT EXISTS sale_returns (
   shift_id INTEGER REFERENCES cashier_shifts(id),
   terminal_id INTEGER,
   terminal_name TEXT,
+  refund_cash REAL, -- cash paid out of the drawer (C4); NULL on returns from before C4
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -349,6 +359,18 @@ CREATE TABLE IF NOT EXISTS expenses (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 14b2. Cash pay-in / pay-out during a shift (C4): changes the expected drawer cash, never the day's profit
+CREATE TABLE IF NOT EXISTS cash_movements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shift_id INTEGER NOT NULL REFERENCES cashier_shifts(id),
+  direction TEXT NOT NULL, -- 'in' | 'out'
+  amount REAL NOT NULL,
+  reason TEXT NOT NULL,
+  user_id INTEGER,
+  user_name TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 14c. Stock counts and adjustments (M9). Product ids carry no foreign key: the history outlives a deleted medicine.
 -- A count changes nothing until it is applied; every stock change outside sales and purchases is a stock_adjustments row.
 CREATE TABLE IF NOT EXISTS stock_counts (
@@ -503,6 +525,8 @@ CREATE TABLE IF NOT EXISTS cashier_shifts (
   total_returns_amount REAL DEFAULT 0.0,
   total_customer_payments REAL DEFAULT 0.0,
   total_expenses_cash REAL DEFAULT 0.0,
+  total_cash_in REAL DEFAULT 0.0,
+  total_cash_out REAL DEFAULT 0.0,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'open',
   terminal_id INTEGER,
@@ -528,6 +552,7 @@ CREATE INDEX IF NOT EXISTS idx_prescription_records_sale ON prescription_records
 CREATE INDEX IF NOT EXISTS idx_prescription_records_created ON prescription_records(created_at);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
 CREATE INDEX IF NOT EXISTS idx_expenses_shift ON expenses(shift_id);
+CREATE INDEX IF NOT EXISTS idx_cash_movements_shift ON cash_movements(shift_id);
 CREATE INDEX IF NOT EXISTS idx_stock_adjustments_created ON stock_adjustments(created_at);
 CREATE INDEX IF NOT EXISTS idx_stock_adjustments_product ON stock_adjustments(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_count_items_count ON stock_count_items(count_id);
@@ -606,5 +631,17 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; definitio
   { table: 'sale_returns', column: 'terminal_id', definition: 'INTEGER' },
   { table: 'sale_returns', column: 'terminal_name', definition: 'TEXT' },
   { table: 'cashier_shifts', column: 'terminal_id', definition: 'INTEGER' },
-  { table: 'cashier_shifts', column: 'terminal_name', definition: 'TEXT' }
+  { table: 'cashier_shifts', column: 'terminal_name', definition: 'TEXT' },
+  { table: 'products', column: 'shortage_flag', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { table: 'products', column: 'shortage_note', definition: "TEXT NOT NULL DEFAULT ''" },
+  { table: 'sales', column: 'round_off', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'sales', column: 'paid_cash', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'sales', column: 'paid_card', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'sales', column: 'paid_credit', definition: 'REAL NOT NULL DEFAULT 0.0' },
+  { table: 'sales', column: 'void_reason', definition: 'TEXT' },
+  { table: 'sales', column: 'voided_by', definition: 'TEXT' },
+  { table: 'sales', column: 'voided_at', definition: 'DATETIME' },
+  { table: 'sale_returns', column: 'refund_cash', definition: 'REAL' },
+  { table: 'cashier_shifts', column: 'total_cash_in', definition: 'REAL DEFAULT 0.0' },
+  { table: 'cashier_shifts', column: 'total_cash_out', definition: 'REAL DEFAULT 0.0' }
 ];

@@ -4,6 +4,17 @@ All notable changes to PharmaCare Pro. Dates are in the store's local calendar.
 
 ## [Unreleased] — 2026-10-24
 
+### New features (Phase C, `docs/NEXT_PHASES.md`)
+- **Print Quotation (F11):** prints the prices of the bill on the counter as a QUOTATION. It is not a sale: stock, shift, khata, loyalty and reports do not change, and the bill stays open for F9. The validity (days) is set in Settings → Store.
+- **Bill round-off:** Settings → Store can round every bill to the nearest 1, 5 or 10 (off by default). The receipt shows the round-off line.
+- **Medicine units:** the Admin keeps the list of units (ml, Litre, Vial, ...) in Settings → Store. Medicines keep their unit even when it is removed from the list.
+- **Shortage mark:** a medicine can be marked short with a note. The counter sees a warning when it is sold, and it stays on the reorder list until stock is purchased.
+- **Split payment:** one bill can be paid partly in cash, partly by card/online and partly on khata. Shift totals and the day close count each part. A return first lowers the khata part, then pays the rest in cash.
+- **Cash In / Out:** money put into or taken out of the drawer during a shift (with a reason) changes the expected cash. Admin by default (new permission "Cash Pay-in / Pay-out").
+- **Void an invoice:** a bill made by mistake can be voided with a reason while its shift is open. The stock, khata and points come back; the bill stays in the history marked Voided. The permission "Delete Invoices" is now called "Void Invoices".
+- **Second shift:** the store can allow only one shift per person per day.
+- **Backups:** new "Every 2 days" and "Every 3 days" schedules. If the backup folder cannot be used, the backup goes to the secondary folder. The secondary folder keeps its own copies. The overdue warning appears after two missed backups, not one.
+
 ### Fixes and small additions (Phase B, `docs/NEXT_PHASES.md`)
 - **Reports → Print Report** prints the report on an A4 page, with the store name, report name and dates. Before, it printed a blank page.
 - **P&L Summary → Export CSV** exports the summary figures. Before, it exported the previous report.

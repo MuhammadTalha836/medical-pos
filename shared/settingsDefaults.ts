@@ -2,6 +2,7 @@ import { DEFAULT_DEVELOPER_FOOTER } from './invoice';
 import { DEFAULT_DEVELOPER_PROFILE_SETTINGS } from './developerProfile';
 import { DEFAULT_BACKUP_MODE } from './backup';
 import { DEFAULT_WHATSAPP_RECEIPT_TEMPLATE, DEFAULT_WHATSAPP_REMINDER_TEMPLATE } from './whatsapp';
+import { DEFAULT_UNIT_TYPES } from './unitTypes';
 
 // Default system_settings values, shared by the seed, GET /api/settings and the Settings page.
 // Settings are stored as strings; booleans are 'true' / 'false'.
@@ -68,6 +69,12 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   low_stock_threshold: '10',
   max_bill_discount_pct: '14',
   reorder_cover_days: '7',
+  // Phase C: bill round-off step (0 = off, 1, 5, 10), quotation validity in days (1 = today only),
+  // the medicine unit list and whether one person may start a second shift on the same day
+  round_off_to: '0',
+  quotation_valid_days: '1',
+  medicine_unit_types: JSON.stringify(DEFAULT_UNIT_TYPES),
+  allow_second_shift_same_day: 'true',
   // Close each finished day on its own after midnight (M8)
   auto_day_close: 'true',
   // Loyalty points (M10): the Developer allows the feature, then the Admin switches it on

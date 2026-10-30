@@ -28,4 +28,22 @@ describe('computeShiftTotals', () => {
     expect(t.totalExpensesCash).toBe(150);
     expect(t.expectedCash).toBe(1000 + 800 - 150);
   });
+
+  it('split bills, stored cash refunds and cash pay-in/out (C4)', () => {
+    const t = computeShiftTotals(
+      1000,
+      [{ netTotal: 500, paymentType: 'Split', paidCash: 300, paidCard: 100, paidCredit: 100 }, { netTotal: 200, paymentType: 'Cash' }],
+      [{ refundAmount: 150, refundCash: 50, originalPaymentType: 'Split' }, { refundAmount: 20, refundCash: null, originalPaymentType: 'Cash' }],
+      [],
+      [],
+      [{ direction: 'in', amount: 500 }, { direction: 'out', amount: 300 }]
+    );
+    expect(t.totalCashSales).toBe(500);
+    expect(t.totalCardSales).toBe(100);
+    expect(t.totalCreditSales).toBe(100);
+    expect(t.totalReturnsCash).toBe(70);
+    expect(t.totalCashIn).toBe(500);
+    expect(t.totalCashOut).toBe(300);
+    expect(t.expectedCash).toBe(1000 + 500 - 70 + 500 - 300);
+  });
 });

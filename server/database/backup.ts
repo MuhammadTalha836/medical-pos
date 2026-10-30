@@ -145,14 +145,10 @@ export function createBackup(
   return run;
 }
 
-async function runBackup(backupType: BackupType, customDir?: string, secondaryDir?: string): Promise<BackupResult> {
-  const targetDir = customDir ? path.resolve(customDir) : DEFAULT_BACKUP_DIR;
-  const now = new Date();
-  const dateStr = now.toISOString().replace(/[:.]/g, '-');
-  const filename = `pharmacy_backup_${backupType}_${dateStr}.db`;
+/** Writes a verified snapshot into a folder: .partial, integrity check, atomic rename, checksum sidecar */
+async function writeVerifiedSnapshot(targetDir: string, filename: string): Promise<{ filepath: string; checksum: string; size: number }> {
   const filepath = path.join(targetDir, filename);
   const partialPath = `${filepath}.partial`;
-
   try {
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
@@ -182,72 +178,110 @@ async function runBackup(backupType: BackupType, customDir?: string, secondaryDi
       throw new Error('Checksum mismatch after writing backup file.');
     }
     fs.writeFileSync(`${filepath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
-    const stats = fs.statSync(filepath);
-
-    // Multi-Destination: Copy to secondary destination (e.g. External USB drive) if configured
-    let secondaryPath: string | undefined = undefined;
-    if (secondaryDir && secondaryDir.trim()) {
-      try {
-        const secDirResolved = path.resolve(secondaryDir.trim());
-        if (!fs.existsSync(secDirResolved)) {
-          fs.mkdirSync(secDirResolved, { recursive: true });
-        }
-        const copyPath = path.join(secDirResolved, filename);
-        fs.copyFileSync(filepath, copyPath);
-        if (calculateFileChecksum(copyPath) === checksum) {
-          fs.writeFileSync(`${copyPath}.sha256`, `${checksum}  ${filename}\n`, 'utf8');
-          secondaryPath = copyPath;
-        } else {
-          removeIfExists(copyPath);
-          console.warn('[Backup] Secondary copy checksum mismatch; copy discarded.');
-        }
-      } catch (secErr: any) {
-        console.warn('[Backup] Secondary destination copy warning:', secErr.message);
-      }
-    }
-
-    // 4. Record the verified backup
-    const history = db.prepare(`
-      INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status, checksum_sha256, verified, secondary_path)
-      VALUES (?, ?, ?, ?, 'success', ?, 1, ?)
-    `).run(filename, filepath, backupType, stats.size, checksum, secondaryPath ?? null);
-
-    // 5. Only now is it safe to prune older backups in this folder
-    const prunedCount = backupType === 'pre_restore'
-      ? prunePreRestoreSnapshots(targetDir)
-      : pruneBackupsByRetentionLimit(undefined, targetDir);
-
-    return {
-      success: true,
-      historyId: Number(history.lastInsertRowid),
-      filename,
-      filepath,
-      secondaryPath,
-      checksumSha256: checksum,
-      sizeBytes: stats.size,
-      type: backupType,
-      timestamp: now.toISOString(),
-      prunedCount,
-      message: secondaryPath
-        ? 'Backup created, verified, and synced to secondary external drive.'
-        : 'Backup created and verified successfully.'
-    };
-  } catch (error: any) {
+    return { filepath, checksum, size: fs.statSync(filepath).size };
+  } catch (error) {
     removeIfExists(partialPath);
     removeIfExists(`${partialPath}-wal`);
     removeIfExists(`${partialPath}-shm`);
-    const message = error?.message || String(error);
-    try {
-      db.prepare(`
-        INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status, verified, error_message)
-        VALUES (?, ?, ?, 0, 'failed', 0, ?)
-      `).run(filename, filepath, backupType, message);
-    } catch {
-      // History is best effort when the database itself is the problem
-    }
-    console.error('Backup failed:', message);
-    throw new Error(`Backup failed: ${message}`);
+    throw error;
   }
+}
+
+async function runBackup(backupType: BackupType, customDir?: string, secondaryDir?: string): Promise<BackupResult> {
+  const targetDir = customDir ? path.resolve(customDir) : DEFAULT_BACKUP_DIR;
+  const secondaryResolved = secondaryDir && secondaryDir.trim() ? path.resolve(secondaryDir.trim()) : null;
+  const now = new Date();
+  const dateStr = now.toISOString().replace(/[:.]/g, '-');
+  const filename = `pharmacy_backup_${backupType}_${dateStr}.db`;
+  const filepath = path.join(targetDir, filename);
+
+  let written: { filepath: string; checksum: string; size: number };
+  let primaryError: string | null = null;
+  try {
+    written = await writeVerifiedSnapshot(targetDir, filename);
+  } catch (error: any) {
+    const message = error?.message || String(error);
+    // Failover (C5): the primary folder cannot take the backup (disk full, drive removed), so the secondary
+    // folder gets it instead, and that copy is the backup of record
+    let failover: typeof written | null = null;
+    if (secondaryResolved && secondaryResolved !== targetDir) {
+      try {
+        failover = await writeVerifiedSnapshot(secondaryResolved, filename);
+      } catch (secErr: any) {
+        console.warn('[Backup] Secondary folder failed too:', secErr?.message || secErr);
+      }
+    }
+    if (!failover) {
+      try {
+        db.prepare(`
+          INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status, verified, error_message)
+          VALUES (?, ?, ?, 0, 'failed', 0, ?)
+        `).run(filename, filepath, backupType, message);
+      } catch {
+        // History is best effort when the database itself is the problem
+      }
+      console.error('Backup failed:', message);
+      throw new Error(`Backup failed: ${message}`);
+    }
+    console.warn('[Backup] Primary folder failed, backup saved to the secondary folder:', message);
+    written = failover;
+    primaryError = message;
+  }
+
+  // Multi-Destination: Copy to secondary destination (e.g. External USB drive) if configured
+  let secondaryPath: string | undefined = undefined;
+  if (!primaryError && secondaryResolved) {
+    try {
+      if (!fs.existsSync(secondaryResolved)) {
+        fs.mkdirSync(secondaryResolved, { recursive: true });
+      }
+      const copyPath = path.join(secondaryResolved, filename);
+      fs.copyFileSync(written.filepath, copyPath);
+      if (calculateFileChecksum(copyPath) === written.checksum) {
+        fs.writeFileSync(`${copyPath}.sha256`, `${written.checksum}  ${filename}\n`, 'utf8');
+        secondaryPath = copyPath;
+      } else {
+        removeIfExists(copyPath);
+        console.warn('[Backup] Secondary copy checksum mismatch; copy discarded.');
+      }
+    } catch (secErr: any) {
+      console.warn('[Backup] Secondary destination copy warning:', secErr.message);
+    }
+  }
+
+  // 4. Record the verified backup
+  const history = db.prepare(`
+    INSERT INTO backup_history (backup_filename, backup_path, backup_type, file_size_bytes, status, checksum_sha256, verified, secondary_path, error_message)
+    VALUES (?, ?, ?, ?, 'success', ?, 1, ?, ?)
+  `).run(filename, written.filepath, backupType, written.size, written.checksum, secondaryPath ?? null,
+    // Shown on the dashboard, so no folder paths or system messages (those are in the log above)
+    primaryError ? 'The last backup could not be saved in the backup folder, so it was saved in the secondary folder. Check the backup folder.' : null);
+
+  // 5. Only now is it safe to prune older backups; each folder keeps its own newest copies
+  let prunedCount = backupType === 'pre_restore'
+    ? prunePreRestoreSnapshots(primaryError ? secondaryResolved! : targetDir)
+    : primaryError ? 0 : pruneBackupsByRetentionLimit(undefined, targetDir);
+  if (backupType !== 'pre_restore' && secondaryResolved && secondaryResolved !== targetDir) {
+    prunedCount += pruneSecondaryFolder(secondaryResolved);
+  }
+
+  return {
+    success: true,
+    historyId: Number(history.lastInsertRowid),
+    filename,
+    filepath: written.filepath,
+    secondaryPath,
+    checksumSha256: written.checksum,
+    sizeBytes: written.size,
+    type: backupType,
+    timestamp: now.toISOString(),
+    prunedCount,
+    message: primaryError
+      ? 'The backup folder could not be used, so the backup was saved to the secondary folder. Check the backup folder.'
+      : secondaryPath
+        ? 'Backup created, verified, and synced to secondary external drive.'
+        : 'Backup created and verified successfully.'
+  };
 }
 
 interface RetainedBackupRow {
@@ -255,6 +289,61 @@ interface RetainedBackupRow {
   backup_filename: string;
   backup_path: string;
   secondary_path: string | null;
+}
+
+/**
+ * Pruning a primary backup keeps its secondary copy (C5): the row then points at the copy, and the secondary
+ * folder's own retention removes it later. Without a copy the backup is deleted.
+ */
+function retireBackupRow(row: RetainedBackupRow) {
+  if (row.secondary_path && fs.existsSync(row.secondary_path)) {
+    removeIfExists(row.backup_path);
+    removeIfExists(`${row.backup_path}.sha256`);
+    db.prepare('UPDATE backup_history SET backup_path = ?, secondary_path = NULL WHERE id = ?').run(row.secondary_path, row.id);
+    return;
+  }
+  deleteBackupRow(row);
+}
+
+/**
+ * Keeps the newest N routine backups in the secondary folder, whether they are copies of primary backups or
+ * backups saved there when the primary folder failed. Only files recorded in backup_history are touched.
+ */
+export function pruneSecondaryFolder(dir: string, customLimit?: number): number {
+  try {
+    let maxKeep = customLimit ?? getLocalRetentionLimit();
+    if (isNaN(maxKeep) || maxKeep < 1) maxKeep = 1;
+    const placeholders = ROUTINE_BACKUP_TYPES.map(() => '?').join(', ');
+    const rows = db.prepare(`
+      SELECT id, backup_filename, backup_path, secondary_path
+      FROM backup_history
+      WHERE status = 'success' AND verified = 1 AND backup_type IN (${placeholders})
+      ORDER BY id DESC
+    `).all(...ROUTINE_BACKUP_TYPES) as RetainedBackupRow[];
+    const resolvedDir = path.resolve(dir);
+    const inDir = (file: string | null) => !!file && path.dirname(path.resolve(file)) === resolvedDir && fs.existsSync(file);
+    const held = rows.filter(r => inDir(r.backup_path) || inDir(r.secondary_path));
+
+    let deletedCount = 0;
+    for (const row of held.slice(maxKeep)) {
+      try {
+        if (inDir(row.secondary_path)) {
+          removeIfExists(row.secondary_path!);
+          removeIfExists(`${row.secondary_path}.sha256`);
+          db.prepare('UPDATE backup_history SET secondary_path = NULL WHERE id = ?').run(row.id);
+        } else {
+          deleteBackupRow(row);
+        }
+        deletedCount++;
+      } catch (e) {
+        console.warn('[Backup Prune] Error removing secondary file:', row.backup_filename, e);
+      }
+    }
+    return deletedCount;
+  } catch (err) {
+    console.warn('[Backup Prune] Secondary warning:', err);
+    return 0;
+  }
 }
 
 function deleteBackupRow(row: RetainedBackupRow) {
@@ -302,7 +391,7 @@ export function pruneBackupsByRetentionLimit(customLimit?: number, dir: string =
     let deletedCount = 0;
     for (const row of retained.slice(maxKeep)) {
       try {
-        deleteBackupRow(row);
+        retireBackupRow(row);
         deletedCount++;
       } catch (e) {
         console.warn('[Backup Prune] Error removing file:', row.backup_filename, e);

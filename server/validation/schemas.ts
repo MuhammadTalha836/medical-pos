@@ -232,6 +232,8 @@ export const productSchema = z.looseObject({
   stock_boxes: optionalWhole('Opening boxes must be a whole number of 0 or more', 0),
   stock_loose: optionalWhole('Opening loose units must be a whole number of 0 or more', 0),
   allow_open_sale: z.union([z.boolean(), z.number(), z.string()]).nullish(),
+  shortage_flag: z.union([z.boolean(), z.number(), z.string()]).nullish(),
+  shortage_note: optionalText(200, 'Shortage note'),
   status: optionalText(20, 'Status')
 });
 

@@ -156,7 +156,7 @@ router.post('/api/setup/complete', async (req: Request, res: Response) => {
     }
 
     if (!isValidFrequency(body.backup.frequency)) {
-      return res.status(400).json({ error: 'Invalid backup frequency. Allowed: off, twice_daily, daily, weekly' });
+      return res.status(400).json({ error: 'Invalid backup frequency. Allowed: off, twice_daily, daily, every_2_days, every_3_days, weekly' });
     }
     if (!isValidBackupTime(body.backup.time)) {
       return res.status(400).json({ error: 'Backup time must use 24-hour HH:MM format' });

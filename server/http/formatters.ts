@@ -52,6 +52,13 @@ interface SaleEntity {
   loyaltyPlanName?: string | null;
   pointsBalance?: number | null;
   terminalName?: string | null;
+  roundOff?: number;
+  paidCash?: number;
+  paidCard?: number;
+  paidCredit?: number;
+  voidReason?: string | null;
+  voidedBy?: string | null;
+  voidedAt?: Date | null;
   createdAt: Date;
   items?: SaleItemEntity[];
 }
@@ -109,6 +116,13 @@ export function formatSale(sale: SaleEntity) {
     loyalty_plan_name: sale.loyaltyPlanName ?? null,
     points_balance: sale.pointsBalance ?? null,
     terminal_name: sale.terminalName ?? null,
+    round_off: sale.roundOff ?? 0,
+    paid_cash: sale.paidCash ?? 0,
+    paid_card: sale.paidCard ?? 0,
+    paid_credit: sale.paidCredit ?? 0,
+    void_reason: sale.voidReason ?? null,
+    voided_by: sale.voidedBy ?? null,
+    voided_at: sale.voidedAt ?? null,
     created_at: sale.createdAt,
     items: sale.items ? sale.items.map(formatSaleItem) : undefined
   };

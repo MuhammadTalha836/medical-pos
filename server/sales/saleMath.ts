@@ -120,6 +120,84 @@ export function settleCash(paymentType: string, netTotal: number, cashTendered: 
   return { cashTendered: round2(tendered), changeDue: round2(tendered - netTotal) };
 }
 
+/** Allowed round-off steps (setting round_off_to); 0 = off */
+export const ROUND_OFF_STEPS = [0, 1, 5, 10] as const;
+
+/** Rounds the bill to the nearest step (198 -> 200 with 10, 196 -> 195 with 5); roundOff is what was added (signed) */
+export function roundOff(netTotal: number, step: unknown): { netTotal: number; roundOff: number } {
+  const size = Number(step);
+  if (!ROUND_OFF_STEPS.includes(size as typeof ROUND_OFF_STEPS[number]) || size === 0 || netTotal <= 0) {
+    return { netTotal, roundOff: 0 };
+  }
+  const rounded = round2(Math.round(netTotal / size) * size);
+  return { netTotal: rounded, roundOff: round2(rounded - netTotal) };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Tenders (C4): how a bill was paid. Card covers Card and Online.
+
+export interface Tenders { cash: number; card: number; credit: number }
+
+export interface TenderSource {
+  paymentType: string;
+  netTotal: number;
+  paidCash?: number | null;
+  paidCard?: number | null;
+  paidCredit?: number | null;
+}
+
+/** The tender split of a sale: the stored amounts, or (bills from before split payment) the whole net in its one type */
+export function tenderSplit(sale: TenderSource): Tenders {
+  const cash = Number(sale.paidCash) || 0, card = Number(sale.paidCard) || 0, credit = Number(sale.paidCredit) || 0;
+  if (cash + card + credit > 0) return { cash, card, credit };
+  if (sale.paymentType === 'Cash') return { cash: sale.netTotal, card: 0, credit: 0 };
+  if (sale.paymentType === 'Card' || sale.paymentType === 'Online') return { cash: 0, card: sale.netTotal, credit: 0 };
+  if (sale.paymentType === 'Credit') return { cash: 0, card: 0, credit: sale.netTotal };
+  return { cash: 0, card: 0, credit: 0 };
+}
+
+/**
+ * Checks a split payment: every part 0 or more, at least two parts used, and together exactly the bill.
+ * Returns the parts rounded to paisa.
+ */
+export function checkSplit(netTotal: number, split: { cash?: unknown; card?: unknown; credit?: unknown } | null | undefined): Tenders {
+  const part = (value: unknown, name: string) => {
+    const n = toNumber(value) ?? 0;
+    if (n < 0) throw new Error(`The ${name} part cannot be negative.`);
+    return round2(n);
+  };
+  const tenders = { cash: part(split?.cash, 'cash'), card: part(split?.card, 'card'), credit: part(split?.credit, 'credit') };
+  if ([tenders.cash, tenders.card, tenders.credit].filter(v => v > 0).length < 2) {
+    throw new Error('A split payment needs at least two parts (cash, card or credit).');
+  }
+  const total = round2(tenders.cash + tenders.card + tenders.credit);
+  if (Math.abs(total - netTotal) > PRICE_TOLERANCE) {
+    throw new Error(`The split parts add up to ${total.toFixed(2)}, but the bill is ${netTotal.toFixed(2)}.`);
+  }
+  return tenders;
+}
+
+/** Tenders for a single-type bill */
+export function singleTender(paymentType: string, netTotal: number): Tenders {
+  return tenderSplit({ paymentType, netTotal });
+}
+
+/**
+ * How a refund is paid back (owner rule for split bills): first it lowers what is still owed on the khata (the
+ * bill's credit part, less credit already taken back by earlier returns), and the rest is cash from the drawer.
+ * Single-type bills keep their rule: Cash -> drawer, Card/Online -> back to the card, Credit -> khata.
+ */
+export function refundTenders(sale: TenderSource, refundedBefore: number, refund: number): { cash: number; credit: number } {
+  if (sale.paymentType !== 'Split') {
+    if (sale.paymentType === 'Cash') return { cash: refund, credit: 0 };
+    if (sale.paymentType === 'Credit') return { cash: 0, credit: refund };
+    return { cash: 0, credit: 0 };
+  }
+  const creditPart = tenderSplit(sale).credit;
+  const credit = round2(Math.min(refundedBefore + refund, creditPart) - Math.min(refundedBefore, creditPart));
+  return { cash: round2(refund - credit), credit };
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // Returns
 
@@ -171,7 +249,8 @@ export function priceReturn(
     soldByKey.set(key, entry);
   }
   const subtotal = sold.reduce((sum, line) => sum + line.netAmount, 0);
-  const paidShare = subtotal > 0 ? Math.min(1, Math.max(0, saleNetTotal / subtotal)) : 0;
+  // The net may sit a little above the subtotal when the bill was rounded up (C1), so no cap at 1
+  const paidShare = subtotal > 0 ? Math.max(0, saleNetTotal / subtotal) : 0;
 
   const returnedByKey = new Map<string, number>();
   for (const line of alreadyReturned) {

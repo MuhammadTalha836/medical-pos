@@ -13,6 +13,7 @@ import { ReceiptPrinterCard } from '../components/settings/ReceiptPrinterCard';
 import { LoyaltySettingsTab } from '../components/loyalty/LoyaltySettingsTab';
 import { CountersTab } from '../components/lan/CountersTab';
 import { AuditLogPanel } from '../components/audit/AuditLogPanel';
+import { StoreRulesCard } from '../components/settings/StoreRulesCard';
 import { moneyFormatter } from '../utils/format';
 import {
   DEFAULT_WHATSAPP_RECEIPT_TEMPLATE,
@@ -660,6 +661,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ settings, onRefreshS
                 </div>
               </div>
             </div>
+
+            <StoreRulesCard
+              values={formData}
+              onChange={(key, value) => setFormData(prev => ({ ...prev, [key]: value }))}
+              canManageShifts={hasPermission('can_manage_shifts')}
+            />
 
             {/* WhatsApp messages */}
             <div className="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">

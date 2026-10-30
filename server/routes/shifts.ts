@@ -3,7 +3,7 @@ import { Prisma } from '../generated/prisma/client';
 import { prisma } from '../database/prisma';
 import { runShiftCloseBackup } from '../backup/scheduler';
 import { parseBody, shiftReopenSchema } from '../validation/schemas';
-import { getActingUser, sessionIdentity, hasRolePermission, hasAnyPermission, sendError, SESSION_REQUIRED_ERROR, type Actor } from '../http/context';
+import { getActingUser, sessionIdentity, hasRolePermission, hasAnyPermission, requirePermission, sendError, SESSION_REQUIRED_ERROR, type Actor } from '../http/context';
 import { logDenied } from '../security/audit';
 import { loadShiftTotals } from '../shifts/loadShiftTotals';
 import type { ShiftTotals } from '../shifts/shiftTotals';
@@ -55,6 +55,8 @@ function shiftPayload(shift: ShiftRecord, live: ShiftTotals | null, durationMinu
     total_returns_amount: live ? live.totalReturnsCash : shift.totalReturnsAmount,
     total_customer_payments: live ? live.totalCustomerPaymentsCash : shift.totalCustomerPayments,
     total_expenses_cash: live ? live.totalExpensesCash : shift.totalExpensesCash,
+    total_cash_in: live ? live.totalCashIn : shift.totalCashIn,
+    total_cash_out: live ? live.totalCashOut : shift.totalCashOut,
     notes: shift.notes,
     status: shift.status,
     terminal_id: shift.terminalId,
@@ -73,6 +75,8 @@ function summaryPayload(shift: ShiftRecord, totals: ShiftTotals, durationMinutes
     total_returns_cash: totals.totalReturnsCash,
     total_customer_payments_cash: totals.totalCustomerPaymentsCash,
     total_expenses_cash: totals.totalExpensesCash,
+    total_cash_in: totals.totalCashIn,
+    total_cash_out: totals.totalCashOut,
     expected_cash: totals.expectedCash,
     invoices_count: totals.salesCount,
     returns_count: totals.returnsCount,
@@ -107,6 +111,8 @@ async function closeShiftRecord(shift: ShiftRecord, closingCash: number, notes: 
         totalReturnsAmount: totals.totalReturnsCash,
         totalCustomerPayments: totals.totalCustomerPaymentsCash,
         totalExpensesCash: totals.totalExpensesCash,
+        totalCashIn: totals.totalCashIn,
+        totalCashOut: totals.totalCashOut,
         notes
       }
     });
@@ -186,6 +192,17 @@ router.post('/api/shifts/start', async (req: Request, res: Response) => {
         error: `User already has an active open shift (${existingOpen.shiftNo}). You must close it before starting a new one.`,
         activeShift: existingOpen
       });
+    }
+
+    // Store policy (C6): one shift per person per day, when the Admin turned second shifts off
+    const secondShift = await prisma.systemSetting.findUnique({ where: { key: 'allow_second_shift_same_day' } });
+    if (secondShift?.value === 'false') {
+      const midnight = new Date();
+      midnight.setHours(0, 0, 0, 0);
+      const earlier = await prisma.cashierShift.findFirst({ where: { userId: Number(user_id), startTime: { gte: midnight } }, select: { shiftNo: true } });
+      if (earlier) {
+        return res.status(409).json({ error: `You already had a shift today (${earlier.shiftNo}). This store allows one shift per person per day; ask a manager to reopen it.` });
+      }
     }
 
     // Unique shift number, e.g. SH-YYYYMMDD-0001. Two counters may start shifts at the same moment (LAN mode),
@@ -280,6 +297,8 @@ router.get('/api/shifts/:id/summary', async (req: Request, res: Response) => {
         totalReturnsCash: shift.totalReturnsAmount,
         totalCustomerPaymentsCash: shift.totalCustomerPayments,
         totalExpensesCash: shift.totalExpensesCash,
+        totalCashIn: shift.totalCashIn,
+        totalCashOut: shift.totalCashOut,
         expectedCash: shift.expectedCash ?? totals.expectedCash
       }, durationMinutes)
     });
@@ -430,7 +449,8 @@ router.get('/api/shifts/:id', async (req: Request, res: Response) => {
         expenses: {
           select: { id: true, category: true, amount: true, paymentMethod: true, notes: true, createdAt: true },
           orderBy: { id: 'desc' }
-        }
+        },
+        cashMovements: { orderBy: { id: 'desc' } }
       }
     });
 
@@ -475,10 +495,85 @@ router.get('/api/shifts/:id', async (req: Request, res: Response) => {
         payment_method: e.paymentMethod,
         notes: e.notes,
         created_at: e.createdAt
-      }))
+      })),
+      cash_movements: shift.cashMovements.map(cashMovementPayload)
     });
   } catch (error: unknown) {
     sendError(res, error);
+  }
+});
+
+// Cash pay-in / pay-out (C4): money put into or taken out of the drawer that is not a sale, return,
+// khata payment or expense (e.g. change brought from the bank, cash sent to the owner)
+type CashMovementRecord = Prisma.CashMovementGetPayload<object>;
+const cashMovementPayload = (m: CashMovementRecord) => ({
+  id: m.id,
+  shift_id: m.shiftId,
+  direction: m.direction,
+  amount: m.amount,
+  reason: m.reason,
+  user_name: m.userName,
+  created_at: m.createdAt
+});
+
+router.get('/api/shifts/:id/cash-movements', async (req: Request, res: Response) => {
+  try {
+    const shift = await prisma.cashierShift.findUnique({ where: { id: Number(req.params.id) } });
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (!(await shiftReader(req, res, shift))) return;
+    const rows = await prisma.cashMovement.findMany({ where: { shiftId: shift.id }, orderBy: { id: 'desc' } });
+    res.json(rows.map(cashMovementPayload));
+  } catch (error: unknown) {
+    sendError(res, error);
+  }
+});
+
+router.post('/api/shifts/:id/cash-movements', async (req: Request, res: Response) => {
+  try {
+    const actor = await requirePermission(req, res, 'can_cash_in_out', 'You do not have permission to put cash in or take cash out of the drawer.');
+    if (!actor) return;
+    const direction = req.body?.direction;
+    if (direction !== 'in' && direction !== 'out') return res.status(400).json({ error: 'Choose cash in or cash out.' });
+    const amount = cashAmount(req.body?.amount);
+    if (amount === null || amount <= 0) return res.status(400).json({ error: 'Enter an amount greater than 0.' });
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    if (reason.length < 3 || reason.length > 200) return res.status(400).json({ error: 'Enter a reason (3 to 200 characters).' });
+
+    const shift = await prisma.cashierShift.findUnique({ where: { id: Number(req.params.id) } });
+    if (!shift) return res.status(404).json({ error: 'Shift not found' });
+    if (shift.userId !== actor.id && !(await hasRolePermission(actor.role, 'can_manage_shifts'))) {
+      await logDenied(actor, 'can_manage_shifts', req);
+      return res.status(403).json({ error: OTHER_SHIFT_DENIED });
+    }
+
+    const { user_id, user_name } = await sessionIdentity(req);
+    const created = await prisma.$transaction(async (tx) => {
+      // Checked inside the transaction: a closed shift's figures never change
+      const current = await tx.cashierShift.findUnique({ where: { id: shift.id }, select: { status: true } });
+      if (current?.status !== 'open') throw new Error('This shift is closed. Cash can only be moved during an open shift.');
+      if (direction === 'out') {
+        const totals = await loadShiftTotals(shift, tx);
+        if (amount > totals.expectedCash + 0.005) {
+          throw new Error(`Only ${totals.expectedCash.toFixed(2)} should be in the drawer; you cannot take out ${amount.toFixed(2)}.`);
+        }
+      }
+      return tx.cashMovement.create({
+        data: { shiftId: shift.id, direction, amount, reason, userId: user_id ? Number(user_id) : null, userName: user_name || null }
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: direction === 'in' ? 'CASH_IN' : 'CASH_OUT',
+        module: 'Shift Management',
+        details: `Cash ${direction === 'in' ? 'put into' : 'taken out of'} the drawer of shift ${shift.shiftNo}: ${amount.toFixed(2)}. Reason: ${reason}`,
+        userId: user_id ? Number(user_id) : null,
+        userName: user_name || null
+      }
+    });
+    res.json({ success: true, movement: cashMovementPayload(created) });
+  } catch (error: unknown) {
+    sendError(res, error, 400);
   }
 });
 

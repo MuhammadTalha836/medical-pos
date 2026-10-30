@@ -1,5 +1,7 @@
 import {
   BackupStatus,
+  CashMovement,
+  Quotation,
   ControlledRegisterRow,
   DayCloseRange,
   DayCloseReport,
@@ -210,6 +212,9 @@ export const api = {
     get<SaleInvoice[]>('/sales', params),
   getSaleById: (id: number) => get<SaleInvoice>(`/sales/${id}`),
   createSaleReturn: (data: unknown) => post<any>('/sales/return', data),
+  /** Prices the cart like a sale without saving anything (C8) */
+  getQuote: (data: unknown) => post<{ quote: Quotation }>('/sales/quote', data),
+  voidSale: (id: number, reason: string) => post<{ success: boolean; sale: SaleInvoice }>(`/sales/${id}/void`, { reason }),
 
   // Purchases
   getPurchases: () => get<PurchaseInvoice[]>('/purchases'),
@@ -295,7 +300,10 @@ export const api = {
     post<{ success: boolean; message: string; shift: CashierShift; backup?: any }>(`/shifts/${shiftId}/close`, data),
   getShifts: (params?: DateRange & { user_id?: number; status?: string }) => get<CashierShift[]>('/shifts', params),
   getShiftDetails: (shiftId: number) =>
-    get<{ shift: CashierShift; sales: any[]; returns: any[]; payments: any[]; expenses: any[] }>(`/shifts/${shiftId}`),
+    get<{ shift: CashierShift; sales: any[]; returns: any[]; payments: any[]; expenses: any[]; cash_movements?: CashMovement[] }>(`/shifts/${shiftId}`),
+  getCashMovements: (shiftId: number) => get<CashMovement[]>(`/shifts/${shiftId}/cash-movements`),
+  addCashMovement: (shiftId: number, data: { direction: 'in' | 'out'; amount: number; reason: string }) =>
+    post<{ success: boolean; movement: CashMovement }>(`/shifts/${shiftId}/cash-movements`, data),
   reopenShiftByAdmin: (shiftId: number, data: AdminShiftAction) =>
     post<SuccessMessage & { shift: CashierShift }>(`/shifts/${shiftId}/admin/reopen`, data),
   correctShiftByAdmin: (shiftId: number, data: AdminShiftAction & { corrected_closing_cash: number }) =>

@@ -255,7 +255,8 @@ router.get('/api/reports/controlled-register', async (req: Request, res: Respons
       product_name: r.productName,
       quantity: r.quantity,
       is_loose: r.isLoose === 1,
-      returned_qty: returnedQty.get(r.id) ?? 0,
+      // A voided invoice put every unit back (the row stays in the register, marked by its status)
+      returned_qty: r.sale.status === 'cancelled' ? r.quantity : returnedQty.get(r.id) ?? 0,
       patient_name: r.patientName,
       patient_phone: r.patientPhone,
       patient_cnic: r.patientCnic,

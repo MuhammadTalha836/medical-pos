@@ -53,7 +53,7 @@ describe('computeSchedule', () => {
   });
 
   it('off is never due', () => {
-    expect(computeSchedule({ frequency: 'off', time: '23:00', now: at(2026, 10, 10, 23, 30) })).toEqual({ enabled: false, latestDueSlot: null, nextRunAt: null, isDue: false });
+    expect(computeSchedule({ frequency: 'off', time: '23:00', now: at(2026, 10, 10, 23, 30) })).toEqual({ enabled: false, latestDueSlot: null, nextRunAt: null, isDue: false, isOverdue: false });
   });
 });
 
@@ -68,5 +68,27 @@ describe('schedule validation', () => {
     expect(normalizeFrequency('on_shift_close')).toBe('daily');
     expect(normalizeFrequency('weekly')).toBe('weekly');
     expect(normalizeFrequency('hourly')).toBe('daily');
+  });
+
+  it('every 2 / every 3 days: slots on fixed calendar days', () => {
+    for (const [frequency, gap] of [['every_2_days', 2], ['every_3_days', 3]] as const) {
+      const first = computeSchedule({ frequency, time: '22:00', lastSuccessAt: at(2026, 10, 10, 12), now: at(2026, 10, 10, 12, 1) }).nextRunAt!;
+      const after = new Date(first.getTime() + 60_000);
+      const second = computeSchedule({ frequency, time: '22:00', lastSuccessAt: after, now: after }).nextRunAt!;
+      expect(first.getHours()).toBe(22);
+      expect(Math.round((second.getTime() - first.getTime()) / 86_400_000)).toBe(gap);
+    }
+  });
+
+  it('overdue only after two missed slots in a row (C5)', () => {
+    const lastSuccessAt = at(2026, 10, 9, 23, 5);
+    const oneMissed = computeSchedule({ frequency: 'daily', time: '23:00', lastSuccessAt, now: at(2026, 10, 11, 9) });
+    expect(oneMissed.isDue).toBe(true);
+    expect(oneMissed.isOverdue).toBe(false);
+    const twoMissed = computeSchedule({ frequency: 'daily', time: '23:00', lastSuccessAt, now: at(2026, 10, 12, 9) });
+    expect(twoMissed.isOverdue).toBe(true);
+    const weekly = computeSchedule({ frequency: 'weekly', weekday: 0, time: '10:00', lastSuccessAt: at(2026, 10, 4, 11), now: at(2026, 10, 13, 9) });
+    expect(weekly.isDue).toBe(true);
+    expect(weekly.isOverdue).toBe(false);
   });
 });

@@ -32,7 +32,7 @@ Status: ⬜ not started · 🟡 in progress · ✅ done
 |---|---|---|
 | A | Security and correctness (server) | 🟡 built and tested; waiting for the owner's check |
 | B | Visible bugs and small gaps | 🟡 built and tested; waiting for the owner's check |
-| C | New features (owner picks), including **C8 Print Quotation** | ⬜ |
+| C | New features (owner picks), including **C8 Print Quotation** | 🟡 all of C1–C8 built and tested; waiting for the owner's check |
 | D | Large structural changes (owner decision; not recommended now) | ⬜ |
 | E | Docs that are out of date | ⬜ |
 
@@ -249,10 +249,53 @@ A customer asks "how much will this cost?" before buying. The cashier prints the
 - A changed rate without `can_discount` is refused.
 - It works without an open shift.
 
-**Open questions for the owner:**
-1. Is **F11** fine as the shortcut?
-2. Is "valid today only" enough, or do you want a number of days?
-3. Should the quotation show the customer's khata balance? Proposed: no.
+**Owner answers (2026-10-27):** F11 is fine; validity is a setting in days (1 = today only); no khata balance on the slip.
+
+### Built (2026-10-28)
+The owner picked all of C1–C8. Owner rules: a bill is voided only while its shift is open, its day is not closed and nothing was returned; cash pay-in / pay-out is Admin-only by default; a split bill's refund lowers the khata part first, then the rest is cash.
+
+- **C1:**
+  - Setting `round_off_to` (0 / 1 / 5 / 10, default off).
+  - `roundOff` in `saleMath.ts` runs after loyalty, before the cash and credit-limit checks; the result is stored in `sales.round_off`.
+  - The receipt and the POS show a "Round off" line. A full return refunds the rounded amount.
+- **C2:**
+  - Setting `medicine_unit_types` (a JSON list) through `shared/unitTypes.ts`, which checks 1–50 unique names.
+  - Edited in Settings → Store → Billing & Counter Rules.
+  - The medicine form reads the list and keeps a medicine's unlisted unit.
+- **C3:**
+  - `products.shortage_flag` / `shortage_note`, set in the medicine form.
+  - The POS shows a badge and a notice; the reorder list always shows the medicine (reason `shortage`).
+  - A purchase clears the mark.
+- **C4 split:**
+  - Payment type `Split`, with `sales.paid_cash` / `paid_card` / `paid_credit` filled on every new bill.
+  - `tenderSplit` / `checkSplit` / `refundTenders` (`saleMath.ts`) feed shift totals, the day close, khata and returns.
+  - Returns store `sale_returns.refund_cash`.
+  - The POS has a Split button with Card and Khata parts; cash is the rest.
+- **C4 cash in/out:**
+  - Table `cash_movements`, permission `can_cash_in_out` (Admin) and `POST/GET /api/shifts/:id/cash-movements`.
+  - Expected cash = … + in − out, saved on close as `total_cash_in` / `total_cash_out`. It is not part of the day-close profit.
+  - A **Cash In / Out** button in the POS shift bar; the lines appear on the close window, the shift slip and Shifts admin.
+- **C5:**
+  - Frequencies `every_2_days` / `every_3_days`, on fixed calendar days.
+  - `isOverdue` means two missed slots in a row; the dashboard uses it.
+  - If the backup folder fails, the backup goes to the secondary folder, with a dashboard warning.
+  - The secondary folder keeps its own newest copies (`pruneSecondaryFolder`); pruning the main folder keeps the copy.
+- **C6:**
+  - Setting `allow_second_shift_same_day` (default on); only shift managers change it.
+  - When it is off, a second shift on the same day gets 409. A manager reopen still works.
+- **C7:**
+  - `POST /api/sales/:id/void` (`can_delete_invoice`, now labelled "Void Invoices") with a reason.
+  - Stock goes back to its batches; khata and loyalty are reversed; the bill becomes `cancelled` with `void_reason` / `voided_by` / `voided_at`. Audited as `SALE_VOIDED`.
+  - Shift totals, the khata list and the statement leave voided bills out; the controlled register marks them.
+  - Sales History has a **Void** button; receipts and the invoice window show VOID.
+- **C8:**
+  - `POST /api/sales/quote` (login only, no shift) reuses the sale pricing (`server/sales/priceCart.ts`) and writes nothing.
+  - `QT-YYYYMMDD-HHMMSS`, low-stock lines, validity from `quotation_valid_days`.
+  - **Print Quotation (F11)** on the POS; `UnifiedInvoice` has a `quotation` mode (QUOTATION heading; "not a receipt, not a sale"; no payment, cash, points or barcode).
+  - The POS screen itself still needs an open shift (unchanged), so in practice a quotation is printed during a shift.
+- **Tests:**
+  - `test:phaseC` (9 tests).
+  - Specs for round-off, tenders, split refunds, unit types, shift totals with split and cash in/out, the every-2/3-days slots, overdue, and the day close with split.
 
 ---
 

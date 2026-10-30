@@ -178,7 +178,9 @@ router.post('/api/purchases', async (req: Request, res: Response) => {
             boxTradePrice: boxCost,
             boxRetailPrice: boxRetail,
             unitTradePrice: round2(boxCost / packing),
-            unitRetailPrice: round2(boxRetail / packing)
+            unitRetailPrice: round2(boxRetail / packing),
+            // New stock arrived, so a shortage mark (C3) is no longer true
+            ...(totalBoxes > 0 ? { shortageFlag: 0, shortageNote: '' } : {})
           }
         });
 

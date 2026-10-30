@@ -49,16 +49,22 @@ const money2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
  * hand), an "Opening / other changes" line comes first, so the statement always ends on the real balance.
  */
 export function customerStatement(
-  sales: Array<{ invoice_no: string; sale_date: string | Date; net_total: number; payment_type: string }>,
+  sales: Array<{ invoice_no: string; sale_date: string | Date; net_total: number; payment_type: string; paid_credit?: number; status?: string }>,
   returns: Array<{ return_no: string; invoice_no: string | null; created_at: string | Date; refund_amount: number }>,
   payments: Array<{ payment_date: string | Date; amount: number; payment_method: string; notes?: string | null }>,
   currentBalance: number
 ): CustomerStatement {
   const rows: Array<Omit<StatementEntry, 'balance'> & { at: number }> = [
-    ...sales.filter(s => s.payment_type === 'Credit').map(s => ({
-      at: toMs(s.sale_date), date: new Date(s.sale_date).toISOString(), kind: 'bill' as const,
-      reference: s.invoice_no, details: 'Credit bill', debit: s.net_total, credit: 0
-    })),
+    // Credit bills, and the credit part of split bills; a voided bill was taken off the khata again
+    ...sales
+      .filter(s => s.status !== 'cancelled' && (s.payment_type === 'Credit' || (s.payment_type === 'Split' && (s.paid_credit ?? 0) > 0)))
+      .map(s => ({
+        at: toMs(s.sale_date), date: new Date(s.sale_date).toISOString(), kind: 'bill' as const,
+        reference: s.invoice_no,
+        details: s.payment_type === 'Split' ? 'Credit part of a split bill' : 'Credit bill',
+        debit: s.payment_type === 'Split' ? s.paid_credit ?? 0 : s.net_total,
+        credit: 0
+      })),
     ...returns.map(r => ({
       at: toMs(r.created_at), date: new Date(r.created_at).toISOString(), kind: 'return' as const,
       reference: r.return_no, details: r.invoice_no ? `Return on ${r.invoice_no}` : 'Return', debit: 0, credit: r.refund_amount

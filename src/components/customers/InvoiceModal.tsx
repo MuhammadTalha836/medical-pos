@@ -52,6 +52,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ saleId, settings, on
               {invoice.status === 'returned' ? 'All items on this invoice were returned' : 'Some items on this invoice were returned'}
             </p>
           )}
+          {invoice.status === 'cancelled' && (
+            <p className="badge-danger inline-flex">
+              Voided{invoice.voided_by ? ` by ${invoice.voided_by}` : ''}{invoice.void_reason ? `: ${invoice.void_reason}` : ''}. Not counted as a sale.
+            </p>
+          )}
           <UnifiedInvoice
             invoice={invoice}
             settings={settings}

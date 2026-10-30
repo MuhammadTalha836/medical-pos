@@ -8,18 +8,19 @@ import { logDenied } from '../security/audit';
 import { formatSale } from '../http/formatters';
 import { DEVELOPER_PROFILE_SETTING_KEYS, composeInvoiceFooter } from '../../shared/developerProfile';
 import { DEFAULT_SETTINGS } from '../../shared/settingsDefaults';
-import { priceReturn, priceSaleLine, settleCash, totalSale } from '../sales/saleMath';
+import { checkSplit, priceReturn, refundTenders, roundOff, settleCash, singleTender, tenderSplit } from '../sales/saleMath';
+import { priceCart, pricingSettings } from '../sales/priceCart';
 import { localDateKey, localDateString } from '../../shared/dates';
 import { applyLoyalty, expiryDate, pointsEarned, returnedShare, shareDue } from '../../shared/loyalty';
 import { requestTerminal, type RequestTerminal } from '../lan/lanGate';
 import { addPoints, expireDuePoints, LOYALTY_UNAVAILABLE, loyaltyActive, maybeUpgrade, planOf, planRules, recomputeBalance, removePoints } from '../loyalty/loyaltyStore';
 import { returnUnits, syncProductBatches, takeUnits } from '../stock/batchStock';
-import { missingPrescriptionFields, normalizeSchedule } from '../../shared/schedule';
 
 // Counter sales (POS), sales history and returns
 const router = Router();
 
-const PAYMENT_TYPES = ['Cash', 'Card', 'Credit', 'Online'];
+// Split (C4): one bill paid partly in cash, card/online and/or khata credit
+const PAYMENT_TYPES = ['Cash', 'Card', 'Credit', 'Online', 'Split'];
 
 /** The signed-in user's open shift (a shift id sent by the client is never trusted) */
 async function openShiftIdFor(userId: number | null): Promise<number | null> {
@@ -40,6 +41,16 @@ async function wrongCounterMessage(shiftId: number, terminal: RequestTerminal | 
   const shift = await prisma.cashierShift.findUnique({ where: { id: shiftId }, select: { terminalId: true, terminalName: true } });
   if (!shift?.terminalId || !terminal || shift.terminalId === terminal.id) return null;
   return `Your shift is open on ${shift.terminalName || 'another computer'}. Sell from there, or close that shift first.`;
+}
+
+/** Store name/address and the developer footer settings, for the receipt snapshot (sales and quotations) */
+async function storeIdentity(db: Prisma.TransactionClient | typeof prisma): Promise<Record<string, string>> {
+  const identityRows = await db.systemSetting.findMany({
+    where: { key: { in: ['store_name', 'store_address', 'developer_invoice_footer', ...DEVELOPER_PROFILE_SETTING_KEYS] } }
+  });
+  const identity: Record<string, string> = {};
+  for (const row of identityRows) identity[row.key] = row.value;
+  return identity;
 }
 
 const describeStock = (boxes: number, loose: number, unitType: string) =>
@@ -83,15 +94,15 @@ router.post('/api/sales', async (req: Request, res: Response) => {
     if (hasCustomerId && !linkedCustomer) {
       return res.status(400).json({ error: 'The selected customer was not found. Search for the customer again.' });
     }
-    if (paymentType === 'Credit' && !linkedCustomer) {
+    const splitCredit = paymentType === 'Split' && Number(req.body.split?.credit) > 0;
+    if ((paymentType === 'Credit' || splitCredit) && !linkedCustomer) {
       return res.status(400).json({ error: 'Select or save a khata customer for credit sales.' });
     }
 
-    const maxSetting = await prisma.systemSetting.findUnique({ where: { key: 'max_bill_discount_pct' } });
-    const maxBillDiscountPct = Number(maxSetting?.value ?? DEFAULT_SETTINGS.max_bill_discount_pct);
+    const { maxBillDiscountPct, roundOffTo } = await pricingSettings();
     const rules = {
       canDiscount: !!actor && (await hasRolePermission(actor.role, 'can_discount')),
-      maxBillDiscountPct: Number.isFinite(maxBillDiscountPct) ? maxBillDiscountPct : 0
+      maxBillDiscountPct
     };
 
     const today = localDateKey();
@@ -110,39 +121,9 @@ router.post('/api/sales', async (req: Request, res: Response) => {
         }
 
         // Every line is priced here from the medicine record; the client's amounts are only a request
-        const pricedItems = [];
-        for (const item of items as any[]) {
-          const prod = await tx.product.findUnique({ where: { id: Number(item.product_id) } });
-          if (!prod) throw new Error(`Product ID ${item.product_id} not found.`);
-          const isLoose = item.is_loose === true || item.is_loose === 1 || item.is_loose === '1';
-          const quantity = Number(item.quantity);
-
-          // Open-Sale Validation: Prohibit selling loose units if allowOpenSale is 0
-          if (isLoose && !prod.allowOpenSale) {
-            throw new Error(`Open packaging sale is prohibited for "${prod.name}". This medicine cannot be sold as an individual unit. Please sell it in its original packaging.`);
-          }
-
-          // Minimum Sale Quantity Validation
-          const minQty = prod.minSaleQty || 1;
-          if (quantity < minQty) {
-            const unitLabel = isLoose ? prod.unitType : 'Pack(s)';
-            throw new Error(`Minimum sale quantity for "${prod.name}" is ${minQty} ${unitLabel}. (Requested: ${quantity})`);
-          }
-
-          // Controlled medicines need the prescription details for the register (drug-law record)
-          const controlled = normalizeSchedule(prod.schedule) === 'controlled';
-          if (controlled) {
-            const missing = missingPrescriptionFields(prescription);
-            if (missing.length > 0) {
-              throw new Error(`"${prod.name}" is a controlled medicine. Enter the ${missing.join(', ')} from the prescription.`);
-            }
-          }
-
-          const priced = priceSaleLine(prod, isLoose, quantity, { unitPrice: item.unit_price, discountPct: item.discount_pct }, rules);
-          pricedItems.push({ prod, isLoose, quantity, priced, controlled, batchId: item.batch_id ? Number(item.batch_id) : null });
-        }
-
-        let totals = totalSale(pricedItems.map(i => i.priced), bill_discount_pct, rules);
+        const cart = await priceCart(tx, items as any[], bill_discount_pct, rules, prescription);
+        const pricedItems = cart.lines;
+        let totals = cart.totals;
         let loyalty: { plan: NonNullable<Awaited<ReturnType<typeof planOf>>>; bill: ReturnType<typeof applyLoyalty> } | null = null;
         if (loyaltyOn && linkedCustomer) {
           await expireDuePoints(tx, linkedCustomer.id);
@@ -159,14 +140,22 @@ router.post('/api/sales', async (req: Request, res: Response) => {
             throw new Error(`${linkedCustomer.name} is not on a loyalty plan.`);
           }
         }
-        const cash = settleCash(paymentType, totals.netTotal, cash_tendered);
+        // Round-off (C1) comes last, so the customer pays the rounded figure whatever discounts came before
+        const rounded = roundOff(totals.netTotal, roundOffTo);
+        totals = { ...totals, netTotal: rounded.netTotal };
+
+        // How the bill is paid (C4): a split must add up to the bill exactly
+        const tenders = paymentType === 'Split' ? checkSplit(totals.netTotal, req.body.split) : singleTender(paymentType, totals.netTotal);
+        const cash = paymentType === 'Split'
+          ? (tenders.cash > 0 ? settleCash('Cash', tenders.cash, cash_tendered) : { cashTendered: 0, changeDue: 0 })
+          : settleCash(paymentType, totals.netTotal, cash_tendered);
 
         // Credit limit (0 = no limit), checked against the balance at the moment of the sale
-        if (paymentType === 'Credit' && linkedCustomer) {
+        if (tenders.credit > 0 && linkedCustomer) {
           const current = await tx.customer.findUnique({ where: { id: linkedCustomer.id } });
           const limit = current?.creditLimit ?? 0;
           const balance = current?.currentBalance ?? 0;
-          if (limit > 0 && balance + totals.netTotal > limit + 0.005) {
+          if (limit > 0 && balance + tenders.credit > limit + 0.005) {
             const available = Math.max(0, limit - balance);
             throw new Error(`Credit limit reached for ${linkedCustomer.name}: limit ${limit.toFixed(2)}, balance ${balance.toFixed(2)}, available ${available.toFixed(2)}.`);
           }
@@ -190,11 +179,7 @@ router.post('/api/sales', async (req: Request, res: Response) => {
         const invoiceNo = `INV-${today}-${String(nextSeq).padStart(4, '0')}`;
 
         // Snapshot the protected store identity & developer footer so reprints match the original receipt
-        const identityRows = await tx.systemSetting.findMany({
-          where: { key: { in: ['store_name', 'store_address', 'developer_invoice_footer', ...DEVELOPER_PROFILE_SETTING_KEYS] } }
-        });
-        const identity: Record<string, string> = {};
-        for (const row of identityRows) identity[row.key] = row.value;
+        const identity = await storeIdentity(tx);
 
         // 1. Insert Sale Master
         const sale = await tx.sale.create({
@@ -209,6 +194,10 @@ router.post('/api/sales', async (req: Request, res: Response) => {
             shiftId: activeShiftId,
             ...totals,
             ...cash,
+            roundOff: rounded.roundOff,
+            paidCash: tenders.cash,
+            paidCard: tenders.card,
+            paidCredit: tenders.credit,
             ...(loyalty ? {
               memberDiscountPct: loyalty.bill.memberDiscountPct,
               memberDiscountAmt: loyalty.bill.memberDiscountAmt,
@@ -292,11 +281,11 @@ router.post('/api/sales', async (req: Request, res: Response) => {
           });
         }
 
-        // 3. Update customer Khata balance if credit sale
-        if (paymentType === 'Credit' && linkedCustomer) {
+        // 3. Update customer Khata balance with the credit part (the whole bill for a credit sale)
+        if (tenders.credit > 0 && linkedCustomer) {
           await tx.customer.update({
             where: { id: linkedCustomer.id },
-            data: { currentBalance: { increment: totals.netTotal } }
+            data: { currentBalance: { increment: tenders.credit } }
           });
         }
 
@@ -307,7 +296,10 @@ router.post('/api/sales', async (req: Request, res: Response) => {
             await removePoints(tx, 'redeem', loyalty.bill.pointsRedeemed, { ...entry, notes: `Used on ${invoiceNo}` });
           }
           const rulesOfPlan = planRules(loyalty.plan);
-          const earned = pointsEarned(totals.netTotal, rulesOfPlan, paymentType);
+          // A split bill earns on what was paid now, unless the plan also rewards credit
+          const earned = paymentType === 'Split'
+            ? pointsEarned(rulesOfPlan.earnOnCredit ? totals.netTotal : totals.netTotal - tenders.credit, rulesOfPlan, 'Cash')
+            : pointsEarned(totals.netTotal, rulesOfPlan, paymentType);
           await addPoints(tx, 'earn', earned, expiryDate(localDateString(), rulesOfPlan.expiryMonths), { ...entry, notes: `Earned on ${invoiceNo}` });
           const balance = await recomputeBalance(tx, linkedCustomer.id);
           await tx.sale.update({ where: { id: sale.id }, data: { pointsEarned: earned, pointsBalance: balance } });
@@ -497,6 +489,10 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
         requested
       );
 
+      // Cash out of the drawer and khata credit taken back (C4: a split bill lowers the khata part first)
+      const refundedBefore = (await tx.saleReturn.aggregate({ where: { saleId: original.id }, _sum: { refundAmount: true } }))._sum.refundAmount ?? 0;
+      const refundSplit = refundTenders(original, refundedBefore, priced.totalRefund);
+
       const countToday = await tx.saleReturn.count({ where: { returnNo: { startsWith: `SR-${today}-` } } });
       const returnNo = `SR-${today}-${String(countToday + 1).padStart(4, '0')}`;
 
@@ -512,7 +508,8 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
           userName: user_name || 'Cashier',
           shiftId: activeShiftId,
           terminalId: terminal?.id ?? null,
-          terminalName: terminal?.name ?? null
+          terminalName: terminal?.name ?? null,
+          refundCash: refundSplit.cash
         }
       });
 
@@ -586,11 +583,11 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
         await recomputeBalance(tx, original.customerId);
       }
 
-      // Returning goods from a credit sale lowers what the customer owes
-      if (original.paymentType === 'Credit' && original.customerId) {
+      // Returning goods from a credit sale (or the credit part of a split bill) lowers what the customer owes
+      if (refundSplit.credit > 0 && original.customerId) {
         const customer = await tx.customer.findUnique({ where: { id: original.customerId } });
         if (customer) {
-          const newBalance = Math.max(0, customer.currentBalance - priced.totalRefund);
+          const newBalance = Math.max(0, customer.currentBalance - refundSplit.credit);
           await tx.customer.update({ where: { id: customer.id }, data: { currentBalance: newBalance } });
           await tx.auditLog.create({
             data: {
@@ -603,7 +600,7 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
         }
       }
 
-      return { returnId: saleReturn.id, returnNo, totalRefund: priced.totalRefund, saleStatus: priced.fullyReturned ? 'returned' : 'partially_returned' };
+      return { returnId: saleReturn.id, returnNo, totalRefund: priced.totalRefund, refundCash: refundSplit.cash, refundCredit: refundSplit.credit, saleStatus: priced.fullyReturned ? 'returned' : 'partially_returned' };
     });
 
     let result: Awaited<ReturnType<typeof executeReturn>> | null = null;
@@ -622,6 +619,190 @@ router.post('/api/sales/return', async (req: Request, res: Response) => {
 
     res.json({ success: true, ...result });
   } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+// Quotation (C8): the cart priced exactly like a sale, but nothing is saved. No shift is needed, no stock is taken
+// or reserved, and the INV- sequence, khata, loyalty and reports never see it.
+router.post('/api/sales/quote', async (req: Request, res: Response) => {
+  try {
+    const actor = await getActingUser(req);
+    if (!actor) return res.status(401).json(SESSION_REQUIRED_ERROR);
+    const body = parseBody(createSaleSchema, req.body, res);
+    if (!body) return;
+    const { user_name } = await sessionIdentity(req);
+
+    const { maxBillDiscountPct, roundOffTo } = await pricingSettings();
+    const rules = { canDiscount: await hasRolePermission(actor.role, 'can_discount'), maxBillDiscountPct };
+    const cart = await priceCart(prisma, body.items, req.body.bill_discount_pct, rules);
+    const rounded = roundOff(cart.totals.netTotal, roundOffTo);
+
+    const customerId = Number(req.body.customer_id) || 0;
+    const customer = customerId ? await prisma.customer.findUnique({ where: { id: customerId }, select: { name: true, phone: true } }) : null;
+    const identity = await storeIdentity(prisma);
+    const validRow = await prisma.systemSetting.findUnique({ where: { key: 'quotation_valid_days' } });
+    const validDays = Math.min(30, Math.max(1, Math.floor(Number(validRow?.value ?? DEFAULT_SETTINGS.quotation_valid_days)) || 1));
+
+    const now = new Date();
+    const lastDay = new Date(now);
+    lastDay.setDate(lastDay.getDate() + validDays - 1);
+    const time = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join('');
+    const totals = cart.totals;
+
+    res.json({
+      quote: {
+        invoice_no: `QT-${localDateKey(now)}-${time}`,
+        sale_date: now.toISOString(),
+        customer_name: customer?.name ?? (typeof req.body.customer_name === 'string' && req.body.customer_name.trim() ? req.body.customer_name.trim() : 'Counter Customer'),
+        customer_phone: customer?.phone ?? null,
+        user_name: user_name || actor.username,
+        total_gross: totals.totalGross,
+        total_item_discount: totals.totalItemDiscount,
+        bill_discount_pct: totals.billDiscountPct,
+        bill_discount_amt: totals.billDiscountAmt,
+        round_off: rounded.roundOff,
+        net_total: rounded.netTotal,
+        items: cart.lines.map(({ prod, isLoose, quantity, priced }) => {
+          const packing = prod.packing || 1;
+          const wanted = isLoose ? quantity : quantity * packing;
+          return {
+            product_id: prod.id,
+            c_code: prod.cCode,
+            p_code: prod.pCode,
+            product_name: prod.name,
+            unit_type: prod.unitType,
+            location_rack: prod.locationRack,
+            is_loose: isLoose ? 1 : 0,
+            quantity,
+            unit_price: priced.unitPrice,
+            gross_amount: priced.grossAmount,
+            discount_pct: priced.discountPct,
+            discount_amount: priced.discountAmount,
+            net_amount: priced.netAmount,
+            // Not reserved: the slip only warns that the shelf has less than asked
+            low_stock: prod.stockBoxes * packing + prod.stockLoose < wanted
+          };
+        }),
+        store_name_snapshot: identity.store_name ?? null,
+        store_address_snapshot: identity.store_address ?? null,
+        invoice_footer_snapshot: composeInvoiceFooter(identity),
+        valid_days: validDays,
+        valid_until: localDateString(lastDay)
+      }
+    });
+  } catch (error: unknown) {
+    sendError(res, error, 400);
+  }
+});
+
+class VoidError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+// Void an invoice (C7): a bill rung up by mistake is cancelled, never deleted. Stock goes back to the batches it came
+// from, the khata credit and loyalty points are reversed, and the shift no longer counts it. Only while its shift is
+// still open, its day is not closed and nothing was returned from it.
+router.post('/api/sales/:id/void', async (req: Request, res: Response) => {
+  try {
+    const actor = await requirePermission(req, res, 'can_delete_invoice', 'You do not have permission to void invoices.');
+    if (!actor) return;
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+    if (reason.length < 3 || reason.length > 200) return res.status(400).json({ error: 'Enter the reason for voiding (3 to 200 characters).' });
+    const { user_id, user_name } = await sessionIdentity(req);
+    const saleId = Number(req.params.id);
+
+    const voided = await prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.findUnique({ where: { id: saleId }, include: { items: true } });
+      if (!sale) throw new VoidError('Sale invoice not found', 404);
+      if (sale.status === 'cancelled') throw new VoidError(`Invoice ${sale.invoiceNo} is already void.`, 409);
+      const returns = await tx.saleReturn.count({ where: { saleId: sale.id } });
+      if (sale.status !== 'completed' || returns > 0) {
+        throw new VoidError(`Items were already returned from invoice ${sale.invoiceNo}, so it cannot be voided. Use a return instead.`, 409);
+      }
+      const shift = sale.shiftId ? await tx.cashierShift.findUnique({ where: { id: sale.shiftId }, select: { status: true } }) : null;
+      if (shift?.status !== 'open') {
+        throw new VoidError(`The shift of invoice ${sale.invoiceNo} is closed, so it cannot be voided. Use a return instead.`, 409);
+      }
+      const day = localDateString(new Date(sale.saleDate));
+      const closing = await tx.dailyClosing.findUnique({ where: { closingDate: day }, select: { isClosed: true } });
+      if (closing?.isClosed === 1) throw new VoidError(`The day ${day} is closed. Reopen the day close before voiding its invoices.`, 409);
+
+      // Every unit goes back to the batch it was taken from
+      for (const item of sale.items) {
+        const prod = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!prod) continue;
+        const packing = prod.packing || 1;
+        const unitsBack = item.isLoose ? item.quantity : item.quantity * packing;
+        const totalUnits = (prod.stockBoxes * packing) + prod.stockLoose + unitsBack;
+        await tx.product.update({ where: { id: prod.id }, data: { stockBoxes: Math.floor(totalUnits / packing), stockLoose: totalUnits % packing } });
+        const taken = await tx.saleItemBatch.findMany({ where: { saleItemId: item.id } });
+        for (const alloc of taken) {
+          const back = alloc.units - alloc.returnedUnits;
+          if (back <= 0) continue;
+          await tx.saleItemBatch.update({ where: { id: alloc.id }, data: { returnedUnits: { increment: back } } });
+          await returnUnits(tx, packing, [{ batchId: alloc.batchId, units: back }]);
+        }
+        await syncProductBatches(tx, prod.id);
+      }
+
+      // Khata: the credit part is no longer owed
+      const credit = tenderSplit(sale).credit;
+      if (credit > 0 && sale.customerId) {
+        const customer = await tx.customer.findUnique({ where: { id: sale.customerId } });
+        if (customer) {
+          const newBalance = Math.max(0, customer.currentBalance - credit);
+          await tx.customer.update({ where: { id: customer.id }, data: { currentBalance: newBalance } });
+          await tx.auditLog.create({
+            data: {
+              action: 'KHATA_VOID_ADJUSTMENT',
+              module: 'Khata',
+              details: `Void of invoice ${sale.invoiceNo}: ${customer.name} balance ${customer.currentBalance.toFixed(2)} -> ${newBalance.toFixed(2)}`,
+              userName: user_name || 'Admin'
+            }
+          });
+        }
+      }
+
+      // Loyalty: earned points taken back, used points given back
+      if (sale.customerId && (sale.pointsEarned > 0 || sale.pointsRedeemed > 0)) {
+        const history = await tx.loyaltyTransaction.findMany({ where: { saleId: sale.id } });
+        const done = (type: string) => history.filter(h => h.type === type).reduce((sum, h) => sum + Math.abs(h.points), 0);
+        const entry = { customerId: sale.customerId, saleId: sale.id, actor, notes: `Void of ${sale.invoiceNo}` };
+        const takeBack = sale.pointsEarned - done('earn_reversed');
+        if (takeBack > 0) {
+          await removePoints(tx, 'earn_reversed', takeBack, { ...entry, preferLotIds: history.filter(h => h.type === 'earn').map(h => h.id) });
+        }
+        const giveBack = sale.pointsRedeemed - done('redeem_refunded');
+        if (giveBack > 0) {
+          const customer = await tx.customer.findUnique({ where: { id: sale.customerId } });
+          const plan = customer ? await planOf(tx, customer) : null;
+          await addPoints(tx, 'redeem_refunded', giveBack, expiryDate(localDateString(), plan?.expiryMonths ?? 0), entry);
+        }
+        await recomputeBalance(tx, sale.customerId);
+      }
+
+      return tx.sale.update({
+        where: { id: sale.id },
+        data: { status: 'cancelled', voidReason: reason, voidedBy: user_name || null, voidedAt: new Date() },
+        include: { items: true }
+      });
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'SALE_VOIDED',
+        module: 'Sales',
+        details: `Invoice ${voided.invoiceNo} (${voided.netTotal.toFixed(2)}, ${voided.paymentType}) voided. Reason: ${reason}`,
+        userId: user_id ? Number(user_id) : null,
+        userName: user_name || null
+      }
+    });
+    res.json({ success: true, sale: formatSale(voided) });
+  } catch (error: unknown) {
+    if (error instanceof VoidError) return res.status(error.status).json({ error: error.message });
     sendError(res, error, 400);
   }
 });

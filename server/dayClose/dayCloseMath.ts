@@ -2,7 +2,10 @@
 // Sales are counted on the day they were made and returns on the day they were refunded, so an
 // invoice returned a week later lowers that later day, not the original one.
 
-export interface DaySaleRow { netTotal: number; paymentType: string }
+import { tenderSplit, type TenderSource } from '../sales/saleMath';
+
+/** A sale with its tender split (C4); older bills count wholly in their one payment type */
+export type DaySaleRow = TenderSource;
 /** One line sold that day: quantity in its own unit (box or loose) and the cost of that unit */
 export interface DaySaleItemRow { quantity: number; unitCost: number }
 export interface DayReturnRow { refundAmount: number }
@@ -97,9 +100,9 @@ const sum = <T>(rows: T[], pick: (row: T) => number) => rows.reduce((total, row)
 
 export function computeDayClose(input: DayCloseInput): DayCloseFigures {
   const salesTotal = sum(input.sales, s => s.netTotal);
-  const salesCash = sum(input.sales.filter(s => s.paymentType === 'Cash'), s => s.netTotal);
-  const salesCard = sum(input.sales.filter(s => s.paymentType === 'Card' || s.paymentType === 'Online'), s => s.netTotal);
-  const salesCredit = sum(input.sales.filter(s => s.paymentType === 'Credit'), s => s.netTotal);
+  const salesCash = sum(input.sales, s => tenderSplit(s).cash);
+  const salesCard = sum(input.sales, s => tenderSplit(s).card);
+  const salesCredit = sum(input.sales, s => tenderSplit(s).credit);
   const returnsTotal = sum(input.returns, r => r.refundAmount);
   const netSales = salesTotal - returnsTotal;
 

@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { usePosStore } from '../store/usePosStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { api } from '../services/apiService';
-import { PrescriptionInput, Product, SaleInvoice, SystemSettings } from '../types';
+import { PrescriptionInput, Product, Quotation, SaleInvoice, SystemSettings } from '../types';
 import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { InvoiceTabs } from '../components/pos/InvoiceTabs';
 import { CustomerPicker } from '../components/pos/CustomerPicker';
 import { PrescriptionModal } from '../components/pos/PrescriptionModal';
 import { SubstitutesModal } from '../components/pos/SubstitutesModal';
+import { CashMovementModal } from '../components/pos/CashMovementModal';
 import { ScheduleBadge } from '../components/common/ScheduleBadge';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import { receiptMessage } from '../../shared/whatsapp';
@@ -37,6 +38,9 @@ import {
   ShieldAlert,
   Keyboard,
   Award,
+  Layers,
+  FileText,
+  ArrowDownUp,
 } from 'lucide-react';
 import { currencySymbol, moneyFormatter } from '../utils/format';
 import { useShiftElapsed } from '../hooks/useShiftElapsed';
@@ -46,6 +50,8 @@ import { loyaltyOn, planRulesOf } from '../utils/loyalty';
 interface PosPageProps {
   settings?: SystemSettings | null;
 }
+
+const isShort = (product: Product) => product.shortage_flag === 1 || product.shortage_flag === true;
 
 /**
  * Calculates 4 smart ascending cash tender denomination tags.
@@ -167,6 +173,15 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   const [prescriptionPrompt, setPrescriptionPrompt] = useState<{ shouldPrint: boolean } | null>(null);
   // The medicine whose same-formula substitutes are shown (F7 or the Substitutes button)
   const [substitutesFor, setSubstitutesFor] = useState<Product | null>(null);
+  // Quotation (C8) shown in its own slip dialog; nothing is saved
+  const [quotation, setQuotation] = useState<Quotation | null>(null);
+  const [loadingQuote, setLoadingQuote] = useState(false);
+  const quotationContainerRef = useRef<HTMLDivElement>(null);
+  // Split payment (C4): the card and khata parts; cash is what is left of the bill
+  const [splitCard, setSplitCard] = useState(0);
+  const [splitCredit, setSplitCredit] = useState(0);
+  // Cash pay-in / pay-out dialog (C4)
+  const [cashMoveOpen, setCashMoveOpen] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const tenderedInputRef = useRef<HTMLInputElement>(null);
@@ -196,9 +211,21 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
     const net = round2(Math.max(0, afterMember - value));
     return { rules, member, limit, used, value, net, earn: pointsEarned(net, rules, paymentType) };
   })();
-  const totals = loyaltyPreview
-    ? { ...baseTotals, netTotal: loyaltyPreview.net, changeDue: round2(Math.max(0, cashTendered - loyaltyPreview.net)) }
-    : baseTotals;
+  const beforeRound = loyaltyPreview ? loyaltyPreview.net : baseTotals.netTotal;
+  // Round-off (C1) preview, the same rule as the server: to the nearest step, after every discount
+  const roundStep = Number(settings?.round_off_to) || 0;
+  const roundedNet = roundStep > 0 && beforeRound > 0 ? round2(Math.round(beforeRound / roundStep) * roundStep) : beforeRound;
+  const roundOffAmt = round2(roundedNet - beforeRound);
+  // Split payment: the cash part is the rest of the bill; cash received is counted against that part only
+  const splitCash = round2(roundedNet - splitCard - splitCredit);
+  const cashDue = paymentType === 'Split' ? Math.max(0, splitCash) : roundedNet;
+  const totals = { ...baseTotals, netTotal: roundedNet, changeDue: round2(Math.max(0, cashTendered - cashDue)) };
+
+  // The split parts belong to the bill on screen
+  useEffect(() => {
+    setSplitCard(0);
+    setSplitCredit(0);
+  }, [activeId]);
 
   // Initial focus
   useEffect(() => {
@@ -277,7 +304,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
   keyHandlerRef.current = (e: KeyboardEvent) => {
       // The shift dialogs live in the shift store (opened from the header too), so they are read here directly
       const shiftDialogOpen = useShiftStore.getState().isStartModalOpen || useShiftStore.getState().isClosingModalOpen;
-      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null || prescriptionPrompt !== null || substitutesFor !== null || shiftDialogOpen;
+      const anyModalOpen = isReceiptModalOpen || isShortcutsModalOpen || pendingCloseId !== null || prescriptionPrompt !== null || substitutesFor !== null || shiftDialogOpen || quotation !== null || cashMoveOpen;
+      // The cash pay-in/out form takes the keyboard (its own Esc closes it)
+      if (cashMoveOpen) return;
       const ctrl = e.ctrlKey || e.metaKey;
       // The close-invoice question takes Enter/Esc itself; no other shortcut runs behind it
       if (pendingCloseId !== null && e.key !== 'Escape') return;
@@ -364,7 +393,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       else if (e.key === 'F10') {
         e.preventDefault();
         if (e.repeat) return;
-        if (isReceiptModalOpen) {
+        if (quotation) {
+          void printReceiptIn(quotationContainerRef.current);
+        } else if (isReceiptModalOpen) {
           printShownReceipt();
         } else if (cart.length > 0) {
           if (isSubmittingRef.current || loadingSale) return;
@@ -375,11 +406,21 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           printShownReceipt(300);
         }
       }
+      // F11: Print a quotation of the current bill (C8); nothing is saved and the cart stays
+      else if (e.key === 'F11') {
+        e.preventDefault();
+        if (e.repeat || anyModalOpen) return;
+        void handlePrintQuotation();
+      }
       // 8. Esc: Close a dialog or cancel current action where safe
       else if (e.key === 'Escape') {
         if (pendingCloseId) {
           e.preventDefault();
           setPendingCloseId(null);
+        } else if (quotation) {
+          e.preventDefault();
+          setQuotation(null);
+          searchInputRef.current?.focus();
         } else if (isReceiptModalOpen) {
           e.preventDefault();
           setIsReceiptModalOpen(false);
@@ -425,7 +466,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       setErrorMessage(`Open packaging sale is prohibited for "${product.name}". This medicine can only be sold in complete packs.`);
       addItem(product, false, 1);
     } else {
-      setErrorMessage(null);
+      // A medicine marked short (C3) is still sold; the cashier is told so it can be reordered or substituted
+      setErrorMessage(isShort(product) ? `"${product.name}" is marked short${product.shortage_note ? `: ${product.shortage_note}` : ''}.` : null);
       addItem(product, isLoose, 1);
     }
     setSearchQuery('');
@@ -490,9 +532,13 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       }
     }
 
-    if (paymentType === 'Credit' && !customerId) {
+    if ((paymentType === 'Credit' || (paymentType === 'Split' && splitCredit > 0)) && !customerId) {
       setErrorMessage('Select or save the customer for a credit (khata) sale [F4].');
       customerNameInputRef.current?.focus();
+      return;
+    }
+    if (paymentType === 'Split' && splitCash < 0) {
+      setErrorMessage('The card and khata parts are more than the bill. Lower one of them.');
       return;
     }
 
@@ -536,6 +582,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         cash_tendered: cashTendered,
         change_due: totals.changeDue,
         payment_type: paymentType,
+        split: paymentType === 'Split' ? { cash: splitCash, card: splitCard, credit: splitCredit } : undefined,
         notes: notes || null,
         prescription: controlledNames.length > 0 ? rx : null,
         redeem_points: loyaltyPreview?.used || 0
@@ -578,6 +625,49 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
       isSubmittingRef.current = false;
       setLoadingSale(false);
     }
+  };
+
+  // Quotation (C8): the server prices the cart with the sale rules and saves nothing
+  const handlePrintQuotation = async () => {
+    if (loadingQuote) return;
+    if (cart.length === 0) {
+      setErrorMessage('Add medicines to the bill first, then print a quotation [F11].');
+      searchInputRef.current?.focus();
+      return;
+    }
+    try {
+      setLoadingQuote(true);
+      setErrorMessage(null);
+      const { quote } = await api.getQuote({
+        customer_id: customerId,
+        customer_name: customerName || 'Counter Customer',
+        bill_discount_pct: billDiscountPct,
+        items: cart.map(item => ({
+          product_id: item.product.id,
+          is_loose: item.is_loose,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          discount_pct: item.discount_pct
+        }))
+      });
+      setQuotation(quote);
+      if (loadPrintPrefs().silent) setTimeout(() => { void printReceiptIn(quotationContainerRef.current); }, 300);
+    } catch (err: any) {
+      setErrorMessage(err instanceof TypeError ? 'The main computer is not reachable. Try the quotation again when it is connected.' : err.message || 'The quotation could not be made.');
+    } finally {
+      setLoadingQuote(false);
+    }
+  };
+
+  // The quotation in the receipt's shape, so it prints with the same thermal layouts
+  const quotationInvoice: SaleInvoice | null = quotation && {
+    ...quotation,
+    id: 0,
+    cash_tendered: 0,
+    change_due: 0,
+    payment_type: 'Cash',
+    status: 'completed',
+    items: quotation.items.map(item => ({ ...item, unit_cost: 0 }))
   };
 
   return (
@@ -646,6 +736,17 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                   </div>
                 </div>
               )}
+              {hasPermission('can_cash_in_out') && (
+                <button
+                  type="button"
+                  onClick={() => setCashMoveOpen(true)}
+                  className="btn-secondary btn-sm"
+                  title="Put cash into or take cash out of the drawer"
+                >
+                  <ArrowDownUp className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <span>Cash In / Out</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setClosingModalOpen(true)}
@@ -704,6 +805,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                         <span className="px-1.5 py-0.5 text-2xs bg-slate-100 dark:bg-surface-inset-dark text-slate-600 dark:text-slate-400 font-mono rounded-sm border border-slate-200 dark:border-slate-700">{prod.p_code}</span>
                         {prod.location_rack && (
                           <span className="px-1.5 py-0.5 text-2xs badge-warning">Loc: {prod.location_rack}</span>
+                        )}
+                        {isShort(prod) && (
+                          <span className="px-1.5 py-0.5 text-2xs badge-warning" title={prod.shortage_note || 'Marked short'}>Shortage</span>
                         )}
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center space-x-3 mt-1">
@@ -837,6 +941,9 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                           <div className="font-bold text-slate-900 dark:text-white flex items-center space-x-1.5">
                             <span>{item.product.name}</span>
                             <ScheduleBadge schedule={item.product.schedule} />
+                            {isShort(item.product) && (
+                              <span className="px-1.5 py-0.5 text-2xs badge-warning" title={item.product.shortage_note || 'Marked short'}>Shortage</span>
+                            )}
                             {isOverStock && (
                               <span title="Quantity exceeds stock on hand" className="text-amber-500">
                                 <AlertTriangle className="w-4 h-4 inline" />
@@ -1135,6 +1242,13 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             </div>
           )}
 
+          {roundOffAmt !== 0 && (
+            <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400 font-medium">
+              <span>Round off:</span>
+              <span className="font-mono font-bold">{roundOffAmt > 0 ? '+' : '-'}{money(Math.abs(roundOffAmt))}</span>
+            </div>
+          )}
+
           {/* NET PAYABLE */}
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-col space-y-1">
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Net Payable Amount</span>
@@ -1150,8 +1264,8 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
         {/* Payment Type Selection */}
         <div className="space-y-2">
           <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Payment Method</span>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {(['Cash', 'Card', 'Online', 'Credit'] as const).map((type) => (
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+            {(['Cash', 'Card', 'Online', 'Credit', 'Split'] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setPaymentType(type)}
@@ -1165,10 +1279,48 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
                 {type === 'Card' && <CreditCard className="w-4 h-4" />}
                 {type === 'Online' && <Smartphone className="w-4 h-4" />}
                 {type === 'Credit' && <User className="w-4 h-4" />}
+                {type === 'Split' && <Layers className="w-4 h-4" />}
                 <span>{type}</span>
               </button>
             ))}
           </div>
+
+          {/* Split payment: card and khata parts are typed in, cash is the rest */}
+          {paymentType === 'Split' && (
+            <div className="bg-slate-50 dark:bg-surface-inset-dark border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+              <div className="flex justify-between items-center gap-2">
+                <label htmlFor="pos-split-card" className="text-slate-700 dark:text-slate-300 font-medium">Card / Online part:</label>
+                <input
+                  id="pos-split-card"
+                  type="number"
+                  min="0"
+                  value={splitCard || ''}
+                  onChange={e => setSplitCard(Math.max(0, parseFloat(e.target.value) || 0))}
+                  placeholder="0"
+                  className="field-input field-sm w-28 text-right font-mono"
+                />
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <label htmlFor="pos-split-credit" className="text-slate-700 dark:text-slate-300 font-medium">Khata (credit) part:</label>
+                <input
+                  id="pos-split-credit"
+                  type="number"
+                  min="0"
+                  value={splitCredit || ''}
+                  onChange={e => setSplitCredit(Math.max(0, parseFloat(e.target.value) || 0))}
+                  placeholder="0"
+                  className="field-input field-sm w-28 text-right font-mono"
+                />
+              </div>
+              <div className={`flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800 font-semibold ${splitCash < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                <span>Cash part (the rest):</span>
+                <span className="font-mono">{money(splitCash)}</span>
+              </div>
+              {splitCredit > 0 && !customerId && (
+                <p className="text-2xs text-amber-700 dark:text-amber-400">A khata part needs a saved customer [F4].</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cash Tendered & Change calculator */}
@@ -1183,14 +1335,14 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               type="number"
               value={cashTendered || ''}
               onChange={(e) => setCashTendered(parseFloat(e.target.value) || 0)}
-              placeholder={totals.netTotal.toString()}
+              placeholder={cashDue.toString()}
               className="field-input field-sm w-28 text-right font-mono font-bold"
             />
           </div>
 
           {/* Quick denomination chips */}
           <div className="flex space-x-1.5 pt-1">
-            {getDynamicCashTags(totals.netTotal).map((amt, idx) => {
+            {getDynamicCashTags(cashDue).map((amt, idx) => {
               const isExact = idx === 0;
               const isSelected = cashTendered === amt;
 
@@ -1242,6 +1394,17 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
             <span>Save Without Print</span>
             <kbd className="ml-1 px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F9</kbd>
           </button>
+
+          <button
+            onClick={() => void handlePrintQuotation()}
+            disabled={cart.length === 0 || loadingQuote}
+            title="Print the prices of this bill as a quotation. Nothing is saved and the bill stays open."
+            className="w-full py-2 bg-slate-100 dark:bg-[#162032] hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-xl border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+          >
+            <FileText className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            <span>{loadingQuote ? 'Preparing Quotation...' : 'Print Quotation'}</span>
+            <kbd className="ml-1 px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-sm border border-slate-300 dark:border-slate-700">F11</kbd>
+          </button>
         </div>
       </div>
     </div>
@@ -1258,6 +1421,7 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-teal-400 rounded-sm border border-slate-700 shadow-2xs">F8</kbd><span className="text-xs font-medium text-slate-300">Payment</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-emerald-400 rounded-sm border border-slate-700 shadow-2xs">F9</kbd><span className="text-xs font-medium text-slate-300">Save</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-amber-400 rounded-sm border border-slate-700 shadow-2xs">F10</kbd><span className="text-xs font-medium text-slate-300">Print</span></span>
+          <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-amber-400 rounded-sm border border-slate-700 shadow-2xs">F11</kbd><span className="text-xs font-medium text-slate-300">Quotation</span></span>
           <span className="flex items-center space-x-1.5 whitespace-nowrap"><kbd className="px-1.5 py-0.5 text-2xs font-mono font-bold bg-slate-800 text-rose-400 rounded-sm border border-slate-700 shadow-2xs">Esc</kbd><span className="text-xs font-medium text-slate-300">Close</span></span>
         </div>
 
@@ -1337,6 +1501,35 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
           )}
         </div>
       </Modal>
+
+      {/* Quotation slip (C8): printed like a receipt, saved nowhere */}
+      <Modal
+        isOpen={quotation !== null}
+        onClose={() => setQuotation(null)}
+        title="Quotation (not a sale)"
+        maxWidth="max-w-md"
+      >
+        <div ref={quotationContainerRef}>
+          {quotation && quotationInvoice && (
+            <UnifiedInvoice
+              invoice={quotationInvoice}
+              settings={settings}
+              quotation={{ validDays: quotation.valid_days, validUntil: quotation.valid_until }}
+              onClose={() => setQuotation(null)}
+            />
+          )}
+        </div>
+      </Modal>
+
+      {activeShift && (
+        <CashMovementModal
+          isOpen={cashMoveOpen}
+          shiftId={activeShift.id}
+          money={money}
+          onClose={() => setCashMoveOpen(false)}
+          onSaved={() => fetchShiftSummary(activeShift.id)}
+        />
+      )}
 
       {/* Keyboard Shortcuts Reference Modal */}
       <Modal
@@ -1427,6 +1620,12 @@ export const PosPage: React.FC<PosPageProps> = ({ settings }) => {
               <span className="w-20"><kbd className="bg-slate-800 text-amber-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F10</kbd></span>
               <span className="w-40 font-bold text-slate-800 dark:text-white">Print Receipt</span>
               <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Saves & prints thermal receipt, or reprints receipt if already saved.</span>
+            </div>
+
+            <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+              <span className="w-20"><kbd className="bg-slate-800 text-amber-400 font-bold px-2 py-0.5 rounded-sm font-mono text-xs border border-slate-700">F11</kbd></span>
+              <span className="w-40 font-bold text-slate-800 dark:text-white">Print Quotation</span>
+              <span className="flex-1 text-slate-500 dark:text-slate-400 text-xs">Prints the bill's prices as a quotation. Not a sale: stock, shift and khata do not change, and the bill stays open.</span>
             </div>
 
             <div className="flex items-center justify-between p-2.5 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">

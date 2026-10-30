@@ -46,7 +46,14 @@ router.get('/api/reorder', async (req: Request, res: Response) => {
     const items = [];
     for (const p of products) {
       const sold = Math.max(0, soldUnits.get(p.id) ?? 0);
-      const suggestion = suggestReorder(p, sold, coverDays);
+      const shortage = p.shortageFlag === 1;
+      // A medicine marked short by staff (C3) is always listed; with no other reason, order at least one box
+      const suggestion = suggestReorder(p, sold, coverDays) ?? (shortage ? {
+        avgDailyUnits: Math.round((sold / SALES_WINDOW_DAYS) * 100) / 100,
+        daysLeft: null,
+        reason: 'shortage' as const,
+        suggestedBoxes: 1
+      } : null);
       if (!suggestion) continue;
       items.push({
         product_id: p.id,
@@ -64,6 +71,8 @@ router.get('/api/reorder', async (req: Request, res: Response) => {
         avg_daily_units: suggestion.avgDailyUnits,
         days_left: suggestion.daysLeft,
         reason: suggestion.reason,
+        shortage,
+        shortage_note: shortage ? p.shortageNote : '',
         suggested_boxes: suggestion.suggestedBoxes,
         box_trade_price: p.boxTradePrice,
         box_retail_price: p.boxRetailPrice,

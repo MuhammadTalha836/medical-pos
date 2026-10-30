@@ -36,7 +36,7 @@ export const PERMISSION_GROUPS = [
     items: [
       { key: 'can_discount', label: 'Give Discounts' },
       { key: 'can_return_sale', label: 'Process Sale Returns' },
-      { key: 'can_delete_invoice', label: 'Delete Invoices' },
+      { key: 'can_delete_invoice', label: 'Void Invoices' },
       { key: 'can_view_all_sales', label: 'View All Staff Invoices' }
     ]
   },
@@ -63,6 +63,7 @@ export const PERMISSION_GROUPS = [
       { key: 'can_restore', label: 'Restore Database Snapshot' },
       { key: 'can_shift_close', label: 'Execute Shift Closing' },
       { key: 'can_manage_shifts', label: 'Manage & Reopen Shifts' },
+      { key: 'can_cash_in_out', label: 'Cash Pay-in / Pay-out' },
       { key: 'can_stock_zero', label: 'Reset Stock Zero Audit' },
       { key: 'can_manage_users', label: 'Manage Staff Logins' },
       { key: 'can_manage_roles', label: 'Manage Cashier & Custom Roles' },

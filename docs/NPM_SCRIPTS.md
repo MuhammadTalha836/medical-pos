@@ -157,6 +157,7 @@ npm run <script-name>
 "test:m11": "node scripts/electron.mjs test server/tests/m11_test.ts"
 "test:phaseA": "node scripts/electron.mjs test server/tests/phaseA_test.ts"
 "test:phaseB": "node scripts/electron.mjs test server/tests/phaseB_test.ts"
+"test:phaseC": "node scripts/electron.mjs test server/tests/phaseC_test.ts"
 ```
 
 **What they do:**
@@ -174,7 +175,7 @@ npm run <script-name>
 - `npm run test:phase3` runs one suite.
 - To run all of them:
   ```bash
-  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4 && npm run test:m5 && npm run test:m6 && npm run test:m7 && npm run test:m8 && npm run test:m9 && npm run test:m10 && npm run test:m11 && npm run test:phaseA && npm run test:phaseB
+  npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4 && npm run test:m5 && npm run test:m6 && npm run test:m7 && npm run test:m8 && npm run test:m9 && npm run test:m10 && npm run test:m11 && npm run test:phaseA && npm run test:phaseB && npm run test:phaseC
   ```
 
 **Why:** These prove that the real business flows still work (sale, stock, shifts, permissions, license, backups) and not just single functions.
@@ -199,6 +200,7 @@ npm run <script-name>
 | `test:m8` | Expenses and day close: a cash expense lowers the shift's expected cash (bank does not), closed-shift expenses locked, amount/date/permission checks, cashiers see only their own, day-close figures (sales, returns, cost, expenses, net profit), close/reopen lock and permissions, automatic midnight close (catch-up, reopened days, switched off), Day / Month / Date-range totals |
 | `test:m9` | Stock count and adjustment: opening stock recorded, medicine edit ignores stock, counting changes nothing until Apply, Apply keeps later sales and keeps batches equal to stock, applied count locked, single adjustment by batch with reason/direction/zero checks, cashier can count but not apply or adjust, adjustment history filters and totals, Stock Zero rows |
 | `test:phaseB` | Phase B: credit-bill returns in the khata ledger, Sales History customer/medicine filters and paging (own-only kept), product-wise/company-wise date ranges, Dashboard local today and active shifts (managers only), the Admin audit log without Developer rows, the real version from /api/status |
+| `test:phaseC` | Phase C: quotation priced like a sale but saving nothing (no shift needed), round-off and the credit limit, the medicine unit list, the shortage mark on the reorder list, the second-shift policy, void (stock, batches, khata, loyalty, shift; refused after returns or on a closed shift), split payment with the khata-first refund, cash pay-in/out, backup failover to the secondary folder and its own retention |
 | `test:phaseA` | Phase A (`docs/NEXT_PHASES.md`): own-only sales and shifts with the return exception, khata reads, one open shift under a race, PERMISSION_DENIED rows (throttled), local-day date filters for every stored format, P&L bill discount once, product/company input checks, barcode 409, loose price, product audit, restore refusing newer and upgrading older backups |
 | `test:m11` | Multi-PC LAN: open health, unpaired remote refused, pairing code (Admin only, main computer only, wrong/expired/used/lockout), local-only routes from a counter, version mismatch, Remove access ends the key and its sessions, one login per cashier (Admin may have several), shift bound to its counter, same `client_request_id` saves once, two sales of the last unit give one sale, network mode Developer-only on the main computer |
 | `test:m10` | Loyalty: Developer gate and Admin switch, plans/templates/default/archive/delete, earning on cash (credit only when allowed), member discount within the store maximum, redeem limits and totals, returns taking back and giving back points, expiry oldest first, automatic upgrade (never down), manual points and plan changes with permission, switched off again |
@@ -319,7 +321,7 @@ npm run lint && npm test
 
 **Before a commit:**
 ```bash
-npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4 && npm run test:m5 && npm run test:m6 && npm run test:m7 && npm run test:m8 && npm run test:m9 && npm run test:m10 && npm run test:m11 && npm run test:phaseA && npm run test:phaseB
+npm run lint && npm test && npm run test:functional && npm run test:phase1 && npm run test:phase2 && npm run test:phase3 && npm run test:phase4 && npm run test:phase5 && npm run test:phase6 && npm run test:phase7 && npm run test:phase8 && npm run test:m1 && npm run test:m2 && npm run test:m3 && npm run test:m4 && npm run test:m5 && npm run test:m6 && npm run test:m7 && npm run test:m8 && npm run test:m9 && npm run test:m10 && npm run test:m11 && npm run test:phaseA && npm run test:phaseB && npm run test:phaseC
 ```
 
 **Client release (on Windows):**

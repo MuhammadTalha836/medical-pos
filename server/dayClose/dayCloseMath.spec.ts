@@ -6,6 +6,14 @@ const empty: DayCloseInput = {
 };
 
 describe('computeDayClose', () => {
+  it('a split bill counts each part in its own bucket (C4)', () => {
+    const f = computeDayClose({ ...empty, sales: [{ netTotal: 500, paymentType: 'Split', paidCash: 200, paidCard: 100, paidCredit: 200 }, { netTotal: 50, paymentType: 'Cash' }] });
+    expect(f.salesTotal).toBe(550);
+    expect(f.salesCash).toBe(250);
+    expect(f.salesCard).toBe(100);
+    expect(f.salesCredit).toBe(200);
+  });
+
   it('splits sales by payment and takes returns and their cost back', () => {
     const d = computeDayClose({
       ...empty,

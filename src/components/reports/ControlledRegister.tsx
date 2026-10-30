@@ -113,7 +113,9 @@ export const ControlledRegister: React.FC<ControlledRegisterProps> = ({ settings
                     <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">{row.product_name}</td>
                     <td className="py-2.5 px-3 text-right font-mono num">
                       {showQty(row)}
-                      {row.returned_qty > 0 && <div className="text-2xs font-sans font-semibold text-amber-700 dark:text-amber-400">{row.returned_qty} returned</div>}
+                      {row.sale_status === 'cancelled'
+                        ? <div className="text-2xs font-sans font-semibold text-rose-700 dark:text-rose-400">Invoice voided</div>
+                        : row.returned_qty > 0 && <div className="text-2xs font-sans font-semibold text-amber-700 dark:text-amber-400">{row.returned_qty} returned</div>}
                     </td>
                     <td className="py-2.5 px-3">
                       <div className="font-semibold text-slate-900 dark:text-white">{row.patient_name}</div>

@@ -82,6 +82,8 @@ model Product {
   allowOpenSale       Int                  @default(1) @map("allow_open_sale")
   minSaleQty          Int                  @default(1) @map("min_sale_qty")
   schedule            String               @default("none")
+  shortageFlag        Int                  @default(0) @map("shortage_flag")
+  shortageNote        String               @default("") @map("shortage_note")
   status              String               @default("active")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at")
@@ -188,6 +190,13 @@ model Sale {
   terminalId            Int?     @map("terminal_id")
   terminalName          String?  @map("terminal_name")
   clientRequestId       String?  @map("client_request_id")
+  roundOff              Float    @default(0.0) @map("round_off")
+  paidCash              Float    @default(0.0) @map("paid_cash")
+  paidCard              Float    @default(0.0) @map("paid_card")
+  paidCredit            Float    @default(0.0) @map("paid_credit")
+  voidReason            String?  @map("void_reason")
+  voidedBy              String?  @map("voided_by")
+  voidedAt              DateTime? @map("voided_at")
   createdAt         DateTime     @default(now()) @map("created_at")
 
   customer          Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
@@ -243,6 +252,7 @@ model SaleReturn {
   shiftId           Int?             @map("shift_id")
   terminalId        Int?             @map("terminal_id")
   terminalName      String?          @map("terminal_name")
+  refundCash        Float?           @map("refund_cash")
   createdAt         DateTime         @default(now()) @map("created_at")
 
   sale              Sale?            @relation(fields: [saleId], references: [id], onDelete: SetNull)
@@ -466,6 +476,22 @@ model Expense {
   @@map("expenses")
 }
 
+model CashMovement {
+  id        Int          @id @default(autoincrement())
+  shiftId   Int          @map("shift_id")
+  direction String
+  amount    Float
+  reason    String
+  userId    Int?         @map("user_id")
+  userName  String?      @map("user_name")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  shift     CashierShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+
+  @@index([shiftId], name: "idx_cash_movements_shift")
+  @@map("cash_movements")
+}
+
 model StockCount {
   id        Int              @id @default(autoincrement())
   countNo   String           @unique @map("count_no")
@@ -643,6 +669,8 @@ model CashierShift {
   totalReturnsAmount    Float             @default(0.0) @map("total_returns_amount")
   totalCustomerPayments Float             @default(0.0) @map("total_customer_payments")
   totalExpensesCash     Float             @default(0.0) @map("total_expenses_cash")
+  totalCashIn           Float             @default(0.0) @map("total_cash_in")
+  totalCashOut          Float             @default(0.0) @map("total_cash_out")
   notes                 String?
   status                String            @default("open")
   terminalId            Int?              @map("terminal_id")
@@ -655,6 +683,7 @@ model CashierShift {
   saleReturns           SaleReturn[]
   customerPayments      CustomerPayment[]
   expenses              Expense[]
+  cashMovements         CashMovement[]
 
   @@index([userId, status], name: "idx_shifts_user_status")
   @@index([shiftNo], name: "idx_shifts_shift_no")

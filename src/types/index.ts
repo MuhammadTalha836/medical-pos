@@ -176,6 +176,9 @@ export interface Product {
   allow_open_sale?: boolean | number;
   min_sale_qty?: number;
   schedule?: MedicineSchedule;
+  /** Marked short by staff (C3): the POS warns and the reorder list always shows it */
+  shortage_flag?: number | boolean;
+  shortage_note?: string;
   status: 'active' | 'inactive';
   company_name?: string;
   created_at?: string;
@@ -348,7 +351,8 @@ export interface SaleInvoice {
   net_total: number;
   cash_tendered: number;
   change_due: number;
-  payment_type: 'Cash' | 'Card' | 'Credit' | 'Online';
+  payment_type: 'Cash' | 'Card' | 'Credit' | 'Online' | 'Split';
+  /** cancelled = voided (C7) */
   status: 'completed' | 'partially_returned' | 'returned' | 'cancelled';
   notes?: string | null;
   shift_id?: number | null;
@@ -367,6 +371,47 @@ export interface SaleInvoice {
   points_earned?: number;
   loyalty_plan_name?: string | null;
   points_balance?: number | null;
+
+  // Phase C: round-off, how the bill was paid (filled since split payment) and the void record
+  round_off?: number;
+  paid_cash?: number;
+  paid_card?: number;
+  paid_credit?: number;
+  void_reason?: string | null;
+  voided_by?: string | null;
+  voided_at?: string | null;
+}
+
+/** A printed quotation (C8): priced like a sale, never saved */
+export interface Quotation {
+  invoice_no: string;
+  sale_date: string;
+  customer_name: string;
+  customer_phone: string | null;
+  user_name: string;
+  total_gross: number;
+  total_item_discount: number;
+  bill_discount_pct: number;
+  bill_discount_amt: number;
+  round_off: number;
+  net_total: number;
+  items: (Omit<SaleItem, 'unit_cost'> & { low_stock: boolean })[];
+  store_name_snapshot: string | null;
+  store_address_snapshot: string | null;
+  invoice_footer_snapshot: string | null;
+  valid_days: number;
+  valid_until: string;
+}
+
+/** Cash put into or taken out of the drawer during a shift (C4) */
+export interface CashMovement {
+  id: number;
+  shift_id: number;
+  direction: 'in' | 'out';
+  amount: number;
+  reason: string;
+  user_name: string | null;
+  created_at: string;
 }
 
 export interface SaleItem {
@@ -389,6 +434,8 @@ export interface SaleItem {
   batch_id?: number;
   /** Already returned from this line (invoice details only) */
   returned_qty?: number;
+  /** Quotation lines only (C8): the shelf has less than quoted */
+  low_stock?: boolean;
 }
 
 export interface PurchaseItem {
@@ -475,7 +522,10 @@ export interface ReorderItem {
   sold_30d_units: number;
   avg_daily_units: number;
   days_left: number | null;
-  reason: 'below_minimum' | 'running_out';
+  reason: 'below_minimum' | 'running_out' | 'shortage';
+  /** Marked short by staff (C3), whatever the reason above */
+  shortage?: boolean;
+  shortage_note?: string;
   suggested_boxes: number;
   box_trade_price: number;
   box_retail_price: number;
@@ -652,6 +702,9 @@ export interface CashierShift {
   total_customer_payments: number;
   /** Shop expenses paid out of the drawer during the shift */
   total_expenses_cash?: number;
+  /** Cash pay-in / pay-out (C4) */
+  total_cash_in?: number;
+  total_cash_out?: number;
   notes?: string | null;
   status: 'open' | 'closed';
   created_at?: string;
@@ -667,6 +720,8 @@ export interface ShiftSummary {
   total_returns_cash: number;
   total_customer_payments_cash: number;
   total_expenses_cash?: number;
+  total_cash_in?: number;
+  total_cash_out?: number;
   expected_cash: number;
   actual_cash?: number;
   difference?: number;
@@ -704,7 +759,7 @@ export interface AuditLogPage {
 }
 
 // Phase 4: Developer-controlled automatic backup frequency
-export type BackupFrequency = 'off' | 'twice_daily' | 'daily' | 'weekly';
+export type BackupFrequency = 'off' | 'twice_daily' | 'daily' | 'every_2_days' | 'every_3_days' | 'weekly';
 
 export interface BackupStatus {
   frequency: BackupFrequency;
@@ -718,6 +773,8 @@ export interface BackupStatus {
   last_status: 'success' | 'failed' | null;
   last_error: string | null;
   last_type: string | null;
+  /** Set when the newest good backup went to the secondary folder because the main folder failed */
+  last_warning?: string | null;
   last_backup_file: string | null;
   retention_limit: number;
   retained_count: number;

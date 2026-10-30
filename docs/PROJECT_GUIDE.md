@@ -67,6 +67,16 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
    - Every customer needs a phone number, unique by digits (`normalizePhone` in `shared/customers.ts`).
    - Partial or full cash recovery payment recording.
    - Customer account statements and history export: Khata → **Statement** (`CustomerStatementModal`, built by `customerStatement` in `shared/customers.ts`) lists credit bills, credit-bill returns and payments with a running balance; Print and CSV.
+   - Phase C (`docs/NEXT_PHASES.md`):
+     - **Print Quotation** (F11, `POST /api/sales/quote`, nothing saved).
+     - **Round-off** (`round_off_to`).
+     - Admin **medicine unit list** (`medicine_unit_types`, `shared/unitTypes.ts`).
+     - **Shortage mark** (POS warning, reorder list; cleared by a purchase).
+     - **Split payment** (`paid_cash` / `paid_card` / `paid_credit`; refunds lower the khata part first).
+     - **Cash In / Out** per shift (`cash_movements`, `can_cash_in_out`).
+     - **Void invoice** (`POST /api/sales/:id/void`, `can_delete_invoice`; open shift only, no returns).
+     - **One shift per day** option (`allow_second_shift_same_day`).
+     - Backups **every 2 / 3 days**, secondary-folder failover with its own retention, and overdue after two missed slots.
 
 6. **Sales History & Returns (`SalesHistoryPage.tsx`)**:
    - Filterable invoice history by invoice number, customer, and date range.
@@ -150,7 +160,7 @@ PharmaCare Pro is designed for high-speed, reliable pharmacy operations with **z
 
 12. **System Settings & Granular Staff Roles (`SettingsPage.tsx`)**:
     - Pharmacy business profile, drug license number, tax/NTN number, custom receipt headers/footers/terms, currency symbol, maximum bill discount cap.
-    - 43 staff permissions (11 modules + 32 actions, `shared/permissions.ts`) covering POS operations, sales, returns, discounts, customer khata, product/company masters, purchases, reports, utilities, user accounts, shift management and LAN counters.
+    - 44 staff permissions (11 modules + 33 actions, `shared/permissions.ts`) covering POS operations, sales, returns, discounts, customer khata, product/company masters, purchases, reports, utilities, user accounts, shift management and LAN counters.
     - The server enforces reads as well as writes (Phase A): staff see only their own invoices and shifts unless granted "View All Staff Invoices" or shift management. A returns user opens another bill by its full invoice number. Every refusal is written to the audit trail as DENIED.
 
 

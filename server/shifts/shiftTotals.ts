@@ -1,11 +1,18 @@
 // Drawer reconciliation for a cashier shift. One calculation for the live summary, the close, the list,
 // the details view and the admin force-close, so they can never disagree.
+import { tenderSplit, type TenderSource } from '../sales/saleMath';
 
-export interface ShiftSaleRow { netTotal: number; paymentType: string }
-/** originalPaymentType: how the returned invoice was paid (null for a return without an invoice) */
-export interface ShiftReturnRow { refundAmount: number; originalPaymentType: string | null }
+/** A sale with its stored tender split (C4); older bills count wholly in their one payment type */
+export type ShiftSaleRow = TenderSource;
+/**
+ * originalPaymentType: how the returned invoice was paid (null for a return without an invoice).
+ * refundCash: the cash paid out, stored since split payments (C4); when missing the old rule applies.
+ */
+export interface ShiftReturnRow { refundAmount: number; originalPaymentType: string | null; refundCash?: number | null }
 export interface ShiftPaymentRow { amount: number; paymentMethod: string }
 export interface ShiftExpenseRow { amount: number; paymentMethod: string }
+/** Cash put into ('in') or taken out of ('out') the drawer during the shift */
+export interface ShiftCashMovementRow { direction: string; amount: number }
 
 export interface ShiftTotals {
   salesCount: number;
@@ -20,6 +27,9 @@ export interface ShiftTotals {
   totalCustomerPaymentsCash: number;
   /** Shop expenses paid out of the drawer during the shift */
   totalExpensesCash: number;
+  /** Cash pay-in / pay-out (C4) */
+  totalCashIn: number;
+  totalCashOut: number;
   expectedCash: number;
 }
 
@@ -30,20 +40,24 @@ export function computeShiftTotals(
   sales: ShiftSaleRow[],
   returns: ShiftReturnRow[],
   payments: ShiftPaymentRow[],
-  expenses: ShiftExpenseRow[] = []
+  expenses: ShiftExpenseRow[] = [],
+  cashMovements: ShiftCashMovementRow[] = []
 ): ShiftTotals {
   let totalSalesAmount = 0, totalCashSales = 0, totalCardSales = 0, totalCreditSales = 0;
   for (const sale of sales) {
     totalSalesAmount += sale.netTotal;
-    if (sale.paymentType === 'Cash') totalCashSales += sale.netTotal;
-    else if (sale.paymentType === 'Card' || sale.paymentType === 'Online') totalCardSales += sale.netTotal;
-    else if (sale.paymentType === 'Credit') totalCreditSales += sale.netTotal;
+    const tenders = tenderSplit(sale);
+    totalCashSales += tenders.cash;
+    totalCardSales += tenders.card;
+    totalCreditSales += tenders.credit;
   }
 
-  // A credit return lowers the khata balance and a card return goes back to the card: no cash leaves the drawer
-  const totalReturnsCash = returns
-    .filter(r => r.originalPaymentType === null || r.originalPaymentType === 'Cash')
-    .reduce((sum, r) => sum + r.refundAmount, 0);
+  // A credit return lowers the khata balance and a card return goes back to the card: no cash leaves the drawer.
+  // Returns saved since split payments carry the cash actually paid out.
+  const totalReturnsCash = returns.reduce((sum, r) => {
+    if (r.refundCash !== undefined && r.refundCash !== null) return sum + r.refundCash;
+    return r.originalPaymentType === null || r.originalPaymentType === 'Cash' ? sum + r.refundAmount : sum;
+  }, 0);
   const totalCustomerPaymentsCash = payments
     .filter(p => p.paymentMethod.toLowerCase() === 'cash')
     .reduce((sum, p) => sum + p.amount, 0);
@@ -51,6 +65,8 @@ export function computeShiftTotals(
   const totalExpensesCash = expenses
     .filter(e => e.paymentMethod.toLowerCase() === 'cash')
     .reduce((sum, e) => sum + e.amount, 0);
+  const totalCashIn = cashMovements.filter(m => m.direction === 'in').reduce((sum, m) => sum + m.amount, 0);
+  const totalCashOut = cashMovements.filter(m => m.direction === 'out').reduce((sum, m) => sum + m.amount, 0);
 
   return {
     salesCount: sales.length,
@@ -62,6 +78,8 @@ export function computeShiftTotals(
     totalReturnsCash: round2(totalReturnsCash),
     totalCustomerPaymentsCash: round2(totalCustomerPaymentsCash),
     totalExpensesCash: round2(totalExpensesCash),
-    expectedCash: round2(openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash - totalExpensesCash)
+    totalCashIn: round2(totalCashIn),
+    totalCashOut: round2(totalCashOut),
+    expectedCash: round2(openingCash + totalCashSales + totalCustomerPaymentsCash - totalReturnsCash - totalExpensesCash + totalCashIn - totalCashOut)
   };
 }

@@ -12,7 +12,8 @@ import {
   Eye,
   Calendar,
   AlertTriangle,
-  CheckCircle2
+  CheckCircle2,
+  Ban
 } from 'lucide-react';
 import { moneyFormatter } from '../utils/format';
 import { saleStatus } from '../utils/saleStatus';
@@ -62,8 +63,37 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // Void (C7): the bill asked about and the reason typed
+  const [voidTarget, setVoidTarget] = useState<SaleInvoice | null>(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voidError, setVoidError] = useState<string | null>(null);
+  const [isVoiding, setIsVoiding] = useState(false);
 
   const money = moneyFormatter(settings);
+
+  const openVoid = (sale: SaleInvoice) => {
+    setVoidTarget(sale);
+    setVoidReason('');
+    setVoidError(null);
+  };
+
+  const submitVoid = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!voidTarget || isVoiding) return;
+    try {
+      setIsVoiding(true);
+      setVoidError(null);
+      await api.voidSale(voidTarget.id, voidReason.trim());
+      setSuccessMessage(`Invoice ${voidTarget.invoice_no} voided. Its stock is back on the shelf and it no longer counts in the shift.`);
+      setVoidTarget(null);
+      loadSales();
+      setTimeout(() => setSuccessMessage(null), 6000);
+    } catch (err: any) {
+      setVoidError(err.message || 'The invoice could not be voided.');
+    } finally {
+      setIsVoiding(false);
+    }
+  };
 
   const filters = (overrides: Partial<{ invoice: string; customer: string; medicine: string; from: string; to: string }> = {}) => {
     const f = { invoice: searchInvoice, customer: searchCustomer, medicine: searchMedicine, from: dateFrom, to: dateTo, ...overrides };
@@ -395,6 +425,17 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
                             <span>Return</span>
                           </button>
                         )}
+
+                        {sale.status === 'completed' && hasPermission('can_delete_invoice') && (
+                          <button
+                            onClick={() => openVoid(sale)}
+                            className="btn-danger btn-sm"
+                            title="Cancel a bill made by mistake (only while its shift is open)"
+                          >
+                            <Ban className="w-4 h-4" />
+                            <span>Void</span>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -426,6 +467,39 @@ export const SalesHistoryPage: React.FC<SalesHistoryPageProps> = ({ settings }) 
             onClose={() => setIsReceiptModalOpen(false)}
           />
         )}
+      </Modal>
+
+      {/* Void Invoice Modal (C7) */}
+      <Modal
+        isOpen={voidTarget !== null}
+        onClose={() => { if (!isVoiding) setVoidTarget(null); }}
+        title={`Void Invoice ${voidTarget?.invoice_no ?? ''}`}
+        maxWidth="max-w-md"
+      >
+        <form onSubmit={submitVoid} className="space-y-4">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Voiding cancels this bill of {voidTarget ? money(voidTarget.net_total) : ''}. The stock goes back, any khata amount and loyalty points are reversed, and the shift stops counting it. The invoice stays in the history, marked Voided.
+          </p>
+          <div>
+            <label htmlFor="void-reason" className="field-label">Reason</label>
+            <input
+              id="void-reason"
+              type="text"
+              autoFocus
+              maxLength={200}
+              value={voidReason}
+              onChange={e => setVoidReason(e.target.value)}
+              placeholder="e.g. Rung up twice"
+              className="field-input w-full"
+              required
+            />
+          </div>
+          {voidError && <p className="text-xs font-semibold text-rose-600 dark:text-rose-400" role="alert">{voidError}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setVoidTarget(null)} disabled={isVoiding} className="btn-secondary">Keep Invoice</button>
+            <button type="submit" disabled={isVoiding || voidReason.trim().length < 3} className="btn-danger">{isVoiding ? 'Voiding...' : 'Void Invoice'}</button>
+          </div>
+        </form>
       </Modal>
 
       {/* Sale Return Modal */}

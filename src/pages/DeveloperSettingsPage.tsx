@@ -6,7 +6,7 @@ import { AuditLogPanel } from '../components/audit/AuditLogPanel';
 import { Modal } from '../components/common/Modal';
 import { UnifiedInvoice } from '../components/pos/UnifiedInvoice';
 import { DEFAULT_DEVELOPER_FOOTER, FOOTER_MAX_LENGTH } from '../../shared/invoice';
-import { WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
+import { BACKUP_FREQUENCY_LABELS, WEEKDAY_LABELS, describeBackupSchedule } from '../utils/backup';
 import { LicensePanel } from '../components/developer/LicensePanel';
 import { AdminPermissionsPanel } from '../components/developer/AdminPermissionsPanel';
 import { DeveloperProfilePanel } from '../components/developer/DeveloperProfilePanel';
@@ -730,6 +730,8 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
                   <option value="off">Off (no automatic backups)</option>
                   <option value="twice_daily">Every 12 hours</option>
                   <option value="daily">Daily</option>
+                  <option value="every_2_days">Every 2 days</option>
+                  <option value="every_3_days">Every 3 days</option>
                   <option value="weekly">Weekly</option>
                 </select>
                 <span className="text-2xs text-slate-400 mt-1 block">Shift-close backups also run unless this is Off.</span>
@@ -768,7 +770,7 @@ export const DeveloperSettingsPage: React.FC<DeveloperSettingsPageProps> = ({ on
 
             <p className="text-xs text-purple-500 dark:text-purple-300 font-medium">
               {describeBackupSchedule(
-                (['off', 'twice_daily', 'daily', 'weekly'].includes(settings.backup_frequency) ? settings.backup_frequency : 'daily') as BackupFrequency,
+                (Object.keys(BACKUP_FREQUENCY_LABELS).includes(settings.backup_frequency) ? settings.backup_frequency : 'daily') as BackupFrequency,
                 settings.backup_scheduled_time || '23:00',
                 Number(settings.backup_weekly_day || 0)
               )}. Missed runs (e.g. while the PC was off) are caught up once at the next start.

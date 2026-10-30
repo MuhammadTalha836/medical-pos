@@ -85,6 +85,8 @@ router.get('/api/backups/status', async (req: Request, res: Response) => {
     const canSeePaths = await hasRolePermission(actingUser.role, 'can_backup');
     const { settings, frequency, time, weekday, schedule } = await getScheduleState();
     const cloud = await getCloudStatus();
+    // A backup that only reached the secondary folder (C5) still counts, but the Admin should check the main folder
+    const lastGood = await prisma.backupHistory.findFirst({ where: { status: 'success' }, orderBy: { id: 'desc' }, select: { errorMessage: true } });
 
     res.json({
       frequency,
@@ -92,12 +94,14 @@ router.get('/api/backups/status', async (req: Request, res: Response) => {
       weekly_day: weekday,
       enabled: schedule.enabled,
       next_run_at: schedule.nextRunAt ? schedule.nextRunAt.toISOString() : null,
-      is_overdue: schedule.isDue,
+      // The warning waits for two missed backups in a row (C5); one missed slot is caught up on its own
+      is_overdue: schedule.isOverdue,
       last_success_at: settings.last_backup_time || null,
       last_attempt_at: settings.last_backup_attempt_at || null,
       last_status: settings.last_backup_status || (settings.last_backup_time ? 'success' : null),
       last_error: settings.last_backup_status === 'failed' ? settings.last_backup_error || null : null,
       last_type: settings.last_backup_type || null,
+      last_warning: lastGood?.errorMessage ?? null,
       last_backup_file: canSeePaths ? settings.last_backup_file || null : null,
       retention_limit: getLocalRetentionLimit(),
       retained_count: countRetainedBackups(),

@@ -193,7 +193,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
     const headers = [
       'Shift #', 'Cashier Name', 'Cashier ID', 'Counter', 'Start Time', 'Close Time',
       'Duration (min)', 'Opening Cash', 'Total Sales', 'Cash Sales', 'Card Sales',
-      'Credit Sales', 'Returns', 'Cash Expenses', 'Expected Cash', 'Actual Cash', 'Variance', 'Status'
+      'Credit Sales', 'Returns', 'Cash Expenses', 'Cash In', 'Cash Out', 'Expected Cash', 'Actual Cash', 'Variance', 'Status'
     ];
     const rows = filteredShifts.map(s => [
       s.shift_no,
@@ -210,6 +210,8 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
       (s.total_credit_sales || 0).toFixed(2),
       (s.total_returns_amount || 0).toFixed(2),
       (s.total_expenses_cash || 0).toFixed(2),
+      (s.total_cash_in || 0).toFixed(2),
+      (s.total_cash_out || 0).toFixed(2),
       (s.expected_cash || 0).toFixed(2),
       s.closing_cash !== null && s.closing_cash !== undefined ? s.closing_cash.toFixed(2) : '',
       s.cash_difference !== null && s.cash_difference !== undefined ? s.cash_difference.toFixed(2) : '',
@@ -625,6 +627,7 @@ export const ShiftsAdminPage: React.FC<ShiftsAdminPageProps> = ({ settings }) =>
                 { label: 'Card Sales', value: `${money((inspectData.shift?.total_card_sales || 0))}`, mono: true },
                 { label: 'Credit Sales', value: `${money((inspectData.shift?.total_credit_sales || 0))}`, mono: true },
                 { label: 'Cash Expenses', value: `${money((inspectData.shift?.total_expenses_cash || 0))}`, mono: true },
+                { label: 'Cash In / Out', value: `+${money(inspectData.shift?.total_cash_in || 0)} / -${money(inspectData.shift?.total_cash_out || 0)}`, mono: true },
                 { label: 'Expected Cash', value: `${money((inspectData.shift?.expected_cash || 0))}`, mono: true },
                 {
                   label: 'Actual / Variance',

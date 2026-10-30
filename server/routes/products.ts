@@ -72,7 +72,7 @@ router.get('/api/products', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
-             p.allow_open_sale, p.min_sale_qty, p.schedule,
+             p.allow_open_sale, p.min_sale_qty, p.schedule, p.shortage_flag, p.shortage_note,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -117,7 +117,7 @@ router.get('/api/products/search', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
-             p.allow_open_sale, p.min_sale_qty, p.schedule,
+             p.allow_open_sale, p.min_sale_qty, p.schedule, p.shortage_flag, p.shortage_note,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -154,7 +154,7 @@ router.get('/api/products/:id/substitutes', async (req: Request, res: Response) 
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
-             p.allow_open_sale, p.min_sale_qty, p.schedule,
+             p.allow_open_sale, p.min_sale_qty, p.schedule, p.shortage_flag, p.shortage_note,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -178,7 +178,7 @@ router.get('/api/products/:id', async (req: Request, res: Response) => {
              p.unit_type, p.packing, p.box_trade_price, p.box_retail_price,
              p.unit_trade_price, p.unit_retail_price, p.default_discount_pct,
              p.location_rack, p.stock_boxes, p.stock_loose, p.min_stock_alert,
-             p.allow_open_sale, p.min_sale_qty, p.schedule,
+             p.allow_open_sale, p.min_sale_qty, p.schedule, p.shortage_flag, p.shortage_note,
              p.status, p.created_at, p.updated_at, c.name as company_name
       FROM products p
       LEFT JOIN companies c ON p.company_id = c.id
@@ -233,6 +233,8 @@ router.post('/api/products', async (req: Request, res: Response) => {
         allowOpenSale: allowOpenSale ? 1 : 0,
         minSaleQty: body.min_sale_qty ?? 1,
         schedule: schedule ?? 'none',
+        shortageFlag: isOn(body.shortage_flag) ? 1 : 0,
+        shortageNote: isOn(body.shortage_flag) ? body.shortage_note ?? '' : '',
         status: 'active'
       }
       });
@@ -274,6 +276,9 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
     const allowOpenSale = body.allow_open_sale === undefined || body.allow_open_sale === null ? before.allowOpenSale === 1 : isOn(body.allow_open_sale);
     const unitPrice = looseUnitPrice(body, allowOpenSale, packing);
     if ('error' in unitPrice) return res.status(400).json({ error: unitPrice.error });
+    // Shortage mark (C3): left out = unchanged; switching it off clears the note
+    const shortage = body.shortage_flag === undefined || body.shortage_flag === null ? before.shortageFlag === 1 : isOn(body.shortage_flag);
+    const shortageNote = shortage ? body.shortage_note ?? before.shortageNote : '';
 
     await prisma.$transaction(async (tx) => {
       await tx.product.update({
@@ -297,6 +302,8 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
         allowOpenSale: allowOpenSale ? 1 : 0,
         minSaleQty: body.min_sale_qty ?? 1,
         ...(schedule ? { schedule } : {}),
+        shortageFlag: shortage ? 1 : 0,
+        shortageNote,
         status: body.status || 'active'
       }
       });
@@ -311,7 +318,8 @@ router.put('/api/products/:id', async (req: Request, res: Response) => {
       ['unit retail', before.unitRetailPrice, unitPrice.price],
       ['discount %', before.defaultDiscountPct, body.default_discount_pct ?? 0],
       ['loose sale', before.allowOpenSale === 1 ? 'on' : 'off', allowOpenSale ? 'on' : 'off'],
-      ['schedule', before.schedule, schedule ?? before.schedule]
+      ['schedule', before.schedule, schedule ?? before.schedule],
+      ['shortage', before.shortageFlag === 1 ? 'on' : 'off', shortage ? 'on' : 'off']
     ].filter(([, a, b]) => a !== b).map(([label, a, b]) => `${label} ${a} → ${b}`);
     await logSecurityAudit({
       action: 'PRODUCT_UPDATED',

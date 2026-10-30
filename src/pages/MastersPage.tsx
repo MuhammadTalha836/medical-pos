@@ -24,6 +24,7 @@ import { AdjustmentsTab } from '../components/stock/AdjustmentsTab';
 import { ScheduleBadge } from '../components/common/ScheduleBadge';
 import { genericKey } from '../../shared/generic';
 import { MEDICINE_SCHEDULES, MedicineSchedule, SCHEDULE_LABELS, normalizeSchedule } from '../../shared/schedule';
+import { parseUnitTypes, unitChoices } from '../../shared/unitTypes';
 
 interface MastersPageProps {
   settings?: SystemSettings | null;
@@ -65,7 +66,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
     min_stock_alert: 10,
     allow_open_sale: true,
     min_sale_qty: 1,
-    schedule: 'none' as MedicineSchedule
+    schedule: 'none' as MedicineSchedule,
+    shortage_flag: false,
+    shortage_note: ''
   });
 
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -81,6 +84,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
 
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const money = moneyFormatter(settings);
+  const unitTypes = parseUnitTypes(settings?.medicine_unit_types);
 
   // Formula suggestions while typing the generic name, so the same formula is written the same way
   const [genericOptions, setGenericOptions] = useState<{ generic_name: string; uses: number }[]>([]);
@@ -154,7 +158,7 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       barcode: '',
       name: '',
       generic_name: '',
-      unit_type: 'Tablets',
+      unit_type: unitTypes[0] ?? 'Tablets',
       packing: 100,
       box_trade_price: 100,
       box_retail_price: 120,
@@ -167,7 +171,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       min_stock_alert: 10,
       allow_open_sale: true,
       min_sale_qty: 1,
-      schedule: 'none'
+      schedule: 'none',
+      shortage_flag: false,
+      shortage_note: ''
     });
     setIsProductModalOpen(true);
   };
@@ -194,7 +200,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
       min_stock_alert: prod.min_stock_alert,
       allow_open_sale: prod.allow_open_sale === undefined ? true : (prod.allow_open_sale === 1 || prod.allow_open_sale === true),
       min_sale_qty: prod.min_sale_qty || 1,
-      schedule: normalizeSchedule(prod.schedule)
+      schedule: normalizeSchedule(prod.schedule),
+      shortage_flag: prod.shortage_flag === 1 || prod.shortage_flag === true,
+      shortage_note: prod.shortage_note || ''
     });
     setIsProductModalOpen(true);
   };
@@ -477,6 +485,9 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                                 </span>
                               )}
                               <ScheduleBadge schedule={prod.schedule} />
+                              {(prod.shortage_flag === 1 || prod.shortage_flag === true) && (
+                                <span className="px-1.5 py-0.5 text-2xs badge-warning" title={prod.shortage_note || 'Marked short'}>Shortage</span>
+                              )}
                             </div>
                           </td>
                           <td className="py-3 px-3 text-center font-mono text-slate-700 dark:text-slate-300">
@@ -757,19 +768,10 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                   onChange={(e) => setProductForm(prev => ({ ...prev, unit_type: e.target.value }))}
                   className="field-select w-full"
                 >
-                  <option value="Tablets">Tablets</option>
-                  <option value="Capsules">Capsules</option>
-                  <option value="Strip">Strip</option>
-                  <option value="Box">Box</option>
-                  <option value="Bottle">Bottle</option>
-                  <option value="Syrup">Syrup</option>
-                  <option value="Suspension">Suspension</option>
-                  <option value="Injection">Injection</option>
-                  <option value="Drops">Drops</option>
-                  <option value="Sachet">Sachet</option>
-                  <option value="Ointment">Ointment</option>
-                  <option value="Inhaler">Inhaler</option>
-                  <option value="Unit">Unit</option>
+                  {/* The Admin's list (Settings → Store), plus this medicine's own unit if it is no longer listed */}
+                  {unitChoices(unitTypes, productForm.unit_type).map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
                 </select>
               </div>
 
@@ -848,6 +850,33 @@ export const MastersPage: React.FC<MastersPageProps> = ({ settings }) => {
                     ? 'The counter is reminded to check the prescription. The sale is not blocked.'
                     : 'Sold freely over the counter.'}
               </p>
+            </div>
+
+            {/* Shortage mark (C3): the POS warns and the reorder list always shows it; a purchase clears it */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-start">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 sm:pt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={productForm.shortage_flag}
+                  disabled={!(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product'))}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, shortage_flag: e.target.checked }))}
+                  className="accent-teal-600"
+                />
+                <span>Mark as shortage</span>
+              </label>
+              <div className="sm:col-span-3">
+                <input
+                  type="text"
+                  maxLength={200}
+                  value={productForm.shortage_note}
+                  disabled={!productForm.shortage_flag || !(editingProduct ? hasPermission('can_edit_product') : hasPermission('can_add_product'))}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, shortage_note: e.target.value }))}
+                  placeholder="Note, e.g. Company out of stock until next month"
+                  aria-label="Shortage note"
+                  className="field-input w-full"
+                />
+                <p className="field-hint">The counter sees a warning when it is sold, and it stays on the reorder list until stock is purchased.</p>
+              </div>
             </div>
 
             {/* Interactive Stock Conversion & Inventory Impact Card */}

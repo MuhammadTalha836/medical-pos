@@ -4,6 +4,8 @@ export const BACKUP_FREQUENCY_LABELS: Record<BackupFrequency, string> = {
   off: 'Off',
   twice_daily: 'Every 12 hours',
   daily: 'Daily',
+  every_2_days: 'Every 2 days',
+  every_3_days: 'Every 3 days',
   weekly: 'Weekly'
 };
 
@@ -17,5 +19,7 @@ export function describeBackupSchedule(frequency: BackupFrequency, time: string,
     const second = `${String((h + 12) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     return `Every 12 hours at ${time} and ${second}`;
   }
+  if (frequency === 'every_2_days') return `Every 2 days at ${time}`;
+  if (frequency === 'every_3_days') return `Every 3 days at ${time}`;
   return `Daily at ${time}`;
 }

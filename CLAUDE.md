@@ -41,6 +41,7 @@ npm run test:m9          # stock count and adjustment: count changes nothing unt
 npm run test:m10         # loyalty: Developer gate + Admin switch, plans, earn/redeem/member discount, returns, expiry, auto upgrade, manual points
 npm run test:m11         # LAN: pairing, unpaired/remote refusals, local-only routes, version check, revoke, one login, shift per counter, idempotent sale, last unit
 npm run test:phaseB      # docs/NEXT_PHASES.md Phase B: credit returns in the ledger, sales customer/medicine filters + paging, report date ranges, dashboard today/active shifts, Admin audit log, version
+npm run test:phaseC      # docs/NEXT_PHASES.md Phase C: quotation saves nothing, round-off, unit list, shortage, second shift, void, split payment, cash in/out, backup secondary folder
 npm run test:phaseA      # docs/NEXT_PHASES.md Phase A: scoped reads, one open shift race, DENIED audit, restore version/upgrade, local-day dates, P&L discount, product input
 
 npm run developer:key    # create .env.developer (developer master TOTP key) and print its QR; --show / --rotate / --google <id> <secret>
@@ -145,6 +146,24 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
 - **Shift totals** come from one place (`server/shifts/shiftTotals.ts` + `loadShiftTotals`): only refunds of Cash invoices leave the drawer, Online counts with Card. Closing runs in one transaction (`updateMany where status open`), needs the counted cash, and only the owner or `can_manage_shifts` may close.
 - Customers: a sale may carry `customer_id` (a saved khata customer; the sale then stores that customer's saved name/phone). A Credit sale **requires** one and is blocked past the customer's `credit_limit` (0 = no limit); returning a credit sale lowers the balance. Customers need a phone, unique by digits (`normalizePhone` in `shared/customers.ts`); a duplicate answers 409 with the existing customer. The POS picks customers with `CustomerPicker.tsx` (`GET /api/customers/search`). The Customers page (`src/pages/CustomersPage.tsx`, tab id `khata`) has a Customers tab and a Khata (Udhaar) tab; a customer can be deleted only with no invoices, payments or balance.
 - It generates `INV-YYYYMMDD-NNNN` inside `prisma.$transaction`, with a 5-attempt retry on `SQLITE_BUSY` / unique collisions.
+- **Phase C (`docs/NEXT_PHASES.md`):**
+  - **Cart pricing** is `priceCart` (`server/sales/priceCart.ts`), shared by the sale and `POST /api/sales/quote`.
+    - The quotation is login only, needs no shift and writes nothing.
+    - The POS shows it with `UnifiedInvoice`'s `quotation` prop (F11).
+  - **Round-off:** `roundOff(net, round_off_to)` (`saleMath.ts`) runs after loyalty and before the cash and credit-limit checks; the result is stored as `sales.round_off`.
+  - **Tenders:** every new sale stores `paid_cash` / `paid_card` / `paid_credit`. Payment type `Split` needs `split: {cash, card, credit}` that adds up to the bill (`checkSplit`).
+    - **Always use `tenderSplit(sale)`** for money by tender; it derives older bills from `payment_type`.
+    - Returns store `sale_returns.refund_cash` from `refundTenders`, which takes a split bill's khata part off first.
+  - **Void:** `POST /api/sales/:id/void` (`can_delete_invoice`, a reason) sets status `cancelled` and puts back the stock/batches, khata and loyalty.
+    - It is refused when the bill has returns, its shift is closed or its day is closed.
+    - `loadShiftTotals` and the khata queries leave `cancelled` out.
+  - **Cash pay-in / pay-out:** `cash_movements` table; `POST/GET /api/shifts/:id/cash-movements` (`can_cash_in_out`, open shift only). It enters `computeShiftTotals` and is saved as `total_cash_in` / `total_cash_out`, never in the day-close profit.
+  - **Settings:**
+    - `round_off_to`, `quotation_valid_days`, `medicine_unit_types` (JSON list, `shared/unitTypes.ts`);
+    - `allow_second_shift_same_day` (shift managers only; when off, `POST /api/shifts/start` answers 409).
+
+    They are edited in `src/components/settings/StoreRulesCard.tsx`.
+  - **Shortage:** `products.shortage_flag` / `shortage_note`. The reorder list always shows the medicine (reason `shortage`), and a purchase clears the mark.
 - Stock is tracked as boxes + loose units (`packing` units per box). Products can forbid loose ("open") sales and set a minimum sale quantity.
 - **Batches (FEFO).** Invariant: a product's batch units add up to its stock. Rules are in `server/stock/batchMath.ts`; DB helpers in `server/stock/batchStock.ts`, always called inside the caller's transaction.
   - Sales call `takeUnits(..., includeExpired: false)` (expired stock is never sold) and record `sale_item_batches`. Sale returns put units back into those rows (`returned_units`).
@@ -227,6 +246,12 @@ Startup data fixes (e.g. `migrateLegacyInvoiceSettings`) also run from `initPris
   - It then runs `upgradeSchema(db)` (tables, `COLUMN_MIGRATIONS`, indexes, seed, version) and `reconcileAllProductBatches`, so an older backup gets today's columns at once.
   - `app_version` is an internal setting, hidden from `/api/settings`.
 - `createBackup` writes `*.partial`, verifies it (`integrity_check` + core tables), renames it into place, records `backup_history` (`verified`, `checksum_sha256`), and only then prunes.
+- **Secondary folder (Phase C5):**
+  - When the primary folder fails, the backup is written to the secondary folder as the backup of record. The row's `error_message` holds a warning, which `/api/backups/status` returns as `last_warning`.
+  - The secondary folder keeps its own newest N (`pruneSecondaryFolder`). Pruning a primary row keeps its secondary copy (`retireBackupRow` moves the row to it).
+- **Schedule (Phase C5):**
+  - `every_2_days` / `every_3_days` run on fixed calendar days (day number modulo n).
+  - `computeSchedule` also returns `isOverdue` (two missed slots in a row), which is what `is_overdue` reports.
 - Retention is per folder, based on `backup_history` rows; `pre_restore` snapshots are kept separately (newest 3).
 - `computeSchedule` is pure (catch-up, backoff, clock rollback). `runRecordedBackup` / `recordBackupOutcome` update the `last_backup_*` settings that the Dashboard status endpoint reads.
 - The Developer owns the frequency; the Admin can change only `backup_scheduled_time`.

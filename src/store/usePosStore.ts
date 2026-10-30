@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { Product, CartItem, SaleInvoice, PrescriptionInput, LoyaltyPlan } from '../types';
 
-export type PaymentType = 'Cash' | 'Card' | 'Credit' | 'Online';
+// Split (C4): one bill paid partly in cash, card and/or khata credit
+export type PaymentType = 'Cash' | 'Card' | 'Credit' | 'Online' | 'Split';
 
 /** Everything that belongs to one open (unsaved) invoice */
 export interface InvoiceDraft {

@@ -20,10 +20,11 @@ router.get('/api/customers', async (req: Request, res: Response) => {
       SELECT c.id, c.name, c.phone, c.address, c.credit_limit, c.current_balance, c.created_at,
         c.loyalty_points, c.loyalty_plan_id, (SELECT lp.name FROM loyalty_plans lp WHERE lp.id = c.loyalty_plan_id) as loyalty_plan_name,
         (SELECT COUNT(*) FROM sales s WHERE s.customer_id = c.id) as invoices_count,
-        (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.status != 'returned')
+        (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.status NOT IN ('returned', 'cancelled'))
           - (SELECT COALESCE(SUM(r.refund_amount), 0) FROM sale_returns r JOIN sales s ON s.id = r.sale_id
              WHERE s.customer_id = c.id AND s.status = 'partially_returned') as total_purchases,
-        (SELECT COALESCE(SUM(s.net_total), 0) FROM sales s WHERE s.customer_id = c.id AND s.payment_type = 'Credit') as total_credit_sales,
+        (SELECT COALESCE(SUM(CASE WHEN s.payment_type = 'Credit' THEN s.net_total ELSE s.paid_credit END), 0) FROM sales s
+          WHERE s.customer_id = c.id AND s.payment_type IN ('Credit', 'Split') AND s.status != 'cancelled') as total_credit_sales,
         (SELECT COALESCE(SUM(p.amount), 0) FROM customer_payments p WHERE p.customer_id = c.id) as total_payments
       FROM customers c
       ORDER BY c.current_balance DESC, c.name ASC
@@ -235,6 +236,7 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
         saleDate: true,
         netTotal: true,
         paymentType: true,
+        paidCredit: true,
         status: true,
         _count: { select: { items: true } }
       },
@@ -256,12 +258,16 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
       orderBy: { id: 'desc' }
     });
 
-    // Returns of credit bills lowered the khata balance, so the statement lists them as credits
-    const returns = await prisma.saleReturn.findMany({
-      where: { sale: { customerId: idNum, paymentType: 'Credit' } },
-      select: { id: true, returnNo: true, originalInvoiceNo: true, refundAmount: true, createdAt: true },
+    // Returns of credit bills lowered the khata balance, so the statement lists them as credits. A split bill's
+    // return lowered it by the part not paid out in cash.
+    const returnRows = await prisma.saleReturn.findMany({
+      where: { sale: { customerId: idNum, paymentType: { in: ['Credit', 'Split'] } } },
+      select: { id: true, returnNo: true, originalInvoiceNo: true, refundAmount: true, refundCash: true, createdAt: true, sale: { select: { paymentType: true } } },
       orderBy: { id: 'desc' }
     });
+    const returns = returnRows
+      .map(r => ({ ...r, khataAmount: r.sale?.paymentType === 'Split' ? Math.round((r.refundAmount - (r.refundCash ?? 0)) * 100) / 100 : r.refundAmount }))
+      .filter(r => r.khataAmount > 0);
 
     res.json({
       customer: {
@@ -279,6 +285,7 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
         sale_date: s.saleDate,
         net_total: s.netTotal,
         payment_type: s.paymentType,
+        paid_credit: s.paidCredit,
         status: s.status,
         items_count: s._count.items
       })),
@@ -296,7 +303,7 @@ router.get('/api/customers/:id/ledger', async (req: Request, res: Response) => {
         id: r.id,
         return_no: r.returnNo,
         invoice_no: r.originalInvoiceNo,
-        refund_amount: r.refundAmount,
+        refund_amount: r.khataAmount,
         created_at: r.createdAt
       }))
     });
